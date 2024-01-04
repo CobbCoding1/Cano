@@ -139,7 +139,7 @@ int main(void) {
                     Row *next = &buffer.rows[buffer.row_index+1]; 
                     shift_str(next->contents, &next->size, 
                                 cur->contents, &cur->size, buffer.cur_pos);
-                    buffer.rows[buffer.row_index].contents[buffer.rows[buffer.row_index].size-1] = '\n';
+                    cur->contents[cur->size-1] = '\n';
                     buffer.row_index++; 
                     buffer.row_s++;
                     buffer.cur_pos = 0;
