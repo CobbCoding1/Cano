@@ -60,11 +60,10 @@ void shift_rows(Buffer *buf, size_t index) {
     buf->row_s++;
 }
 
-void shift_str(Buffer *buf, size_t dest_index, size_t *dest_s, size_t *str_s, size_t index) {
+void shift_str(Buffer *buf, size_t dest_index, size_t *str_s, size_t index) {
     assert(index < MAX_STRING_SIZE);
     assert(dest_index > 0);
-    *dest_s = (*str_s - index);
-    size_t final_s = *dest_s;
+    size_t final_s = *str_s - index;
     char *temp = calloc(final_s, sizeof(char));
     for(size_t i = index; i < *str_s; i++) {
         temp[i % index] = buf->rows[dest_index-1].contents[i];
@@ -157,8 +156,7 @@ int main(void) {
                     keypad(stdscr, TRUE);
                 } else if(ch == ENTER) {
                     Row *cur = &buffer.rows[buffer.row_index]; 
-                    Row *next = &buffer.rows[buffer.row_index+1]; 
-                    shift_str(&buffer, buffer.row_index+1, &next->size, 
+                    shift_str(&buffer, buffer.row_index+1,
                                 &cur->size, buffer.cur_pos);
                     buffer.row_index++; 
                     buffer.cur_pos = 0;
