@@ -15,15 +15,17 @@ typedef enum {
     INSERT,
 } Mode;
 
+#define MAX_STRING_SIZE 1025
+
 typedef struct {
     size_t index;
     size_t size;
     char *contents;
 } Row;
 
+#define MAX_ROWS 1024
 typedef struct {
-    char *buf;
-    Row rows[1024];
+    Row rows[MAX_ROWS];
     size_t row_index;
     size_t cur_pos;
     size_t row_s;
@@ -46,15 +48,33 @@ char *stringify_mode() {
     }
 }
 
-#define MAX_STRING_SIZE 1024
-
-void shift_str(char *dest, size_t *dest_s, char *str, size_t *str_s, size_t index) {
-    assert(index < MAX_STRING_SIZE);
-    *dest_s = (*str_s - index);
-    for(size_t i = index; i < *str_s; i++) {
-        dest[i % index] = str[i];
+void shift_rows(Buffer *buf, size_t index) {
+    assert(buf->row_s+1 < MAX_ROWS);
+    char *new = calloc(MAX_STRING_SIZE, sizeof(char));
+    for(size_t i = buf->row_s+1; i > index; i--) {
+        buf->rows[i] = buf->rows[i-1];
     }
-    *str_s = index+1;
+    buf->rows[index] = (Row){0};
+    buf->rows[index].contents = new;
+    buf->rows[index].index = index;
+    buf->row_s++;
+}
+
+void shift_str(Buffer *buf, size_t dest_index, size_t *dest_s, size_t *str_s, size_t index) {
+    assert(index < MAX_STRING_SIZE);
+    assert(dest_index > 0);
+    *dest_s = (*str_s - index);
+    size_t final_s = *dest_s;
+    char *temp = calloc(final_s, sizeof(char));
+    for(size_t i = index; i < *str_s; i++) {
+        temp[i % index] = buf->rows[dest_index-1].contents[i];
+        buf->rows[dest_index-1].contents[i] = '\0';
+    }
+    shift_rows(buf, dest_index);
+    strncpy(buf->rows[dest_index].contents, temp, sizeof(char)*final_s);
+    buf->rows[dest_index].size = final_s;
+    *str_s = index;
+    free(temp);
 }
 
 int main(void) {
@@ -85,7 +105,7 @@ int main(void) {
         mvprintw(row-1, col/2, "%.3zu:%.3zu", buffer.row_index, buffer.cur_pos);
         
         for(size_t i = 0; i <= buffer.row_s; i++) {
-            mvprintw(i, 0, buffer.rows[i].contents);
+            mvprintw(i, 0, "%s", buffer.rows[i].contents);
         }
 
         move(y, x);
@@ -106,6 +126,7 @@ int main(void) {
                     FILE *file = fopen("out.txt", "w"); 
                     for(size_t i = 0; i <= buffer.row_s; i++ ) {
                         fwrite(buffer.rows[i].contents, buffer.rows[i].size, 1, file);
+                        fwrite("\n", sizeof("\n")-1, 1, file);
                     }
                     fclose(file);
                     QUIT = 1;
@@ -137,11 +158,9 @@ int main(void) {
                 } else if(ch == ENTER) {
                     Row *cur = &buffer.rows[buffer.row_index]; 
                     Row *next = &buffer.rows[buffer.row_index+1]; 
-                    shift_str(next->contents, &next->size, 
-                                cur->contents, &cur->size, buffer.cur_pos);
-                    cur->contents[cur->size-1] = '\n';
+                    shift_str(&buffer, buffer.row_index+1, &next->size, 
+                                &cur->size, buffer.cur_pos);
                     buffer.row_index++; 
-                    buffer.row_s++;
                     buffer.cur_pos = 0;
                     move(buffer.row_index, buffer.cur_pos);
                 } else {
