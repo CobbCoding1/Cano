@@ -10,13 +10,18 @@ Dependencies: CC, ncurses
 ```
 
 ## Keybinds
-'ctrl + q' - Exit, global keybind, regardless of mode.
-### Normal Mode
-'h', 'j', 'k', 'l' - Movement. \
-'x' - Delete character. \
-'d' - Delete entire line. \
-'i' - Enter insert mode. \
-'ctrl + s' - Save and exit. \
+| Keybind  | Action                    |
+|----------|---------------------------|
+| Ctrl + Q | Quit (regardless of mode) |
+| h        | Move left                 |
+| j        | Move down                 |
+| k        | Move up                   |
+| l        | Move right                |
+| x        | Delete character          |
+| d        | Delete entire line        |
+| i        | Enter insert mode         |
+| Ctrl + S | Save and exit             |
+
 
 ### Insert Mode
 'esc' - Exit insert mode, return to normal mode.
