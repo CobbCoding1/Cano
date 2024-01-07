@@ -181,25 +181,41 @@ int main(int argc, char *argv[]) {
         ch = getch();
         switch(mode) {
             case NORMAL:
-                if(ch == 'i') {
-                    mode = INSERT;
-                    keypad(stdscr, FALSE);
-                } else if(ch == 'h') {
-                    if(buffer.cur_pos != 0) buffer.cur_pos--;
-                } else if(ch == 'l') {
-                    buffer.cur_pos++;
-                } else if(ch == 'k') {
-                    if(buffer.row_index != 0) buffer.row_index--;
-                } else if(ch == 'j') {
-                    if(buffer.row_index < buffer.row_s) buffer.row_index++;
-                } else if(ch == ctrl('s')) {
-                    FILE *file = fopen("out.txt", "w"); 
-                    for(size_t i = 0; i <= buffer.row_s; i++ ) {
-                        fwrite(buffer.rows[i].contents, buffer.rows[i].size, 1, file);
-                        fwrite("\n", sizeof("\n")-1, 1, file);
-                    }
-                    fclose(file);
-                    QUIT = 1;
+                switch(ch) {
+                    case 'i':
+                        mode = INSERT;
+                        keypad(stdscr, FALSE);
+                        break;
+                    case 'h':
+                        if(buffer.cur_pos != 0) buffer.cur_pos--;
+                        break;
+                    case 'j':
+                        if(buffer.row_index < buffer.row_s) buffer.row_index++;
+                        break;
+                    case 'k':
+                        if(buffer.row_index != 0) buffer.row_index--;
+                        break;
+                    case 'l':
+                        buffer.cur_pos++;
+                        break;
+                    case 'x':
+                        Row *cur = &buffer.rows[buffer.row_index];
+                        if(cur->size > 0) {
+                            shift_row_left(cur, buffer.cur_pos);
+                            move(y, buffer.cur_pos);
+                        }
+                        break;
+                    case ctrl('s'):
+                        FILE *file = fopen("out.txt", "w"); 
+                        for(size_t i = 0; i <= buffer.row_s; i++ ) {
+                            fwrite(buffer.rows[i].contents, buffer.rows[i].size, 1, file);
+                            fwrite("\n", sizeof("\n")-1, 1, file);
+                        }
+                        fclose(file);
+                        QUIT = 1;
+                        break;
+                    default:
+                        continue;
                 }
                 if(buffer.cur_pos > buffer.rows[buffer.row_index].size) buffer.cur_pos = buffer.rows[buffer.row_index].size;
                 x = buffer.cur_pos;
