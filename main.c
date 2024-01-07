@@ -76,7 +76,6 @@ void append_rows(Row *a, Row *b) {
         a->contents[(i + a->size)] = b->contents[i];
     }
     a->size = a->size + b->size;
-    //mvprintw(10, 10, "%s, %zu %zu", a->contents, a->size, b->size);
 }
 
 void shift_str_left(Buffer *buf, size_t index) {
@@ -89,10 +88,12 @@ void shift_str_right(Buffer *buf, size_t dest_index, size_t *str_s, size_t index
     assert(dest_index > 0);
     size_t final_s = *str_s - index;
     char *temp = calloc(final_s, sizeof(char));
+    size_t temp_len = 0;
     for(size_t i = index; i < *str_s; i++) {
-        temp[i % index] = buf->rows[dest_index-1].contents[i];
+        temp[temp_len++] = buf->rows[dest_index-1].contents[i];
         buf->rows[dest_index-1].contents[i] = '\0';
     }
+    mvprintw(20, 20, "%zu, %zu, %zu, %s, %zu", final_s, *str_s, index, temp, temp_len);
     shift_rows_right(buf, dest_index);
     strncpy(buf->rows[dest_index].contents, temp, sizeof(char)*final_s);
     buf->rows[dest_index].size = final_s;
@@ -192,7 +193,9 @@ int main(void) {
                 } else {
                     Row *cur = &buffer.rows[buffer.row_index];
                     cur->contents[buffer.cur_pos++] = ch;
-                    cur->size = buffer.cur_pos;
+                    if(buffer.cur_pos >= cur->size) {
+                        cur->size++;
+                    }
                     move(y, buffer.cur_pos);
                 }
                 break;
