@@ -110,13 +110,18 @@ void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t in
 }
 
 void read_file_to_buffer(Buffer *buffer, char *filename) {
-    FILE *file = fopen(filename, "r");
+    FILE *file = fopen(filename, "a+");
+    if(file == NULL) {
+        endwin();
+        fprintf(stderr, "error: could not open file %s\n", filename);
+        exit(1);
+    }
     fseek(file, 0, SEEK_END);
     size_t length = ftell(file);
     fseek(file, 0, SEEK_SET);
     char *buf = malloc(sizeof(char)*length);
     fread(buf, sizeof(char)*length, 1, file);
-    for(size_t i = 0; i < length-1; i++) {
+    for(size_t i = 0; i+1 < length; i++) {
         if(buf[i] == '\n') {
             buffer->row_s++;
             continue;
@@ -127,11 +132,11 @@ void read_file_to_buffer(Buffer *buffer, char *filename) {
 
 int main(int argc, char *argv[]) {
     char *program = argv[0];
-    if(argc < 2) {
-        fprintf(stderr, "usage: %s <filename>\n", program);
-        exit(1);
+    (void)program;
+    char *filename = NULL;
+    if(argc > 1) {
+        filename = argv[1];
     }
-    char *filename = argv[1];
     initscr();
     raw();
     keypad(stdscr, TRUE);
@@ -141,7 +146,7 @@ int main(int argc, char *argv[]) {
     for(size_t i = 0; i < 1024; i++) {
         buffer.rows[i].contents = calloc(MAX_STRING_SIZE, sizeof(char));
     }
-    read_file_to_buffer(&buffer, filename);
+    if(filename != NULL) read_file_to_buffer(&buffer, filename);
 
     int row, col;
     getmaxyx(stdscr, row, col);
