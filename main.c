@@ -48,6 +48,7 @@ char *stringify_mode() {
     }
 }
 
+// shift_rows_* functions shift the entire array of rows
 void shift_rows_left(Buffer *buf, size_t index) {
     assert(buf->row_s+1 < MAX_ROWS);
     for(size_t i = index; i < buf->row_s; i++) {
@@ -68,6 +69,14 @@ void shift_rows_right(Buffer *buf, size_t index) {
     buf->rows[index].index = index;
     buf->row_s++;
 }
+
+// shift_row_* functions shift single row
+void shift_row_left(Row *row, size_t index) {
+    for(size_t i = index; i < row->size; i++) {
+        row->contents[i] = row->contents[i+1];
+    }
+    row->size--;  
+}
 #define NO_CLEAR_
 
 void append_rows(Row *a, Row *b) {
@@ -78,12 +87,12 @@ void append_rows(Row *a, Row *b) {
     a->size = a->size + b->size;
 }
 
-void shift_str_left(Buffer *buf, size_t index) {
+void delete_and_append_row(Buffer *buf, size_t index) {
     append_rows(&buf->rows[index-1], &buf->rows[index]);
     shift_rows_left(buf, index); 
 }
 
-void shift_str_right(Buffer *buf, size_t dest_index, size_t *str_s, size_t index) {
+void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t index) {
     assert(index < MAX_STRING_SIZE);
     assert(dest_index > 0);
     size_t final_s = *str_s - index;
@@ -93,7 +102,6 @@ void shift_str_right(Buffer *buf, size_t dest_index, size_t *str_s, size_t index
         temp[temp_len++] = buf->rows[dest_index-1].contents[i];
         buf->rows[dest_index-1].contents[i] = '\0';
     }
-    mvprintw(20, 20, "%zu, %zu, %zu, %s, %zu", final_s, *str_s, index, temp, temp_len);
     shift_rows_right(buf, dest_index);
     strncpy(buf->rows[dest_index].contents, temp, sizeof(char)*final_s);
     buf->rows[dest_index].size = final_s;
@@ -172,12 +180,11 @@ int main(void) {
                             Row *cur = &buffer.rows[--buffer.row_index];
                             buffer.cur_pos = cur->size;
                             move(buffer.row_index, buffer.cur_pos);
-                            shift_str_left(&buffer, cur->index+1);
+                            delete_and_append_row(&buffer, cur->index+1);
                         }
                     } else {
                         Row *cur = &buffer.rows[buffer.row_index];
-                        cur->contents[--buffer.cur_pos] = ' ';
-                        cur->size = cur->size-1;
+                        shift_row_left(cur, --buffer.cur_pos);
                         move(y, buffer.cur_pos);
                     }
                 } else if(ch == ESCAPE) {
@@ -185,7 +192,7 @@ int main(void) {
                     keypad(stdscr, TRUE);
                 } else if(ch == ENTER) {
                     Row *cur = &buffer.rows[buffer.row_index]; 
-                    shift_str_right(&buffer, buffer.row_index+1,
+                    create_and_cut_row(&buffer, buffer.row_index+1,
                                 &cur->size, buffer.cur_pos);
                     buffer.row_index++; 
                     buffer.cur_pos = 0;
