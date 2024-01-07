@@ -158,7 +158,7 @@ int main(int argc, char *argv[]) {
     int row, col;
     getmaxyx(stdscr, row, col);
 
-    mvprintw(row-1, 0, stringify_mode());
+    mvprintw(row-1, 0, "%.6s", stringify_mode());
     move(0, 0);
 
     int ch = 0;
@@ -170,7 +170,7 @@ int main(int argc, char *argv[]) {
 #endif
         getmaxyx(stdscr, row, col);
         refresh();
-        mvprintw(row-1, 0, stringify_mode());
+        mvprintw(row-1, 0, "%.6s", stringify_mode());
         mvprintw(row-1, col/2, "%.3zu:%.3zu", buffer.row_index, buffer.cur_pos);
         
         for(size_t i = 0; i <= buffer.row_s; i++) {
@@ -198,14 +198,21 @@ int main(int argc, char *argv[]) {
                     case 'l':
                         buffer.cur_pos++;
                         break;
-                    case 'x':
+                    case 'x': {
                         Row *cur = &buffer.rows[buffer.row_index];
                         if(cur->size > 0) {
                             shift_row_left(cur, buffer.cur_pos);
                             move(y, buffer.cur_pos);
                         }
-                        break;
-                    case ctrl('s'):
+                    } break;
+                    case 'd': {
+                        Row *cur = &buffer.rows[buffer.row_index];
+                        cur->size = 0;
+                        if(buffer.row_index == buffer.row_s) buffer.row_index--;
+                        shift_rows_left(&buffer, cur->index);
+                        mvprintw(20, 20, "%zu", buffer.row_s);
+                    } break;
+                    case ctrl('s'): {
                         FILE *file = fopen("out.txt", "w"); 
                         for(size_t i = 0; i <= buffer.row_s; i++ ) {
                             fwrite(buffer.rows[i].contents, buffer.rows[i].size, 1, file);
@@ -213,7 +220,7 @@ int main(int argc, char *argv[]) {
                         }
                         fclose(file);
                         QUIT = 1;
-                        break;
+                    } break;
                     default:
                         continue;
                 }
