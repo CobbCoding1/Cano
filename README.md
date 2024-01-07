@@ -18,7 +18,7 @@ Dependencies: CC, ncurses
 'i' - Enter insert mode. \
 'ctrl + s' - Save and exit. \
 
-## Insert Mode
+### Insert Mode
 'esc' - Exit insert mode, return to normal mode.
 The rest of it works like a regular editor as you would expect.
 
