@@ -48,7 +48,16 @@ char *stringify_mode() {
     }
 }
 
-void shift_rows(Buffer *buf, size_t index) {
+void shift_rows_left(Buffer *buf, size_t index) {
+    assert(buf->row_s+1 < MAX_ROWS);
+    for(size_t i = index; i < buf->row_s; i++) {
+        buf->rows[i] = buf->rows[i+1];
+    }
+    buf->rows[buf->row_s].size = 0;
+    buf->row_s--;
+}
+
+void shift_rows_right(Buffer *buf, size_t index) {
     assert(buf->row_s+1 < MAX_ROWS);
     char *new = calloc(MAX_STRING_SIZE, sizeof(char));
     for(size_t i = buf->row_s+1; i > index; i--) {
@@ -59,8 +68,23 @@ void shift_rows(Buffer *buf, size_t index) {
     buf->rows[index].index = index;
     buf->row_s++;
 }
+#define NO_CLEAR_
 
-void shift_str(Buffer *buf, size_t dest_index, size_t *str_s, size_t index) {
+void append_rows(Row *a, Row *b) {
+    assert(a->size + b->size < MAX_STRING_SIZE);
+    for(size_t i = 0; i < b->size; i++) {
+        a->contents[(i + a->size)] = b->contents[i];
+    }
+    a->size = a->size + b->size;
+    //mvprintw(10, 10, "%s, %zu %zu", a->contents, a->size, b->size);
+}
+
+void shift_str_left(Buffer *buf, size_t index) {
+    append_rows(&buf->rows[index-1], &buf->rows[index]);
+    shift_rows_left(buf, index); 
+}
+
+void shift_str_right(Buffer *buf, size_t dest_index, size_t *str_s, size_t index) {
     assert(index < MAX_STRING_SIZE);
     assert(dest_index > 0);
     size_t final_s = *str_s - index;
@@ -69,7 +93,7 @@ void shift_str(Buffer *buf, size_t dest_index, size_t *str_s, size_t index) {
         temp[i % index] = buf->rows[dest_index-1].contents[i];
         buf->rows[dest_index-1].contents[i] = '\0';
     }
-    shift_rows(buf, dest_index);
+    shift_rows_right(buf, dest_index);
     strncpy(buf->rows[dest_index].contents, temp, sizeof(char)*final_s);
     buf->rows[dest_index].size = final_s;
     *str_s = index;
@@ -97,7 +121,9 @@ int main(void) {
 
     size_t x, y = 0;
     while(ch != ctrl('q') && QUIT != 1) {
+#ifndef NO_CLEAR
         clear();
+#endif
         getmaxyx(stdscr, row, col);
         refresh();
         mvprintw(row-1, 0, stringify_mode());
@@ -113,6 +139,7 @@ int main(void) {
             case NORMAL:
                 if(ch == 'i') {
                     mode = INSERT;
+                    keypad(stdscr, FALSE);
                 } else if(ch == 'h') {
                     if(buffer.cur_pos != 0) buffer.cur_pos--;
                 } else if(ch == 'l') {
@@ -144,11 +171,12 @@ int main(void) {
                             Row *cur = &buffer.rows[--buffer.row_index];
                             buffer.cur_pos = cur->size;
                             move(buffer.row_index, buffer.cur_pos);
+                            shift_str_left(&buffer, cur->index+1);
                         }
                     } else {
                         Row *cur = &buffer.rows[buffer.row_index];
                         cur->contents[--buffer.cur_pos] = ' ';
-                        cur->size = buffer.cur_pos;
+                        cur->size = cur->size-1;
                         move(y, buffer.cur_pos);
                     }
                 } else if(ch == ESCAPE) {
@@ -156,7 +184,7 @@ int main(void) {
                     keypad(stdscr, TRUE);
                 } else if(ch == ENTER) {
                     Row *cur = &buffer.rows[buffer.row_index]; 
-                    shift_str(&buffer, buffer.row_index+1,
+                    shift_str_right(&buffer, buffer.row_index+1,
                                 &cur->size, buffer.cur_pos);
                     buffer.row_index++; 
                     buffer.cur_pos = 0;
