@@ -3,7 +3,7 @@ Cano is a text editor written in C using the ncurses library.
 It is a modal-based editor, based heavily on VIM. 
 
 ![Cano icon](cano.png)
-icon from (LocalTexan)[https://github.com/LocalTexan]
+icon from [LocalTexan](https://github.com/LocalTexan)
 
 ## Quick Start
 Dependencies: CC, ncurses
