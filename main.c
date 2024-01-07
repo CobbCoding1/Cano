@@ -77,6 +77,13 @@ void shift_row_left(Row *row, size_t index) {
     }
     row->size--;  
 }
+
+void shift_row_right(Row *row, size_t index) {
+    row->size++;  
+    for(size_t i = row->size; i > index; i--) {
+        row->contents[i] = row->contents[i-1];
+    }
+}
 #define NO_CLEAR_
 
 void append_rows(Row *a, Row *b) {
@@ -227,10 +234,8 @@ int main(int argc, char *argv[]) {
                     move(buffer.row_index, buffer.cur_pos);
                 } else {
                     Row *cur = &buffer.rows[buffer.row_index];
+                    shift_row_right(cur, buffer.cur_pos);
                     cur->contents[buffer.cur_pos++] = ch;
-                    if(buffer.cur_pos >= cur->size) {
-                        cur->size++;
-                    }
                     move(y, buffer.cur_pos);
                 }
                 break;
