@@ -139,6 +139,35 @@ void read_file_to_buffer(Buffer *buffer, char *filename) {
     }
 }
 
+typedef struct {
+    char brace;
+    int closing;
+} Brace;
+
+Brace find_opposite_brace(char opening) {
+    switch(opening) {
+        case '(':
+            return (Brace){.brace = ')', .closing = 0};
+            break;
+        case '{':
+            return (Brace){.brace = '}', .closing = 0};
+            break;
+        case '[':
+            return (Brace){.brace = ']', .closing = 0};
+            break;
+        case ')':
+            return (Brace){.brace = '(', .closing = 1};
+            break;
+        case '}':
+            return (Brace){.brace = '{', .closing = 1};
+            break;
+        case ']':
+            return (Brace){.brace = '[', .closing = 1};
+            break;
+    }
+    return (Brace){.brace = '0'};
+}
+
 int main(int argc, char *argv[]) {
     char *program = argv[0];
     (void)program;
@@ -215,9 +244,91 @@ int main(int argc, char *argv[]) {
                         shift_rows_left(&buffer, cur->index);
                         mvprintw(20, 20, "%zu", buffer.row_s);
                     } break;
+                    case 'g':
+                        buffer.row_index = 0;
+                        break;
+                    case 'G':
+                        buffer.row_index = buffer.row_s;
+                        break;
+                    case '0':
+                        buffer.cur_pos = 0;
+                        break;
+                    case '$':
+                        buffer.cur_pos = buffer.rows[buffer.row_index].size;
+                        break;
+                    case 'e': {
+                        Row *cur = &buffer.rows[buffer.row_index];
+                        if(cur->contents[buffer.cur_pos+1] == ' ') buffer.cur_pos++;
+                        while(cur->contents[buffer.cur_pos+1] != ' ' && buffer.cur_pos+1 < cur->size) {
+                            buffer.cur_pos++;
+                        }
+                    } break;
+                    case 'b': {
+                        Row *cur = &buffer.rows[buffer.row_index];
+                        if(cur->contents[buffer.cur_pos-1] == ' ') buffer.cur_pos--;
+                        while(cur->contents[buffer.cur_pos-1] != ' ' && buffer.cur_pos > 0) {
+                            buffer.cur_pos--;
+                        }
+                    } break;
+                    case 'w': {
+                        Row *cur = &buffer.rows[buffer.row_index];
+                        if(cur->contents[buffer.cur_pos-1] == ' ') buffer.cur_pos++;
+                        while(cur->contents[buffer.cur_pos-1] != ' ' && buffer.cur_pos < cur->size) {
+                            buffer.cur_pos++;
+                        }
+                    } break;
+                    case '%': {
+                        Row *cur = &buffer.rows[buffer.row_index];
+                        Brace opposite = find_opposite_brace(cur->contents[buffer.cur_pos]);
+                        char brace_stack[64] = {0};
+                        size_t brace_stack_s = 0;
+                        if(opposite.brace == '0') break;
+                        if(opposite.closing) {
+                            int posx = buffer.cur_pos;
+                            int posy = buffer.row_index;
+                            while(posy >= 0) {
+                                posx--;
+                                if(posx < 0) {
+                                    cur = &buffer.rows[--posy];
+                                    posx = cur->size;
+                                }
+                                Brace new_brace = find_opposite_brace(cur->contents[posx]);
+                                if(new_brace.brace != '0' && new_brace.closing) brace_stack[brace_stack_s++] = new_brace.brace;
+                                if(new_brace.brace != '0' && !new_brace.closing) {
+                                    if(brace_stack_s == 0) break;
+                                    brace_stack[--brace_stack_s] = new_brace.brace;
+                                }
+                            }
+                            if(posx >= 0 && posy >= 0) {
+                                buffer.cur_pos = posx;
+                                buffer.row_index = posy;
+                            }
+                            break;
+                        }
+                        size_t initial_x = buffer.cur_pos;
+                        size_t initial_y = buffer.row_index;
+                        while(buffer.row_index <= buffer.row_s) {
+                            buffer.cur_pos++;
+                            if(buffer.cur_pos > cur->size) {
+                                cur = &buffer.rows[++buffer.row_index];
+                                buffer.cur_pos = 0;
+                            }
+                            Brace new_brace = find_opposite_brace(cur->contents[buffer.cur_pos]);
+                            if(new_brace.brace != '0' && !new_brace.closing) brace_stack[brace_stack_s++] = new_brace.brace;
+                            if(new_brace.brace != '0' && new_brace.closing) {
+                                if(brace_stack_s == 0) break;
+                                brace_stack[--brace_stack_s] = new_brace.brace;
+                            }
+                        }
+                        if(buffer.row_index > buffer.row_s) {
+                            buffer.row_index = initial_y;
+                            buffer.cur_pos = initial_x;
+                        }
+                        break;
+                    }
                     case ctrl('s'): {
                         FILE *file = fopen(buffer.filename, "w"); 
-                        for(size_t i = 0; i <= buffer.row_s; i++ ) {
+                        for(size_t i = 0; i <= buffer.row_s; i++) {
                             fwrite(buffer.rows[i].contents, buffer.rows[i].size, 1, file);
                             fwrite("\n", sizeof("\n")-1, 1, file);
                         }
