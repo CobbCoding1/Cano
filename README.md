@@ -14,7 +14,7 @@ Dependencies: CC, ncurses
 
 ## Keybinds
 |Mode  | Keybind  | Action                    |
-|      |----------|---------------------------|
+|------|----------|---------------------------|
 |Global| Ctrl + Q | Quit (regardless of mode) |
 |Normal| h        | Move left                 |
 |Normal| j        | Move down                 |
