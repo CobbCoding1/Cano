@@ -239,10 +239,12 @@ int main(int argc, char *argv[]) {
                     } break;
                     case 'd': {
                         Row *cur = &buffer.rows[buffer.row_index];
+                        memset(cur->contents, 0, cur->size);
                         cur->size = 0;
-                        if(buffer.row_index == buffer.row_s) buffer.row_index--;
-                        shift_rows_left(&buffer, cur->index);
-                        mvprintw(20, 20, "%zu", buffer.row_s);
+                        if(buffer.row_s != 0) {
+                            if(buffer.row_index == buffer.row_s) buffer.row_index--;
+                            shift_rows_left(&buffer, cur->index);
+                        }
                     } break;
                     case 'g':
                         buffer.row_index = 0;
