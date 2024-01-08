@@ -386,6 +386,11 @@ int main(int argc, char *argv[]) {
                     Row *cur = &buffer.rows[buffer.row_index];
                     shift_row_right(cur, buffer.cur_pos);
                     cur->contents[buffer.cur_pos++] = ch;
+                    Brace next_ch = find_opposite_brace(ch); 
+                    if(next_ch.brace != '0' && !next_ch.closing) {
+                        shift_row_right(cur, buffer.cur_pos);
+                        cur->contents[buffer.cur_pos] = next_ch.brace;
+                    } 
                     wmove(main_win, y, buffer.cur_pos);
                 }
                 break;
