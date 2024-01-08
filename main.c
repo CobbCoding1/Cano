@@ -29,6 +29,7 @@ typedef struct {
     size_t row_index;
     size_t cur_pos;
     size_t row_s;
+    char *filename;
 } Buffer;
 
 Mode mode = NORMAL;
@@ -117,6 +118,7 @@ void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t in
 }
 
 void read_file_to_buffer(Buffer *buffer, char *filename) {
+    buffer->filename = filename;
     FILE *file = fopen(filename, "a+");
     if(file == NULL) {
         endwin();
@@ -154,6 +156,7 @@ int main(int argc, char *argv[]) {
         buffer.rows[i].contents = calloc(MAX_STRING_SIZE, sizeof(char));
     }
     if(filename != NULL) read_file_to_buffer(&buffer, filename);
+    else buffer.filename = "out.txt";
 
     int row, col;
     getmaxyx(stdscr, row, col);
@@ -213,7 +216,7 @@ int main(int argc, char *argv[]) {
                         mvprintw(20, 20, "%zu", buffer.row_s);
                     } break;
                     case ctrl('s'): {
-                        FILE *file = fopen("out.txt", "w"); 
+                        FILE *file = fopen(buffer.filename, "w"); 
                         for(size_t i = 0; i <= buffer.row_s; i++ ) {
                             fwrite(buffer.rows[i].contents, buffer.rows[i].size, 1, file);
                             fwrite("\n", sizeof("\n")-1, 1, file);
