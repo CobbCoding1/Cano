@@ -176,8 +176,17 @@ int main(int argc, char *argv[]) {
         filename = argv[1];
     }
     initscr();
+    int grow, gcol;
+    getmaxyx(stdscr, grow, gcol);
     raw();
-    keypad(stdscr, TRUE);
+    WINDOW *main_win = newwin(grow*0.95, gcol, 0, 0);
+
+    int row, col;
+    getmaxyx(main_win, row, col);
+
+    WINDOW *status_bar = newwin(grow*0.05, gcol, grow-1, 0);
+    refresh();
+    keypad(main_win, TRUE);
     noecho();
 
     Buffer buffer = {0};
@@ -187,36 +196,36 @@ int main(int argc, char *argv[]) {
     if(filename != NULL) read_file_to_buffer(&buffer, filename);
     else buffer.filename = "out.txt";
 
-    int row, col;
-    getmaxyx(stdscr, row, col);
-
-    mvprintw(row-1, 0, "%.6s", stringify_mode());
-    move(0, 0);
+    getmaxyx(main_win, row, col);
+    mvwprintw(status_bar, 0, 0, "%.6s", stringify_mode());
+    wmove(main_win, 0, 0);
 
     int ch = 0;
 
-    size_t x, y = 0;
+    size_t x = 0; 
+    size_t y = 0;
     while(ch != ctrl('q') && QUIT != 1) {
 #ifndef NO_CLEAR
         clear();
 #endif
-        getmaxyx(stdscr, row, col);
-        refresh();
-        mvprintw(row-1, 0, "%.6s", stringify_mode());
-        mvprintw(row-1, col/2, "%.3zu:%.3zu", buffer.row_index, buffer.cur_pos);
+        getmaxyx(main_win, row, col);
+        wrefresh(main_win);
+        wrefresh(status_bar);
+        mvwprintw(status_bar, 0, 0, "%.6s", stringify_mode());
+        mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer.row_index, buffer.cur_pos);
         
         for(size_t i = 0; i <= buffer.row_s; i++) {
-            mvprintw(i, 0, "%s", buffer.rows[i].contents);
+            mvwprintw(main_win, i, 0, "%s", buffer.rows[i].contents);
         }
 
-        move(y, x);
-        ch = getch();
+        wmove(main_win, y, x);
+        ch = wgetch(main_win);
         switch(mode) {
             case NORMAL:
                 switch(ch) {
                     case 'i':
                         mode = INSERT;
-                        keypad(stdscr, FALSE);
+                        keypad(main_win, FALSE);
                         break;
                     case 'h':
                         if(buffer.cur_pos != 0) buffer.cur_pos--;
@@ -234,7 +243,7 @@ int main(int argc, char *argv[]) {
                         Row *cur = &buffer.rows[buffer.row_index];
                         if(cur->size > 0) {
                             shift_row_left(cur, buffer.cur_pos);
-                            move(y, buffer.cur_pos);
+                            wmove(main_win, y, buffer.cur_pos);
                         }
                     } break;
                     case 'd': {
@@ -343,44 +352,45 @@ int main(int argc, char *argv[]) {
                 if(buffer.cur_pos > buffer.rows[buffer.row_index].size) buffer.cur_pos = buffer.rows[buffer.row_index].size;
                 x = buffer.cur_pos;
                 y = buffer.row_index;
-                move(y, x);
+                wmove(main_win, y, x);
                 break;
             case INSERT: {
-                keypad(stdscr, FALSE);
+                keypad(main_win, FALSE);
                 if(ch == BACKSPACE) {
-                    getyx(stdscr, y, x);
+                    getyx(main_win, y, x);
                     if(buffer.cur_pos == 0) {
                         if(buffer.row_index != 0) {
                             Row *cur = &buffer.rows[--buffer.row_index];
                             buffer.cur_pos = cur->size;
-                            move(buffer.row_index, buffer.cur_pos);
+                            wmove(main_win, buffer.row_index, buffer.cur_pos);
                             delete_and_append_row(&buffer, cur->index+1);
                         }
                     } else {
                         Row *cur = &buffer.rows[buffer.row_index];
                         shift_row_left(cur, --buffer.cur_pos);
-                        move(y, buffer.cur_pos);
+                        wmove(main_win, y, buffer.cur_pos);
                     }
                 } else if(ch == ESCAPE) {
                     mode = NORMAL;
-                    keypad(stdscr, TRUE);
+                    keypad(main_win, TRUE);
                 } else if(ch == ENTER) {
                     Row *cur = &buffer.rows[buffer.row_index]; 
                     create_and_cut_row(&buffer, buffer.row_index+1,
                                 &cur->size, buffer.cur_pos);
                     buffer.row_index++; 
                     buffer.cur_pos = 0;
-                    move(buffer.row_index, buffer.cur_pos);
+                    wmove(main_win, buffer.row_index, buffer.cur_pos);
                 } else {
                     Row *cur = &buffer.rows[buffer.row_index];
                     shift_row_right(cur, buffer.cur_pos);
                     cur->contents[buffer.cur_pos++] = ch;
-                    move(y, buffer.cur_pos);
+                    wmove(main_win, y, buffer.cur_pos);
                 }
                 break;
              }
         }
-        getyx(stdscr, y, x);
+        getyx(main_win, y, x);
+        getmaxyx(stdscr, grow, gcol);
     }
 
     refresh();
