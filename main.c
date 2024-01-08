@@ -176,18 +176,25 @@ int main(int argc, char *argv[]) {
         filename = argv[1];
     }
     initscr();
+    if(has_colors() == FALSE) {
+        endwin();
+        fprintf(stderr, "error: you do not have colors in your terminal\n");
+        exit(1);
+    }
     int grow, gcol;
     getmaxyx(stdscr, grow, gcol);
     raw();
-    WINDOW *main_win = newwin(grow*0.95, gcol, 0, 0);
+    WINDOW *main_win = newwin(grow*0.95, gcol+5, 0, 5);
+    WINDOW *line_num_win = newwin(grow*0.95, 5, 0, 0);
 
     int row, col;
     getmaxyx(main_win, row, col);
     (void)row; (void)col;
 
-    WINDOW *status_bar = newwin(grow*0.05, gcol, grow-1, 0);
+    WINDOW *status_bar = newwin(grow*0.05, gcol, grow-2, 0);
     wrefresh(main_win);
     wrefresh(status_bar);
+    wrefresh(line_num_win);
     keypad(main_win, TRUE);
     noecho();
 
@@ -216,10 +223,22 @@ int main(int argc, char *argv[]) {
         mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer.row_index, buffer.cur_pos);
         
         for(size_t i = 0; i <= buffer.row_s; i++) {
+            start_color();
+            init_pair(1, COLOR_YELLOW, COLOR_BLACK);
+            wattron(line_num_win, COLOR_PAIR(1));
+            #define RELATIVE_NUMS
+#ifdef RELATIVE_NUMS
+            if(buffer.row_index == i) mvwprintw(line_num_win, i, 0, "%4zu", i+1);
+            else mvwprintw(line_num_win, i, 0, "%4zu", (size_t)abs((int)buffer.row_index-(int)i));
+#else
+            mvwprintw(line_num_win, i, 0, "%4zu", i+1);
+#endif
             mvwprintw(main_win, i, 0, "%s", buffer.rows[i].contents);
+            wattroff(line_num_win, COLOR_PAIR(1));
         }
         wrefresh(main_win);
         wrefresh(status_bar);
+        wrefresh(line_num_win);
 
         wmove(main_win, y, x);
         ch = wgetch(main_win);
@@ -402,6 +421,7 @@ int main(int argc, char *argv[]) {
 
     wrefresh(main_win);
     wrefresh(status_bar);
+    wrefresh(line_num_win);
     endwin();
     return 0;
 }
