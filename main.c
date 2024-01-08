@@ -183,9 +183,11 @@ int main(int argc, char *argv[]) {
 
     int row, col;
     getmaxyx(main_win, row, col);
+    (void)row; (void)col;
 
     WINDOW *status_bar = newwin(grow*0.05, gcol, grow-1, 0);
-    refresh();
+    wrefresh(main_win);
+    wrefresh(status_bar);
     keypad(main_win, TRUE);
     noecho();
 
@@ -206,17 +208,18 @@ int main(int argc, char *argv[]) {
     size_t y = 0;
     while(ch != ctrl('q') && QUIT != 1) {
 #ifndef NO_CLEAR
-        clear();
+        wclear(main_win);
+        wclear(status_bar);
 #endif
         getmaxyx(main_win, row, col);
-        wrefresh(main_win);
-        wrefresh(status_bar);
         mvwprintw(status_bar, 0, 0, "%.6s", stringify_mode());
         mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer.row_index, buffer.cur_pos);
         
         for(size_t i = 0; i <= buffer.row_s; i++) {
             mvwprintw(main_win, i, 0, "%s", buffer.rows[i].contents);
         }
+        wrefresh(main_win);
+        wrefresh(status_bar);
 
         wmove(main_win, y, x);
         ch = wgetch(main_win);
@@ -291,7 +294,6 @@ int main(int argc, char *argv[]) {
                     case '%': {
                         Row *cur = &buffer.rows[buffer.row_index];
                         Brace opposite = find_opposite_brace(cur->contents[buffer.cur_pos]);
-                        char brace_stack[64] = {0};
                         size_t brace_stack_s = 0;
                         if(opposite.brace == '0') break;
                         if(opposite.closing) {
@@ -304,10 +306,10 @@ int main(int argc, char *argv[]) {
                                     posx = cur->size;
                                 }
                                 Brace new_brace = find_opposite_brace(cur->contents[posx]);
-                                if(new_brace.brace != '0' && new_brace.closing) brace_stack[brace_stack_s++] = new_brace.brace;
+                                if(new_brace.brace != '0' && new_brace.closing) brace_stack_s++;
                                 if(new_brace.brace != '0' && !new_brace.closing) {
                                     if(brace_stack_s == 0) break;
-                                    brace_stack[--brace_stack_s] = new_brace.brace;
+                                    brace_stack_s--;
                                 }
                             }
                             if(posx >= 0 && posy >= 0) {
@@ -325,10 +327,10 @@ int main(int argc, char *argv[]) {
                                 buffer.cur_pos = 0;
                             }
                             Brace new_brace = find_opposite_brace(cur->contents[buffer.cur_pos]);
-                            if(new_brace.brace != '0' && !new_brace.closing) brace_stack[brace_stack_s++] = new_brace.brace;
+                            if(new_brace.brace != '0' && !new_brace.closing) brace_stack_s++;
                             if(new_brace.brace != '0' && new_brace.closing) {
                                 if(brace_stack_s == 0) break;
-                                brace_stack[--brace_stack_s] = new_brace.brace;
+                                brace_stack_s--;
                             }
                         }
                         if(buffer.row_index > buffer.row_s) {
@@ -393,7 +395,8 @@ int main(int argc, char *argv[]) {
         getmaxyx(stdscr, grow, gcol);
     }
 
-    refresh();
+    wrefresh(main_win);
+    wrefresh(status_bar);
     endwin();
     return 0;
 }
