@@ -254,7 +254,6 @@ int main(int argc, char *argv[]) {
                 switch(ch) {
                     case 'i':
                         mode = INSERT;
-                        keypad(main_win, TRUE);
                         break;
                     case 'h':
                         if(buffer.cur_pos != 0) buffer.cur_pos--;
@@ -383,7 +382,6 @@ int main(int argc, char *argv[]) {
                 wmove(main_win, y, x);
                 break;
             case INSERT: {
-                keypad(main_win, TRUE);
                 switch(ch) {
                     case BACKSPACE: {
                         getyx(main_win, y, x);
@@ -402,7 +400,6 @@ int main(int argc, char *argv[]) {
                     } break;
                     case ESCAPE:
                         mode = NORMAL;
-                        keypad(main_win, TRUE);
                         break;
                     case ENTER: {
                         Row *cur = &buffer.rows[buffer.row_index]; 
