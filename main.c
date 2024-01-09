@@ -6,12 +6,12 @@
 
 #define ctrl(x) ((x) & 0x1f)
 
-#define BACKSPACE 127 
-#define ESCAPE    27
-#define ENTER     10
-#define DOWN_ARROW 258 
-#define UP_ARROW 259 
-#define LEFT_ARROW 260 
+#define BACKSPACE   263 
+#define ESCAPE      27
+#define ENTER       10
+#define DOWN_ARROW  258 
+#define UP_ARROW    259 
+#define LEFT_ARROW  260 
 #define RIGHT_ARROW 261 
 
 typedef enum {
@@ -320,10 +320,10 @@ int main(int argc, char *argv[]) {
                         Row *cur = &buffer.rows[buffer.row_index];
                         Brace opposite = find_opposite_brace(cur->contents[buffer.cur_pos]);
                         size_t brace_stack_s = 0;
+                        int posx = buffer.cur_pos;
+                        int posy = buffer.row_index;
                         if(opposite.brace == '0') break;
                         if(opposite.closing) {
-                            int posx = buffer.cur_pos;
-                            int posy = buffer.row_index;
                             while(posy >= 0) {
                                 posx--;
                                 if(posx < 0) {
@@ -343,24 +343,22 @@ int main(int argc, char *argv[]) {
                             }
                             break;
                         }
-                        size_t initial_x = buffer.cur_pos;
-                        size_t initial_y = buffer.row_index;
-                        while(buffer.row_index <= buffer.row_s) {
-                            buffer.cur_pos++;
-                            if(buffer.cur_pos > cur->size) {
-                                cur = &buffer.rows[++buffer.row_index];
-                                buffer.cur_pos = 0;
+                        while((size_t)posy <= buffer.row_s) {
+                            posx++;
+                            if((size_t)posx > cur->size) {
+                                cur = &buffer.rows[++posy];
+                                posx = 0;
                             }
-                            Brace new_brace = find_opposite_brace(cur->contents[buffer.cur_pos]);
+                            Brace new_brace = find_opposite_brace(cur->contents[posx]);
                             if(new_brace.brace != '0' && !new_brace.closing) brace_stack_s++;
                             if(new_brace.brace != '0' && new_brace.closing) {
                                 if(brace_stack_s == 0) break;
                                 brace_stack_s--;
                             }
                         }
-                        if(buffer.row_index > buffer.row_s) {
-                            buffer.row_index = initial_y;
-                            buffer.cur_pos = initial_x;
+                        if(((size_t)posy <= buffer.row_s)) {
+                            buffer.row_index = posy;
+                            buffer.cur_pos = posx;
                         }
                         break;
                     }
@@ -419,6 +417,8 @@ int main(int argc, char *argv[]) {
                         break;
                     case RIGHT_ARROW:
                         if(buffer.cur_pos < buffer.rows[buffer.row_index].size) buffer.cur_pos++;
+                        break;
+                    case ctrl('s'):
                         break;
                     default: {
                         Row *cur = &buffer.rows[buffer.row_index];
