@@ -9,11 +9,17 @@
 #define BACKSPACE 127 
 #define ESCAPE    27
 #define ENTER     10
+#define DOWN_ARROW 258 
+#define UP_ARROW 259 
+#define LEFT_ARROW 260 
+#define RIGHT_ARROW 261 
 
 typedef enum {
     NORMAL,
     INSERT,
 } Mode;
+
+int ESCDELAY = 10;
 
 #define MAX_STRING_SIZE 1025
 
@@ -217,6 +223,7 @@ int main(int argc, char *argv[]) {
 #ifndef NO_CLEAR
         wclear(main_win);
         wclear(status_bar);
+        wclear(line_num_win);
 #endif
         getmaxyx(main_win, row, col);
         mvwprintw(status_bar, 0, 0, "%.6s", stringify_mode());
@@ -247,7 +254,7 @@ int main(int argc, char *argv[]) {
                 switch(ch) {
                     case 'i':
                         mode = INSERT;
-                        keypad(main_win, FALSE);
+                        keypad(main_win, TRUE);
                         break;
                     case 'h':
                         if(buffer.cur_pos != 0) buffer.cur_pos--;
@@ -376,45 +383,63 @@ int main(int argc, char *argv[]) {
                 wmove(main_win, y, x);
                 break;
             case INSERT: {
-                keypad(main_win, FALSE);
-                if(ch == BACKSPACE) {
-                    getyx(main_win, y, x);
-                    if(buffer.cur_pos == 0) {
-                        if(buffer.row_index != 0) {
-                            Row *cur = &buffer.rows[--buffer.row_index];
-                            buffer.cur_pos = cur->size;
-                            wmove(main_win, buffer.row_index, buffer.cur_pos);
-                            delete_and_append_row(&buffer, cur->index+1);
+                keypad(main_win, TRUE);
+                switch(ch) {
+                    case BACKSPACE: {
+                        getyx(main_win, y, x);
+                        if(buffer.cur_pos == 0) {
+                            if(buffer.row_index != 0) {
+                                Row *cur = &buffer.rows[--buffer.row_index];
+                                buffer.cur_pos = cur->size;
+                                wmove(main_win, buffer.row_index, buffer.cur_pos);
+                                delete_and_append_row(&buffer, cur->index+1);
+                            }
+                        } else {
+                            Row *cur = &buffer.rows[buffer.row_index];
+                            shift_row_left(cur, --buffer.cur_pos);
+                            wmove(main_win, y, buffer.cur_pos);
                         }
-                    } else {
+                    } break;
+                    case ESCAPE:
+                        mode = NORMAL;
+                        keypad(main_win, TRUE);
+                        break;
+                    case ENTER: {
+                        Row *cur = &buffer.rows[buffer.row_index]; 
+                        create_and_cut_row(&buffer, buffer.row_index+1,
+                                    &cur->size, buffer.cur_pos);
+                        buffer.row_index++; 
+                        buffer.cur_pos = 0;
+                    } break;
+                    case LEFT_ARROW:
+                        if(buffer.cur_pos != 0) buffer.cur_pos--;
+                        break;
+                    case DOWN_ARROW:
+                        if(buffer.row_index < buffer.row_s) buffer.row_index++;
+                        break;
+                    case UP_ARROW:
+                        if(buffer.row_index != 0) buffer.row_index--;
+                        break;
+                    case RIGHT_ARROW:
+                        if(buffer.cur_pos < buffer.rows[buffer.row_index].size) buffer.cur_pos++;
+                        break;
+                    default: {
                         Row *cur = &buffer.rows[buffer.row_index];
-                        shift_row_left(cur, --buffer.cur_pos);
-                        wmove(main_win, y, buffer.cur_pos);
-                    }
-                } else if(ch == ESCAPE) {
-                    mode = NORMAL;
-                    keypad(main_win, TRUE);
-                } else if(ch == ENTER) {
-                    Row *cur = &buffer.rows[buffer.row_index]; 
-                    create_and_cut_row(&buffer, buffer.row_index+1,
-                                &cur->size, buffer.cur_pos);
-                    buffer.row_index++; 
-                    buffer.cur_pos = 0;
-                    wmove(main_win, buffer.row_index, buffer.cur_pos);
-                } else {
-                    Row *cur = &buffer.rows[buffer.row_index];
-                    shift_row_right(cur, buffer.cur_pos);
-                    cur->contents[buffer.cur_pos++] = ch;
-                    Brace next_ch = find_opposite_brace(ch); 
-                    if(next_ch.brace != '0' && !next_ch.closing) {
                         shift_row_right(cur, buffer.cur_pos);
-                        cur->contents[buffer.cur_pos] = next_ch.brace;
-                    } 
-                    wmove(main_win, y, buffer.cur_pos);
+                        cur->contents[buffer.cur_pos++] = ch;
+                        Brace next_ch = find_opposite_brace(ch); 
+                        if(next_ch.brace != '0' && !next_ch.closing) {
+                            shift_row_right(cur, buffer.cur_pos);
+                            cur->contents[buffer.cur_pos] = next_ch.brace;
+                        } 
+                    } break;
                 }
-                break;
              }
         }
+        if(buffer.cur_pos > buffer.rows[buffer.row_index].size) buffer.cur_pos = buffer.rows[buffer.row_index].size;
+        x = buffer.cur_pos;
+        y = buffer.row_index;
+        wmove(main_win, y, x);
         getyx(main_win, y, x);
         getmaxyx(stdscr, grow, gcol);
     }
