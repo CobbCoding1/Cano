@@ -254,17 +254,19 @@ int main(int argc, char *argv[]) {
         if(buffer.row_index >= line_render_start+row) line_render_start = buffer.row_index-row+1;
         
         for(size_t i = line_render_start; i <= line_render_start+row; i++) {
-            size_t print_index = i - line_render_start;
-            wattron(line_num_win, COLOR_PAIR(LINE_NUMS));
-            if(relative_nums) {
-                if(buffer.row_index == print_index) mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
-                else mvwprintw(line_num_win, print_index, 0, "%4zu", (size_t)abs((int)buffer.row_index-(int)print_index));
-            } else {
-                mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
-            }
-            wattroff(line_num_win, COLOR_PAIR(LINE_NUMS));
+            if(i <= buffer.row_s) {
+                size_t print_index = i - line_render_start;
+                wattron(line_num_win, COLOR_PAIR(LINE_NUMS));
+                if(relative_nums) {
+                    if(buffer.row_index == print_index) mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
+                    else mvwprintw(line_num_win, print_index, 0, "%4zu", (size_t)abs((int)buffer.row_index-(int)print_index));
+                } else {
+                    mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
+                }
+                wattroff(line_num_win, COLOR_PAIR(LINE_NUMS));
 
-            mvwprintw(main_win, print_index, 0, "%s", buffer.rows[i].contents);
+                mvwprintw(main_win, print_index, 0, "%s", buffer.rows[i].contents);
+            }
         }
 
         wrefresh(main_win);
