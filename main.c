@@ -17,6 +17,7 @@
 typedef enum {
     NORMAL,
     INSERT,
+    COMMAND,
 } Mode;
 
 int ESCDELAY = 10;
@@ -52,10 +53,11 @@ char *stringify_mode() {
         case INSERT:
             return "INSERT";
             break;
-        default:
-            return "NORMAL";
+        case COMMAND:
+            return "COMMAND";
             break;
     }
+    return "NORMAL";
 }
 
 // shift_rows_* functions shift the entire array of rows
@@ -92,6 +94,20 @@ void shift_row_right(Row *row, size_t index) {
     row->size++;  
     for(size_t i = row->size; i > index; i--) {
         row->contents[i] = row->contents[i-1];
+    }
+}
+
+void shift_str_left(char *str, size_t *str_s, size_t index) {
+    for(size_t i = index; i < *str_s; i++) {
+        str[i] = str[i+1];
+    }
+    *str_s -= 1;
+}
+
+void shift_str_right(char *str, size_t *str_s, size_t index) {
+    *str_s += 1;
+    for(size_t i = *str_s; i > index; i--) {
+        str[i] = str[i-1];
     }
 }
 #define NO_CLEAR_
@@ -220,6 +236,7 @@ int main(int argc, char *argv[]) {
     wrefresh(status_bar);
     wrefresh(line_num_win);
     keypad(main_win, TRUE);
+    keypad(status_bar, TRUE);
     noecho();
 
     Buffer buffer = {0};
@@ -230,12 +247,14 @@ int main(int argc, char *argv[]) {
     else buffer.filename = "out.txt";
 
     getmaxyx(main_win, row, col);
-    mvwprintw(status_bar, 0, 0, "%.6s", stringify_mode());
+    mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
     wmove(main_win, 0, 0);
 
     int ch = 0;
 
     size_t line_render_start = 0;
+    char command[64] = {0};
+    size_t command_s = 0;
 
     size_t x = 0; 
     size_t y = 0;
@@ -247,7 +266,7 @@ int main(int argc, char *argv[]) {
 #endif
         getmaxyx(main_win, row, col);
         // status bar
-        mvwprintw(status_bar, 0, 0, "%.6s", stringify_mode());
+        mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
         mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer.row_index+1, buffer.cur_pos+1);
 
         if(buffer.row_index <= line_render_start) line_render_start = buffer.row_index;
@@ -266,6 +285,9 @@ int main(int argc, char *argv[]) {
                 wattroff(line_num_win, COLOR_PAIR(LINE_NUMS));
 
                 mvwprintw(main_win, print_index, 0, "%s", buffer.rows[i].contents);
+                if(mode == COMMAND) {
+                    mvwprintw(status_bar, 1, 0, ":%.*s", (int)command_s, command);
+                }
             }
         }
 
@@ -276,13 +298,21 @@ int main(int argc, char *argv[]) {
         y = buffer.row_index-line_render_start;
         x = buffer.cur_pos;
 
-        wmove(main_win, y, x);
-        ch = wgetch(main_win);
+        if(mode != COMMAND) {
+            wmove(main_win, y, x);
+            ch = wgetch(main_win);
+        } else {
+            wmove(status_bar, 1, buffer.cur_pos+1);
+            ch = wgetch(status_bar);
+        }
         switch(mode) {
             case NORMAL:
                 switch(ch) {
                     case 'i':
                         mode = INSERT;
+                        break;
+                    case ':':
+                        mode = COMMAND;
                         break;
                     case 'h':
                         if(buffer.cur_pos != 0) buffer.cur_pos--;
@@ -444,12 +474,43 @@ int main(int argc, char *argv[]) {
                         } 
                     } break;
                 }
-             }
+             } break;
+            case COMMAND: {
+                switch(ch) {
+                    case BACKSPACE: {
+                        if(buffer.cur_pos != 0) {
+                            shift_str_left(command, &command_s, --buffer.cur_pos);
+                            wmove(status_bar, 1, buffer.cur_pos);
+                        }
+                    } break;
+                    case ESCAPE:
+                        command_s = 0;
+                        mode = NORMAL;
+                        break;
+                    case ENTER: {
+                    } break;
+                    case LEFT_ARROW:
+                        if(buffer.cur_pos != 0) buffer.cur_pos--;
+                        break;
+                    case DOWN_ARROW:
+                        break;
+                    case UP_ARROW:
+                        break;
+                    case RIGHT_ARROW:
+                        if(buffer.cur_pos < command_s) buffer.cur_pos++;
+                        break;
+                    case ctrl('s'):
+                        break;
+                    default: {
+                        shift_str_right(command, &command_s, buffer.cur_pos);
+                        command[buffer.cur_pos++] = ch;
+                    } break;
+                }
+            } break;
         }
-        if(buffer.cur_pos > buffer.rows[buffer.row_index].size) buffer.cur_pos = buffer.rows[buffer.row_index].size;
+        if(mode != COMMAND && buffer.cur_pos > buffer.rows[buffer.row_index].size) buffer.cur_pos = buffer.rows[buffer.row_index].size;
         x = buffer.cur_pos;
         y = buffer.row_index;
-        wmove(main_win, y, x);
         getyx(main_win, y, x);
         getmaxyx(stdscr, grow, gcol);
     }
