@@ -164,6 +164,9 @@ Brace find_opposite_brace(char opening) {
         case '[':
             return (Brace){.brace = ']', .closing = 0};
             break;
+        case '<':
+            return (Brace){.brace = '>', .closing = 0};
+            break;
         case ')':
             return (Brace){.brace = '(', .closing = 1};
             break;
@@ -172,6 +175,9 @@ Brace find_opposite_brace(char opening) {
             break;
         case ']':
             return (Brace){.brace = '[', .closing = 1};
+            break;
+        case '>':
+            return (Brace){.brace = '<', .closing = 1};
             break;
     }
     return (Brace){.brace = '0'};
