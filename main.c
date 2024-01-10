@@ -21,6 +21,9 @@ typedef enum {
 
 int ESCDELAY = 10;
 
+// global config vars
+int relative_nums = 1;
+
 #define MAX_STRING_SIZE 1025
 
 typedef struct {
@@ -174,6 +177,10 @@ Brace find_opposite_brace(char opening) {
     return (Brace){.brace = '0'};
 }
 
+typedef enum {
+    LINE_NUMS = 1,
+} Color_Pairs;
+
 int main(int argc, char *argv[]) {
     char *program = argv[0];
     (void)program;
@@ -187,6 +194,11 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "error: you do not have colors in your terminal\n");
         exit(1);
     }
+
+    // colors
+    start_color();
+    init_pair(LINE_NUMS, COLOR_YELLOW, COLOR_BLACK);
+
     int grow, gcol;
     getmaxyx(stdscr, grow, gcol);
     raw();
@@ -226,22 +238,21 @@ int main(int argc, char *argv[]) {
         wclear(line_num_win);
 #endif
         getmaxyx(main_win, row, col);
+        // status bar
         mvwprintw(status_bar, 0, 0, "%.6s", stringify_mode());
         mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer.row_index, buffer.cur_pos);
         
         for(size_t i = 0; i <= buffer.row_s; i++) {
-            start_color();
-            init_pair(1, COLOR_YELLOW, COLOR_BLACK);
-            wattron(line_num_win, COLOR_PAIR(1));
-            #define RELATIVE_NUMS
-#ifdef RELATIVE_NUMS
-            if(buffer.row_index == i) mvwprintw(line_num_win, i, 0, "%4zu", i+1);
-            else mvwprintw(line_num_win, i, 0, "%4zu", (size_t)abs((int)buffer.row_index-(int)i));
-#else
-            mvwprintw(line_num_win, i, 0, "%4zu", i+1);
-#endif
+            wattron(line_num_win, COLOR_PAIR(LINE_NUMS));
+            if(relative_nums) {
+                if(buffer.row_index == i) mvwprintw(line_num_win, i, 0, "%4zu", i+1);
+                else mvwprintw(line_num_win, i, 0, "%4zu", (size_t)abs((int)buffer.row_index-(int)i));
+            } else {
+                mvwprintw(line_num_win, i, 0, "%4zu", i+1);
+            }
+            wattroff(line_num_win, COLOR_PAIR(LINE_NUMS));
+
             mvwprintw(main_win, i, 0, "%s", buffer.rows[i].contents);
-            wattroff(line_num_win, COLOR_PAIR(1));
         }
         wrefresh(main_win);
         wrefresh(status_bar);
@@ -319,46 +330,30 @@ int main(int argc, char *argv[]) {
                     case '%': {
                         Row *cur = &buffer.rows[buffer.row_index];
                         Brace opposite = find_opposite_brace(cur->contents[buffer.cur_pos]);
+                        if(opposite.brace == '0') break;
                         size_t brace_stack_s = 0;
                         int posx = buffer.cur_pos;
                         int posy = buffer.row_index;
-                        if(opposite.brace == '0') break;
-                        if(opposite.closing) {
-                            while(posy >= 0) {
-                                posx--;
-                                if(posx < 0) {
-                                    cur = &buffer.rows[--posy];
-                                    posx = cur->size;
-                                }
-                                Brace new_brace = find_opposite_brace(cur->contents[posx]);
-                                if(new_brace.brace != '0' && new_brace.closing) brace_stack_s++;
-                                if(new_brace.brace != '0' && !new_brace.closing) {
-                                    if(brace_stack_s == 0) break;
-                                    brace_stack_s--;
-                                }
+                        int dif = (opposite.closing) ? -1 : 1;
+                        while(posy >= 0 && (size_t)posy <= buffer.row_s) {
+                            posx += dif;
+                            if(posx < 0 || (size_t)posx > cur->size) {
+                                if(posy == 0 && dif == -1) break;
+                                posy += dif;
+                                cur = &buffer.rows[posy];
+                                posx = (posx < 0) ? cur->size : 0;
                             }
-                            if(posx >= 0 && posy >= 0) {
-                                buffer.cur_pos = posx;
-                                buffer.row_index = posy;
-                            }
-                            break;
-                        }
-                        while((size_t)posy <= buffer.row_s) {
-                            posx++;
-                            if((size_t)posx > cur->size) {
-                                cur = &buffer.rows[++posy];
-                                posx = 0;
-                            }
-                            Brace new_brace = find_opposite_brace(cur->contents[posx]);
-                            if(new_brace.brace != '0' && !new_brace.closing) brace_stack_s++;
-                            if(new_brace.brace != '0' && new_brace.closing) {
-                                if(brace_stack_s == 0) break;
-                                brace_stack_s--;
+                            opposite = find_opposite_brace(cur->contents[posx]);
+                            if(opposite.brace == '0') continue; 
+                            if((opposite.closing && dif == -1) || (!opposite.closing && dif == 1)) {
+                                brace_stack_s++;
+                            } else {
+                                if(brace_stack_s-- == 0) break;
                             }
                         }
-                        if(((size_t)posy <= buffer.row_s)) {
-                            buffer.row_index = posy;
+                        if((posx >= 0 && posy >= 0) && ((size_t)posy <= buffer.row_s)) {
                             buffer.cur_pos = posx;
+                            buffer.row_index = posy;
                         }
                         break;
                     }
