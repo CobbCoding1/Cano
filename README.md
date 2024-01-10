@@ -34,6 +34,14 @@ Dependencies: CC, ncurses
 |Normal| Ctrl + S | Save and exit             |
 |Insert| Esc      | Exit insert mode          |
 
+## Commands 
+| Command    | Action                    |
+|------------|---------------------------|
+| set-output | change output file        |
+| quit       | Quit                      |
+| wquit      | Write and quit            |
+| w          | Write without quitting    |
+
 ## Contributing
 Cano is open to contributors. That does not mean that your pull request will be merged. \
 Please structure your pull request as something reasonably small, \

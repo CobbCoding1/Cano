@@ -1,13 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <curses.h>
+#include <ctype.h>
 #include <assert.h>
 #include <string.h>
+#include <unistd.h>
+
+#include <curses.h>
 
 #define ctrl(x) ((x) & 0x1f)
 
 #define BACKSPACE   263 
 #define ESCAPE      27
+#define SPACE       32 
 #define ENTER       10
 #define DOWN_ARROW  258 
 #define UP_ARROW    259 
@@ -42,6 +46,12 @@ typedef struct {
     char *filename;
 } Buffer;
 
+typedef struct {
+    char *command;
+    char *args[16];
+    size_t args_s;
+} Command;
+
 Mode mode = NORMAL;
 int QUIT = 0;
 
@@ -58,6 +68,58 @@ char *stringify_mode() {
             break;
     }
     return "NORMAL";
+}
+
+Command parse_command(char *command, size_t command_s) {
+    Command cmd = {0};
+    //command[++command_s] = ' ';
+    size_t args_start = 0;
+    for(size_t i = 0; i < command_s; i++) {
+        if(i == command_s-1 || command[i] == ' ') {
+            cmd.command = malloc(sizeof(char)*i);
+            strncpy(cmd.command, command, i+1);
+            args_start = i;
+            break;
+        }
+    }
+    if(args_start <= command_s) {
+        for(size_t i = args_start+1; i < command_s; i++) {
+            if(i == command_s-1 || command[i] == ' ') {
+                cmd.args[cmd.args_s] = malloc(sizeof(char)*i-args_start);
+                strncpy(cmd.args[cmd.args_s++], command+args_start+1, i-args_start);
+                args_start = i;
+            }
+        }
+    } 
+    return cmd;
+}
+
+void handle_save(Buffer *buffer) {
+    FILE *file = fopen(buffer->filename, "w"); 
+    for(size_t i = 0; i <= buffer->row_s; i++) {
+        fwrite(buffer->rows[i].contents, buffer->rows[i].size, 1, file);
+        fwrite("\n", sizeof("\n")-1, 1, file);
+    }
+    fclose(file);
+}
+
+int execute_command(Command *command, Buffer *buf) {
+    if(strncmp(command->command, "set-output", 10) == 0) {
+        if(command->args_s < 1) return 1; 
+        buf->filename = command->args[0];
+        for(size_t i = 1; i < command->args_s; i++) free(command->args[i]);
+    } else if(strncmp(command->command, "quit", 4) == 0) {
+        QUIT = 1;
+    } else if(strncmp(command->command, "wquit", 5) == 0) {
+        handle_save(buf);
+        QUIT = 1;
+    } else if(strncmp(command->command, "w", 1) == 0) {
+        handle_save(buf);
+    } else {
+        return 1;
+    }
+    free(command->command);
+    return 0;
 }
 
 // shift_rows_* functions shift the entire array of rows
@@ -110,6 +172,7 @@ void shift_str_right(char *str, size_t *str_s, size_t index) {
         str[i] = str[i-1];
     }
 }
+
 #define NO_CLEAR_
 
 void append_rows(Row *a, Row *b) {
@@ -313,6 +376,7 @@ int main(int argc, char *argv[]) {
                         break;
                     case ':':
                         mode = COMMAND;
+                        buffer.cur_pos = 0;
                         break;
                     case 'h':
                         if(buffer.cur_pos != 0) buffer.cur_pos--;
@@ -406,12 +470,7 @@ int main(int argc, char *argv[]) {
                         break;
                     }
                     case ctrl('s'): {
-                        FILE *file = fopen(buffer.filename, "w"); 
-                        for(size_t i = 0; i <= buffer.row_s; i++) {
-                            fwrite(buffer.rows[i].contents, buffer.rows[i].size, 1, file);
-                            fwrite("\n", sizeof("\n")-1, 1, file);
-                        }
-                        fclose(file);
+                        handle_save(&buffer);
                         QUIT = 1;
                     } break;
                     default:
@@ -488,6 +547,11 @@ int main(int argc, char *argv[]) {
                         mode = NORMAL;
                         break;
                     case ENTER: {
+                        Command cmd = parse_command(command, command_s);
+                        int err = execute_command(&cmd, &buffer);
+                        if(err != 0) mvwprintw(status_bar, 1, 1, "Unknown command: %s", cmd.command);
+                        command_s = 0;
+                        mode = NORMAL;
                     } break;
                     case LEFT_ARROW:
                         if(buffer.cur_pos != 0) buffer.cur_pos--;
