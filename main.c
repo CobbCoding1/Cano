@@ -22,7 +22,7 @@ typedef enum {
 int ESCDELAY = 10;
 
 // global config vars
-int relative_nums = 1;
+int relative_nums = 0;
 
 #define MAX_STRING_SIZE 1025
 
@@ -229,6 +229,8 @@ int main(int argc, char *argv[]) {
 
     int ch = 0;
 
+    size_t line_render_start = 0;
+
     size_t x = 0; 
     size_t y = 0;
     while(ch != ctrl('q') && QUIT != 1) {
@@ -240,23 +242,31 @@ int main(int argc, char *argv[]) {
         getmaxyx(main_win, row, col);
         // status bar
         mvwprintw(status_bar, 0, 0, "%.6s", stringify_mode());
-        mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer.row_index, buffer.cur_pos);
+        mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer.row_index+1, buffer.cur_pos+1);
+
+        if(buffer.row_index <= line_render_start) line_render_start = buffer.row_index;
+        if(buffer.row_index >= line_render_start+row) line_render_start = buffer.row_index-row+1;
         
-        for(size_t i = 0; i <= buffer.row_s; i++) {
+        for(size_t i = line_render_start; i <= line_render_start+row; i++) {
+            size_t print_index = i - line_render_start;
             wattron(line_num_win, COLOR_PAIR(LINE_NUMS));
             if(relative_nums) {
-                if(buffer.row_index == i) mvwprintw(line_num_win, i, 0, "%4zu", i+1);
-                else mvwprintw(line_num_win, i, 0, "%4zu", (size_t)abs((int)buffer.row_index-(int)i));
+                if(buffer.row_index == print_index) mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
+                else mvwprintw(line_num_win, print_index, 0, "%4zu", (size_t)abs((int)buffer.row_index-(int)print_index));
             } else {
-                mvwprintw(line_num_win, i, 0, "%4zu", i+1);
+                mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
             }
             wattroff(line_num_win, COLOR_PAIR(LINE_NUMS));
 
-            mvwprintw(main_win, i, 0, "%s", buffer.rows[i].contents);
+            mvwprintw(main_win, print_index, 0, "%s", buffer.rows[i].contents);
         }
+
         wrefresh(main_win);
         wrefresh(status_bar);
         wrefresh(line_num_win);
+
+        y = buffer.row_index-line_render_start;
+        x = buffer.cur_pos;
 
         wmove(main_win, y, x);
         ch = wgetch(main_win);
