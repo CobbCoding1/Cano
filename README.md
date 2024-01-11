@@ -23,6 +23,9 @@ make
 |Normal| x        | Delete character          |
 |Normal| d        | Delete entire line        |
 |Normal| i        | Enter insert mode         |
+|Normal| I        | Go to beginning of line   |
+|Normal| a        | Insert mode on next char  |
+|Normal| A        | Insert mode at end of line|
 |Normal| g        | Go to first line          |
 |Normal| G        | Go to last line           |
 |Normal| 0        | Go to beginning of line   |

@@ -369,6 +369,20 @@ int main(int argc, char *argv[]) {
                     case 'i':
                         mode = INSERT;
                         break;
+                    case 'I': {
+                        Row *cur = &buffer.rows[buffer.row_index];
+                        buffer.cur_pos = 0;
+                        while(buffer.cur_pos < cur->size && cur->contents[buffer.cur_pos] == ' ') buffer.cur_pos++;
+                        mode = INSERT;
+                    } break;
+                    case 'a':
+                        if(buffer.cur_pos < buffer.rows[buffer.row_index].size) buffer.cur_pos++;
+                        mode = INSERT;
+                        break;
+                    case 'A':
+                        buffer.cur_pos = buffer.rows[buffer.row_index].size;
+                        mode = INSERT;
+                        break;
                     case ':':
                         mode = COMMAND;
                         buffer.cur_pos = 0;
