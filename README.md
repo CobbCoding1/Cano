@@ -1,5 +1,5 @@
 # Cano
-Cano is a text editor written in C using the ncurses library.
+Cano (kay-no) is a text editor written in C using the ncurses library.
 It is a modal-based editor, based heavily on VIM. 
 
 ![Cano icon](cano.png) \
