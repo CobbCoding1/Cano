@@ -27,7 +27,7 @@ typedef enum {
 int ESCDELAY = 10;
 
 // global config vars
-int relative_nums = 0;
+int relative_nums = 1;
 
 #define MAX_STRING_SIZE 1025
 
@@ -114,6 +114,8 @@ int execute_command(Command *command, Buffer *buf) {
         QUIT = 1;
     } else if(strncmp(command->command, "w", 1) == 0) {
         handle_save(buf);
+    } else if(strncmp(command->command, "relative", 8) == 0) {
+        relative_nums = !relative_nums;
     } else {
         return 1;
     }
@@ -622,7 +624,10 @@ int main(int argc, char *argv[]) {
                         } else {
                             Command cmd = parse_command(command, command_s);
                             int err = execute_command(&cmd, &buffer);
-                            if(err != 0) mvwprintw(status_bar, 1, 1, "Unknown command: %s", cmd.command);
+                            if(err != 0) {
+                                sprintf(status_bar_msg, "Unnown command: %s", cmd.command);
+                                print_msg = 1;
+                            }
                         }
                         memset(command, 0, command_s);
                         command_s = 0;

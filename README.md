@@ -46,6 +46,7 @@ make
 | quit       | Quit                      |
 | wquit      | Write and quit            |
 | w          | Write without quitting    |
+| relative   | Toggle relative line nums |
 | !(command) | Execute a shell command   |
 
 ## Contributing
