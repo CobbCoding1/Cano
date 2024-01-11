@@ -149,6 +149,7 @@ void shift_row_left(Row *row, size_t index) {
     for(size_t i = index; i < row->size; i++) {
         row->contents[i] = row->contents[i+1];
     }
+    //row->contents[row->size+1] = '\0';
     row->size--;  
 }
 
@@ -392,7 +393,8 @@ int main(int argc, char *argv[]) {
                         break;
                     case 'x': {
                         Row *cur = &buffer.rows[buffer.row_index];
-                        if(cur->size > 0) {
+                        if(cur->size > 0 && buffer.cur_pos < cur->size) {
+                            cur->contents[cur->size] = '\0';
                             shift_row_left(cur, buffer.cur_pos);
                             wmove(main_win, y, buffer.cur_pos);
                         }
