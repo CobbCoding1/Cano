@@ -520,8 +520,6 @@ int main(int argc, char *argv[]) {
                     case RIGHT_ARROW:
                         if(buffer.cur_pos < buffer.rows[buffer.row_index].size) buffer.cur_pos++;
                         break;
-                    case ctrl('s'):
-                        break;
                     default: {
                         Row *cur = &buffer.rows[buffer.row_index];
                         shift_row_right(cur, buffer.cur_pos);
@@ -562,8 +560,6 @@ int main(int argc, char *argv[]) {
                         break;
                     case RIGHT_ARROW:
                         if(buffer.cur_pos < command_s) buffer.cur_pos++;
-                        break;
-                    case ctrl('s'):
                         break;
                     default: {
                         shift_str_right(command, &command_s, buffer.cur_pos);
