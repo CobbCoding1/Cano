@@ -46,6 +46,7 @@ make
 | quit       | Quit                      |
 | wquit      | Write and quit            |
 | w          | Write without quitting    |
+| !(command) | Execute a shell command   |
 
 ## Contributing
 Cano is open to contributors. That does not mean that your pull request will be merged. \

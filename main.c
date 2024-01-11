@@ -70,9 +70,17 @@ char *stringify_mode() {
     return "NORMAL";
 }
 
+void handle_save(Buffer *buffer) {
+    FILE *file = fopen(buffer->filename, "w"); 
+    for(size_t i = 0; i <= buffer->row_s; i++) {
+        fwrite(buffer->rows[i].contents, buffer->rows[i].size, 1, file);
+        fwrite("\n", sizeof("\n")-1, 1, file);
+    }
+    fclose(file);
+}
+
 Command parse_command(char *command, size_t command_s) {
     Command cmd = {0};
-    //command[++command_s] = ' ';
     size_t args_start = 0;
     for(size_t i = 0; i < command_s; i++) {
         if(i == command_s-1 || command[i] == ' ') {
@@ -92,15 +100,6 @@ Command parse_command(char *command, size_t command_s) {
         }
     } 
     return cmd;
-}
-
-void handle_save(Buffer *buffer) {
-    FILE *file = fopen(buffer->filename, "w"); 
-    for(size_t i = 0; i <= buffer->row_s; i++) {
-        fwrite(buffer->rows[i].contents, buffer->rows[i].size, 1, file);
-        fwrite("\n", sizeof("\n")-1, 1, file);
-    }
-    fclose(file);
 }
 
 int execute_command(Command *command, Buffer *buf) {
@@ -297,6 +296,7 @@ int main(int argc, char *argv[]) {
     keypad(status_bar, TRUE);
     noecho();
 
+
     Buffer buffer = {0};
     for(size_t i = 0; i < 1024; i++) {
         buffer.rows[i].contents = calloc(MAX_STRING_SIZE, sizeof(char));
@@ -309,6 +309,9 @@ int main(int argc, char *argv[]) {
     wmove(main_win, 0, 0);
 
     int ch = 0;
+
+    char status_bar_msg[128] = {0};
+    int print_msg = 0;
 
     size_t line_render_start = 0;
     char command[64] = {0};
@@ -324,6 +327,16 @@ int main(int argc, char *argv[]) {
 #endif
         getmaxyx(main_win, row, col);
         // status bar
+        if(print_msg) {
+            mvwprintw(status_bar, 1, 0, "%s", status_bar_msg);
+            wrefresh(status_bar);
+            sleep(1);
+            wclear(status_bar);
+            print_msg = 0;
+        }
+        if(mode == COMMAND) {
+            mvwprintw(status_bar, 1, 0, ":%.*s", (int)command_s, command);
+        }
         mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
         mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer.row_index+1, buffer.cur_pos+1);
 
@@ -332,6 +345,7 @@ int main(int argc, char *argv[]) {
         
         for(size_t i = line_render_start; i <= line_render_start+row; i++) {
             if(i <= buffer.row_s) {
+
                 size_t print_index = i - line_render_start;
                 wattron(line_num_win, COLOR_PAIR(LINE_NUMS));
                 if(relative_nums) {
@@ -343,9 +357,6 @@ int main(int argc, char *argv[]) {
                 wattroff(line_num_win, COLOR_PAIR(LINE_NUMS));
 
                 mvwprintw(main_win, print_index, 0, "%s", buffer.rows[i].contents);
-                if(mode == COMMAND) {
-                    mvwprintw(status_bar, 1, 0, ":%.*s", (int)command_s, command);
-                }
             }
         }
 
@@ -582,9 +593,24 @@ int main(int argc, char *argv[]) {
                         mode = NORMAL;
                         break;
                     case ENTER: {
-                        Command cmd = parse_command(command, command_s);
-                        int err = execute_command(&cmd, &buffer);
-                        if(err != 0) mvwprintw(status_bar, 1, 1, "Unknown command: %s", cmd.command);
+                        if(command[0] == '!') {
+                            shift_str_left(command, &command_s, 0);
+                            FILE *file = popen(command, "r");
+                            if(file == NULL) {
+                                endwin();
+                                fprintf(stderr, "err");
+                                exit(1);
+                            }
+                            while(fgets(status_bar_msg, sizeof(status_bar_msg), file) != NULL) {
+                                print_msg = 1;
+                            }
+                            pclose(file);
+                        } else {
+                            Command cmd = parse_command(command, command_s);
+                            int err = execute_command(&cmd, &buffer);
+                            if(err != 0) mvwprintw(status_bar, 1, 1, "Unknown command: %s", cmd.command);
+                        }
+                        memset(command, 0, command_s);
                         command_s = 0;
                         mode = NORMAL;
                     } break;
