@@ -244,9 +244,6 @@ Brace find_opposite_brace(char opening) {
         case '[':
             return (Brace){.brace = ']', .closing = 0};
             break;
-        case '<':
-            return (Brace){.brace = '>', .closing = 0};
-            break;
         case ')':
             return (Brace){.brace = '(', .closing = 1};
             break;
@@ -255,9 +252,6 @@ Brace find_opposite_brace(char opening) {
             break;
         case ']':
             return (Brace){.brace = '[', .closing = 1};
-            break;
-        case '>':
-            return (Brace){.brace = '<', .closing = 1};
             break;
     }
     return (Brace){.brace = '0'};
@@ -443,12 +437,14 @@ int main(int argc, char *argv[]) {
                     } break;
                     case '%': {
                         Row *cur = &buffer.rows[buffer.row_index];
-                        Brace opposite = find_opposite_brace(cur->contents[buffer.cur_pos]);
-                        if(opposite.brace == '0') break;
+                        char initial_brace = cur->contents[buffer.cur_pos];
+                        Brace initial_opposite = find_opposite_brace(initial_brace);
+                        if(initial_opposite.brace == '0') break;
                         size_t brace_stack_s = 0;
                         int posx = buffer.cur_pos;
                         int posy = buffer.row_index;
-                        int dif = (opposite.closing) ? -1 : 1;
+                        int dif = (initial_opposite.closing) ? -1 : 1;
+                        Brace opposite = {0};
                         while(posy >= 0 && (size_t)posy <= buffer.row_s) {
                             posx += dif;
                             if(posx < 0 || (size_t)posx > cur->size) {
@@ -462,7 +458,7 @@ int main(int argc, char *argv[]) {
                             if((opposite.closing && dif == -1) || (!opposite.closing && dif == 1)) {
                                 brace_stack_s++;
                             } else {
-                                if(brace_stack_s-- == 0) break;
+                                if(brace_stack_s-- == 0 && opposite.brace == initial_brace) break;
                             }
                         }
                         if((posx >= 0 && posy >= 0) && ((size_t)posy <= buffer.row_s)) {
