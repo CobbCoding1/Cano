@@ -562,6 +562,16 @@ int main(int argc, char *argv[]) {
                     default: {
                         mvwprintw(main_win, 10, 10, "%d", ch);
                         Row *cur = &buffer.rows[buffer.row_index];
+                        Brace cur_brace = find_opposite_brace(cur->contents[buffer.cur_pos]);
+                        if(
+                            (cur_brace.brace != '0' && cur_brace.closing && 
+                             ch == find_opposite_brace(cur_brace.brace).brace) || 
+                            (cur->contents[buffer.cur_pos] == '"' && ch == '"') ||
+                            (cur->contents[buffer.cur_pos] == '\'' && ch == '\'')
+                        ) {
+                            buffer.cur_pos++;
+                            break;
+                        };
                         if(ch == 9) {
                             // TODO: use tabs instead of just 4 spaces
                             for(size_t i = 0; i < 4; i++) {
@@ -577,6 +587,10 @@ int main(int argc, char *argv[]) {
                             shift_row_right(cur, buffer.cur_pos);
                             cur->contents[buffer.cur_pos] = next_ch.brace;
                         } 
+                        if(ch == '"' || ch == '\'') {
+                            shift_row_right(cur, buffer.cur_pos);
+                            cur->contents[buffer.cur_pos] = ch;
+                        }
                     } break;
                 }
              } break;
