@@ -416,6 +416,7 @@ int main(int argc, char *argv[]) {
                         break;
                     case 'e': {
                         Row *cur = &buffer.rows[buffer.row_index];
+                        while(buffer.cur_pos+1 < cur->size && cur->contents[buffer.cur_pos+1] == ' ') buffer.cur_pos++;
                         if(cur->contents[buffer.cur_pos+1] == ' ') buffer.cur_pos++;
                         while(cur->contents[buffer.cur_pos+1] != ' ' && buffer.cur_pos+1 < cur->size) {
                             buffer.cur_pos++;
@@ -430,6 +431,7 @@ int main(int argc, char *argv[]) {
                     } break;
                     case 'w': {
                         Row *cur = &buffer.rows[buffer.row_index];
+                        while(buffer.cur_pos+1 < cur->size && cur->contents[buffer.cur_pos+1] == ' ') buffer.cur_pos++;
                         if(cur->contents[buffer.cur_pos-1] == ' ') buffer.cur_pos++;
                         while(cur->contents[buffer.cur_pos-1] != ' ' && buffer.cur_pos < cur->size) {
                             buffer.cur_pos++;
