@@ -37,6 +37,7 @@ make
 |Normal| O        | Create line above current |
 |Normal| %        | Go to corresponding brace |
 |Normal| Ctrl + S | Save and exit             |
+|Normal| r + (n)  | Repeat next motion n times|
 |Insert| Esc      | Exit insert mode          |
 
 ## Commands 

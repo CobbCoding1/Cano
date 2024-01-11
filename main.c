@@ -315,6 +315,8 @@ int main(int argc, char *argv[]) {
     char status_bar_msg[128] = {0};
     int print_msg = 0;
 
+    int repeating = 0;
+
     size_t line_render_start = 0;
     char command[64] = {0};
     size_t command_s = 0;
@@ -347,17 +349,16 @@ int main(int argc, char *argv[]) {
         
         for(size_t i = line_render_start; i <= line_render_start+row; i++) {
             if(i <= buffer.row_s) {
-
                 size_t print_index = i - line_render_start;
                 wattron(line_num_win, COLOR_PAIR(LINE_NUMS));
                 if(relative_nums) {
                     if(buffer.row_index == print_index) mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
-                    else mvwprintw(line_num_win, print_index, 0, "%4zu", (size_t)abs((int)buffer.row_index-(int)print_index));
+                    else mvwprintw(line_num_win, print_index, 0, "%4zu", 
+                                   (size_t)abs((int)buffer.row_index-(int)print_index));
                 } else {
                     mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
                 }
                 wattroff(line_num_win, COLOR_PAIR(LINE_NUMS));
-
                 mvwprintw(main_win, print_index, 0, "%s", buffer.rows[i].contents);
             }
         }
@@ -366,8 +367,15 @@ int main(int argc, char *argv[]) {
         wrefresh(status_bar);
         wrefresh(line_num_win);
 
+        size_t repeating_count = 1;
+
         y = buffer.row_index-line_render_start;
         x = buffer.cur_pos;
+
+        if(repeating) {
+            mvwprintw(status_bar, 1, gcol-5, "r");
+            wrefresh(status_bar);
+        }
 
         if(mode != COMMAND) {
             wmove(main_win, y, x);
@@ -376,285 +384,318 @@ int main(int argc, char *argv[]) {
             wmove(status_bar, 1, buffer.cur_pos+1);
             ch = wgetch(status_bar);
         }
-        switch(mode) {
-            case NORMAL:
-                switch(ch) {
-                    case 'i':
-                        mode = INSERT;
-                        break;
-                    case 'I': {
-                        Row *cur = &buffer.rows[buffer.row_index];
-                        buffer.cur_pos = 0;
-                        while(buffer.cur_pos < cur->size && cur->contents[buffer.cur_pos] == ' ') buffer.cur_pos++;
-                        mode = INSERT;
-                    } break;
-                    case 'a':
-                        if(buffer.cur_pos < buffer.rows[buffer.row_index].size) buffer.cur_pos++;
-                        mode = INSERT;
-                        break;
-                    case 'A':
-                        buffer.cur_pos = buffer.rows[buffer.row_index].size;
-                        mode = INSERT;
-                        break;
-                    case ':':
-                        mode = COMMAND;
-                        buffer.cur_pos = 0;
-                        break;
-                    case 'h':
-                        if(buffer.cur_pos != 0) buffer.cur_pos--;
-                        break;
-                    case 'j':
-                        if(buffer.row_index < buffer.row_s) buffer.row_index++;
-                        break;
-                    case 'k':
-                        if(buffer.row_index != 0) buffer.row_index--;
-                        break;
-                    case 'l':
-                        buffer.cur_pos++;
-                        break;
-                    case 'x': {
-                        Row *cur = &buffer.rows[buffer.row_index];
-                        if(cur->size > 0 && buffer.cur_pos < cur->size) {
-                            cur->contents[cur->size] = '\0';
-                            shift_row_left(cur, buffer.cur_pos);
-                            wmove(main_win, y, buffer.cur_pos);
-                        }
-                    } break;
-                    case 'd': {
-                        Row *cur = &buffer.rows[buffer.row_index];
-                        memset(cur->contents, 0, cur->size);
-                        cur->size = 0;
-                        if(buffer.row_s != 0) {
-                            if(buffer.row_index == buffer.row_s) buffer.row_index--;
-                            shift_rows_left(&buffer, buffer.row_index);
-                        }
-                    } break;
-                    case 'g':
-                        buffer.row_index = 0;
-                        break;
-                    case 'G':
-                        buffer.row_index = buffer.row_s;
-                        break;
-                    case '0':
-                        buffer.cur_pos = 0;
-                        break;
-                    case '$':
-                        buffer.cur_pos = buffer.rows[buffer.row_index].size;
-                        break;
-                    case 'e': {
-                        Row *cur = &buffer.rows[buffer.row_index];
-                        while(buffer.cur_pos+1 < cur->size && cur->contents[buffer.cur_pos+1] == ' ') buffer.cur_pos++;
-                        if(cur->contents[buffer.cur_pos+1] == ' ') buffer.cur_pos++;
-                        while(cur->contents[buffer.cur_pos+1] != ' ' && buffer.cur_pos+1 < cur->size) {
-                            buffer.cur_pos++;
-                        }
-                    } break;
-                    case 'b': {
-                        Row *cur = &buffer.rows[buffer.row_index];
-                        if(cur->contents[buffer.cur_pos-1] == ' ') buffer.cur_pos--;
-                        while(cur->contents[buffer.cur_pos-1] != ' ' && buffer.cur_pos > 0) {
-                            buffer.cur_pos--;
-                        }
-                    } break;
-                    case 'w': {
-                        Row *cur = &buffer.rows[buffer.row_index];
-                        while(buffer.cur_pos+1 < cur->size && cur->contents[buffer.cur_pos+1] == ' ') buffer.cur_pos++;
-                        if(cur->contents[buffer.cur_pos-1] == ' ') buffer.cur_pos++;
-                        while(cur->contents[buffer.cur_pos-1] != ' ' && buffer.cur_pos < cur->size) {
-                            buffer.cur_pos++;
-                        }
-                    } break;
-                    case 'o': {
-                        shift_rows_right(&buffer, buffer.row_index+1);
-                        buffer.row_index++; 
-                        buffer.cur_pos = 0;
-                        mode = INSERT;
-                    } break;
-                    case 'O': {
-                        shift_rows_right(&buffer, buffer.row_index);
-                        buffer.cur_pos = 0;
-                        mode = INSERT;
-                    } break;
-                    case '%': {
-                        Row *cur = &buffer.rows[buffer.row_index];
-                        char initial_brace = cur->contents[buffer.cur_pos];
-                        Brace initial_opposite = find_opposite_brace(initial_brace);
-                        if(initial_opposite.brace == '0') break;
-                        size_t brace_stack_s = 0;
-                        int posx = buffer.cur_pos;
-                        int posy = buffer.row_index;
-                        int dif = (initial_opposite.closing) ? -1 : 1;
-                        Brace opposite = {0};
-                        while(posy >= 0 && (size_t)posy <= buffer.row_s) {
-                            posx += dif;
-                            if(posx < 0 || (size_t)posx > cur->size) {
-                                if(posy == 0 && dif == -1) break;
-                                posy += dif;
-                                cur = &buffer.rows[posy];
-                                posx = (posx < 0) ? cur->size : 0;
-                            }
-                            opposite = find_opposite_brace(cur->contents[posx]);
-                            if(opposite.brace == '0') continue; 
-                            if((opposite.closing && dif == -1) || (!opposite.closing && dif == 1)) {
-                                brace_stack_s++;
-                            } else {
-                                if(brace_stack_s-- == 0 && opposite.brace == initial_brace) break;
-                            }
-                        }
-                        if((posx >= 0 && posy >= 0) && ((size_t)posy <= buffer.row_s)) {
-                            buffer.cur_pos = posx;
-                            buffer.row_index = posy;
-                        }
-                        break;
-                    }
-                    case ctrl('s'): {
-                        handle_save(&buffer);
-                        QUIT = 1;
-                    } break;
-                    default:
-                        continue;
-                }
-                if(buffer.cur_pos > buffer.rows[buffer.row_index].size) buffer.cur_pos = buffer.rows[buffer.row_index].size;
-                x = buffer.cur_pos;
-                y = buffer.row_index;
-                wmove(main_win, y, x);
-                break;
-            case INSERT: {
-                switch(ch) {
-                    case BACKSPACE: {
-                        getyx(main_win, y, x);
-                        if(buffer.cur_pos == 0) {
-                            if(buffer.row_index != 0) {
-                                Row *cur = &buffer.rows[--buffer.row_index];
-                                buffer.cur_pos = cur->size;
-                                wmove(main_win, buffer.row_index, buffer.cur_pos);
-                                delete_and_append_row(&buffer, cur->index+1);
-                            }
-                        } else {
+
+        if(repeating) {
+            char num[16] = {0};
+            size_t num_s = 0;
+            while(isdigit(ch)) {
+                num[num_s++] = ch;
+                mvwprintw(status_bar, 1, (gcol-5)+num_s, "%c", num[num_s-1]);
+                wrefresh(status_bar);
+                ch = wgetch(main_win);
+            }
+            repeating_count = atoi(num);
+            repeating = 0;
+        }
+
+        wmove(main_win, y, x);
+
+        for(size_t iter = 0; iter < repeating_count; iter++) {
+            switch(mode) {
+                case NORMAL:
+                    switch(ch) {
+                        case 'i':
+                            mode = INSERT;
+                            repeating_count = 1;
+                            break;
+                        case 'I': {
                             Row *cur = &buffer.rows[buffer.row_index];
-                            shift_row_left(cur, --buffer.cur_pos);
-                            wmove(main_win, y, buffer.cur_pos);
-                        }
-                    } break;
-                    case ESCAPE:
-                        mode = NORMAL;
-                        break;
-                    case ENTER: {
-                        Row *cur = &buffer.rows[buffer.row_index]; 
-                        create_and_cut_row(&buffer, buffer.row_index+1,
-                                    &cur->size, buffer.cur_pos);
-                        buffer.row_index++; 
-                        buffer.cur_pos = 0;
-                    } break;
-                    case LEFT_ARROW:
-                        if(buffer.cur_pos != 0) buffer.cur_pos--;
-                        break;
-                    case DOWN_ARROW:
-                        if(buffer.row_index < buffer.row_s) buffer.row_index++;
-                        break;
-                    case UP_ARROW:
-                        if(buffer.row_index != 0) buffer.row_index--;
-                        break;
-                    case RIGHT_ARROW:
-                        if(buffer.cur_pos < buffer.rows[buffer.row_index].size) buffer.cur_pos++;
-                        break;
-                    case KEY_RESIZE:
-                        wrefresh(main_win);
-                        break;
-                    default: {
-                        mvwprintw(main_win, 10, 10, "%d", ch);
-                        Row *cur = &buffer.rows[buffer.row_index];
-                        Brace cur_brace = find_opposite_brace(cur->contents[buffer.cur_pos]);
-                        if(
-                            (cur_brace.brace != '0' && cur_brace.closing && 
-                             ch == find_opposite_brace(cur_brace.brace).brace) || 
-                            (cur->contents[buffer.cur_pos] == '"' && ch == '"') ||
-                            (cur->contents[buffer.cur_pos] == '\'' && ch == '\'')
-                        ) {
+                            buffer.cur_pos = 0;
+                            while(buffer.cur_pos < cur->size && cur->contents[buffer.cur_pos] == ' ') buffer.cur_pos++;
+                            mode = INSERT;
+                            repeating_count = 1;
+                        } break;
+                        case 'a':
+                            if(buffer.cur_pos < buffer.rows[buffer.row_index].size) buffer.cur_pos++;
+                            mode = INSERT;
+                            repeating_count = 1;
+                            break;
+                        case 'A':
+                            buffer.cur_pos = buffer.rows[buffer.row_index].size;
+                            mode = INSERT;
+                            repeating_count = 1;
+                            break;
+                        case ':':
+                            mode = COMMAND;
+                            buffer.cur_pos = 0;
+                            repeating_count = 1;
+                            break;
+                        case 'h':
+                            if(buffer.cur_pos != 0) buffer.cur_pos--;
+                            break;
+                        case 'j':
+                            if(buffer.row_index < buffer.row_s) buffer.row_index++;
+                            break;
+                        case 'k':
+                            if(buffer.row_index != 0) buffer.row_index--;
+                            break;
+                        case 'l':
                             buffer.cur_pos++;
                             break;
-                        };
-                        if(ch == 9) {
-                            // TODO: use tabs instead of just 4 spaces
-                            for(size_t i = 0; i < 4; i++) {
-                                cur->contents[buffer.cur_pos] = ' ';
-                                shift_row_right(cur, buffer.cur_pos++);
+                        case 'x': {
+                            Row *cur = &buffer.rows[buffer.row_index];
+                            if(cur->size > 0 && buffer.cur_pos < cur->size) {
+                                cur->contents[cur->size] = '\0';
+                                shift_row_left(cur, buffer.cur_pos);
+                                wmove(main_win, y, buffer.cur_pos);
                             }
-                        } else {
-                            shift_row_right(cur, buffer.cur_pos);
-                            cur->contents[buffer.cur_pos++] = ch;
-                        }
-                        Brace next_ch = find_opposite_brace(ch); 
-                        if(next_ch.brace != '0' && !next_ch.closing) {
-                            shift_row_right(cur, buffer.cur_pos);
-                            cur->contents[buffer.cur_pos] = next_ch.brace;
-                        } 
-                        if(ch == '"' || ch == '\'') {
-                            shift_row_right(cur, buffer.cur_pos);
-                            cur->contents[buffer.cur_pos] = ch;
-                        }
-                    } break;
-                }
-             } break;
-            case COMMAND: {
-                switch(ch) {
-                    case BACKSPACE: {
-                        if(buffer.cur_pos != 0) {
-                            shift_str_left(command, &command_s, --buffer.cur_pos);
-                            wmove(status_bar, 1, buffer.cur_pos);
-                        }
-                    } break;
-                    case ESCAPE:
-                        command_s = 0;
-                        mode = NORMAL;
-                        break;
-                    case ENTER: {
-                        if(command[0] == '!') {
-                            shift_str_left(command, &command_s, 0);
-                            FILE *file = popen(command, "r");
-                            if(file == NULL) {
-                                endwin();
-                                fprintf(stderr, "err");
-                                exit(1);
+                        } break;
+                        case 'd': {
+                            Row *cur = &buffer.rows[buffer.row_index];
+                            memset(cur->contents, 0, cur->size);
+                            cur->size = 0;
+                            if(buffer.row_s != 0) {
+                                if(buffer.row_index == buffer.row_s) buffer.row_index--;
+                                shift_rows_left(&buffer, buffer.row_index);
                             }
-                            while(fgets(status_bar_msg, sizeof(status_bar_msg), file) != NULL) {
-                                print_msg = 1;
+                        } break;
+                        case 'g':
+                            if(repeating_count-1 > 1 && repeating_count-1 <= buffer.row_s) {
+                                buffer.row_index = repeating_count-1;
+                            } else buffer.row_index = 0;
+                            break;
+                        case 'G':
+                            if(repeating_count-1 > 1 && repeating_count-1 <= buffer.row_s) {
+                                buffer.row_index = repeating_count-1;
+                            } else buffer.row_index = buffer.row_s;
+                            break;
+                        case '0':
+                            buffer.cur_pos = 0;
+                            break;
+                        case '$':
+                            buffer.cur_pos = buffer.rows[buffer.row_index].size;
+                            break;
+                        case 'e': {
+                            Row *cur = &buffer.rows[buffer.row_index];
+                            while(buffer.cur_pos+1 < cur->size && cur->contents[buffer.cur_pos+1] == ' ') buffer.cur_pos++;
+                            if(cur->contents[buffer.cur_pos+1] == ' ') buffer.cur_pos++;
+                            while(cur->contents[buffer.cur_pos+1] != ' ' && buffer.cur_pos+1 < cur->size) {
+                                buffer.cur_pos++;
                             }
-                            pclose(file);
-                        } else {
-                            Command cmd = parse_command(command, command_s);
-                            int err = execute_command(&cmd, &buffer);
-                            if(err != 0) {
-                                sprintf(status_bar_msg, "Unnown command: %s", cmd.command);
-                                print_msg = 1;
+                        } break;
+                        case 'b': {
+                            Row *cur = &buffer.rows[buffer.row_index];
+                            if(cur->contents[buffer.cur_pos-1] == ' ') buffer.cur_pos--;
+                            while(cur->contents[buffer.cur_pos-1] != ' ' && buffer.cur_pos > 0) {
+                                buffer.cur_pos--;
                             }
+                        } break;
+                        case 'w': {
+                            Row *cur = &buffer.rows[buffer.row_index];
+                            while(buffer.cur_pos+1 < cur->size && cur->contents[buffer.cur_pos+1] == ' ') buffer.cur_pos++;
+                            if(cur->contents[buffer.cur_pos-1] == ' ') buffer.cur_pos++;
+                            while(cur->contents[buffer.cur_pos-1] != ' ' && buffer.cur_pos < cur->size) {
+                                buffer.cur_pos++;
+                            }
+                        } break;
+                        case 'o': {
+                            shift_rows_right(&buffer, buffer.row_index+1);
+                            buffer.row_index++; 
+                            buffer.cur_pos = 0;
+                            mode = INSERT;
+                            repeating_count = 1;
+                        } break;
+                        case 'O': {
+                            shift_rows_right(&buffer, buffer.row_index);
+                            buffer.cur_pos = 0;
+                            mode = INSERT;
+                            repeating_count = 1;
+                        } break;
+                        case 'r': {
+                            repeating = 1;
+                        } break;
+                        case '%': {
+                            Row *cur = &buffer.rows[buffer.row_index];
+                            char initial_brace = cur->contents[buffer.cur_pos];
+                            Brace initial_opposite = find_opposite_brace(initial_brace);
+                            if(initial_opposite.brace == '0') break;
+                            size_t brace_stack_s = 0;
+                            int posx = buffer.cur_pos;
+                            int posy = buffer.row_index;
+                            int dif = (initial_opposite.closing) ? -1 : 1;
+                            Brace opposite = {0};
+                            while(posy >= 0 && (size_t)posy <= buffer.row_s) {
+                                posx += dif;
+                                if(posx < 0 || (size_t)posx > cur->size) {
+                                    if(posy == 0 && dif == -1) break;
+                                    posy += dif;
+                                    cur = &buffer.rows[posy];
+                                    posx = (posx < 0) ? cur->size : 0;
+                                }
+                                opposite = find_opposite_brace(cur->contents[posx]);
+                                if(opposite.brace == '0') continue; 
+                                if((opposite.closing && dif == -1) || (!opposite.closing && dif == 1)) {
+                                    brace_stack_s++;
+                                } else {
+                                    if(brace_stack_s-- == 0 && opposite.brace == initial_brace) break;
+                                }
+                            }
+                            if((posx >= 0 && posy >= 0) && ((size_t)posy <= buffer.row_s)) {
+                                buffer.cur_pos = posx;
+                                buffer.row_index = posy;
+                            }
+                            break;
                         }
-                        memset(command, 0, command_s);
-                        command_s = 0;
-                        mode = NORMAL;
-                    } break;
-                    case LEFT_ARROW:
-                        if(buffer.cur_pos != 0) buffer.cur_pos--;
-                        break;
-                    case DOWN_ARROW:
-                        break;
-                    case UP_ARROW:
-                        break;
-                    case RIGHT_ARROW:
-                        if(buffer.cur_pos < command_s) buffer.cur_pos++;
-                        break;
-                    default: {
-                        shift_str_right(command, &command_s, buffer.cur_pos);
-                        command[buffer.cur_pos++] = ch;
-                    } break;
-                }
-            } break;
+                        case ctrl('s'): {
+                            handle_save(&buffer);
+                            QUIT = 1;
+                            repeating_count = 1;
+                        } break;
+                        default:
+                            continue;
+                    }
+                    if(buffer.cur_pos > buffer.rows[buffer.row_index].size) buffer.cur_pos = buffer.rows[buffer.row_index].size;
+                    x = buffer.cur_pos;
+                    y = buffer.row_index;
+                    wmove(main_win, y, x);
+                    break;
+                case INSERT: {
+                    switch(ch) {
+                        case BACKSPACE: {
+                            getyx(main_win, y, x);
+                            if(buffer.cur_pos == 0) {
+                                if(buffer.row_index != 0) {
+                                    Row *cur = &buffer.rows[--buffer.row_index];
+                                    buffer.cur_pos = cur->size;
+                                    wmove(main_win, buffer.row_index, buffer.cur_pos);
+                                    delete_and_append_row(&buffer, cur->index+1);
+                                }
+                            } else {
+                                Row *cur = &buffer.rows[buffer.row_index];
+                                shift_row_left(cur, --buffer.cur_pos);
+                                wmove(main_win, y, buffer.cur_pos);
+                            }
+                        } break;
+                        case ESCAPE:
+                            mode = NORMAL;
+                            break;
+                        case ENTER: {
+                            Row *cur = &buffer.rows[buffer.row_index]; 
+                            create_and_cut_row(&buffer, buffer.row_index+1,
+                                        &cur->size, buffer.cur_pos);
+                            buffer.row_index++; 
+                            buffer.cur_pos = 0;
+                        } break;
+                        case LEFT_ARROW:
+                            if(buffer.cur_pos != 0) buffer.cur_pos--;
+                            break;
+                        case DOWN_ARROW:
+                            if(buffer.row_index < buffer.row_s) buffer.row_index++;
+                            break;
+                        case UP_ARROW:
+                            if(buffer.row_index != 0) buffer.row_index--;
+                            break;
+                        case RIGHT_ARROW:
+                            if(buffer.cur_pos < buffer.rows[buffer.row_index].size) buffer.cur_pos++;
+                            break;
+                        case KEY_RESIZE:
+                            wrefresh(main_win);
+                            break;
+                        default: {
+                            mvwprintw(main_win, 10, 10, "%d", ch);
+                            Row *cur = &buffer.rows[buffer.row_index];
+                            Brace cur_brace = find_opposite_brace(cur->contents[buffer.cur_pos]);
+                            if(
+                                (cur_brace.brace != '0' && cur_brace.closing && 
+                                 ch == find_opposite_brace(cur_brace.brace).brace) || 
+                                (cur->contents[buffer.cur_pos] == '"' && ch == '"') ||
+                                (cur->contents[buffer.cur_pos] == '\'' && ch == '\'')
+                            ) {
+                                buffer.cur_pos++;
+                                break;
+                            };
+                            if(ch == 9) {
+                                // TODO: use tabs instead of just 4 spaces
+                                for(size_t i = 0; i < 4; i++) {
+                                    cur->contents[buffer.cur_pos] = ' ';
+                                    shift_row_right(cur, buffer.cur_pos++);
+                                }
+                            } else {
+                                shift_row_right(cur, buffer.cur_pos);
+                                cur->contents[buffer.cur_pos++] = ch;
+                            }
+                            Brace next_ch = find_opposite_brace(ch); 
+                            if(next_ch.brace != '0' && !next_ch.closing) {
+                                shift_row_right(cur, buffer.cur_pos);
+                                cur->contents[buffer.cur_pos] = next_ch.brace;
+                            } 
+                            if(ch == '"' || ch == '\'') {
+                                shift_row_right(cur, buffer.cur_pos);
+                                cur->contents[buffer.cur_pos] = ch;
+                            }
+                        } break;
+                    }
+                 } break;
+                case COMMAND: {
+                    switch(ch) {
+                        case BACKSPACE: {
+                            if(buffer.cur_pos != 0) {
+                                shift_str_left(command, &command_s, --buffer.cur_pos);
+                                wmove(status_bar, 1, buffer.cur_pos);
+                            }
+                        } break;
+                        case ESCAPE:
+                            command_s = 0;
+                            mode = NORMAL;
+                            break;
+                        case ENTER: {
+                            if(command[0] == '!') {
+                                shift_str_left(command, &command_s, 0);
+                                FILE *file = popen(command, "r");
+                                if(file == NULL) {
+                                    endwin();
+                                    fprintf(stderr, "err");
+                                    exit(1);
+                                }
+                                while(fgets(status_bar_msg, sizeof(status_bar_msg), file) != NULL) {
+                                    print_msg = 1;
+                                }
+                                pclose(file);
+                            } else {
+                                Command cmd = parse_command(command, command_s);
+                                int err = execute_command(&cmd, &buffer);
+                                if(err != 0) {
+                                    sprintf(status_bar_msg, "Unnown command: %s", cmd.command);
+                                    print_msg = 1;
+                                }
+                            }
+                            memset(command, 0, command_s);
+                            command_s = 0;
+                            mode = NORMAL;
+                        } break;
+                        case LEFT_ARROW:
+                            if(buffer.cur_pos != 0) buffer.cur_pos--;
+                            break;
+                        case DOWN_ARROW:
+                            break;
+                        case UP_ARROW:
+                            break;
+                        case RIGHT_ARROW:
+                            if(buffer.cur_pos < command_s) buffer.cur_pos++;
+                            break;
+                        default: {
+                            shift_str_right(command, &command_s, buffer.cur_pos);
+                            command[buffer.cur_pos++] = ch;
+                        } break;
+                    }
+                } break;
+            }
+            if(mode != COMMAND && buffer.cur_pos > buffer.rows[buffer.row_index].size) buffer.cur_pos = buffer.rows[buffer.row_index].size;
+            x = buffer.cur_pos;
+            y = buffer.row_index;
+            getyx(main_win, y, x);
+            getmaxyx(stdscr, grow, gcol);
         }
-        if(mode != COMMAND && buffer.cur_pos > buffer.rows[buffer.row_index].size) buffer.cur_pos = buffer.rows[buffer.row_index].size;
-        x = buffer.cur_pos;
-        y = buffer.row_index;
-        getyx(main_win, y, x);
-        getmaxyx(stdscr, grow, gcol);
     }
 
     wrefresh(main_win);
