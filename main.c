@@ -21,6 +21,7 @@
 typedef enum {
     NORMAL,
     INSERT,
+    SEARCH,
     COMMAND,
 } Mode;
 
@@ -62,6 +63,9 @@ char *stringify_mode() {
             break;
         case INSERT:
             return "INSERT";
+            break;
+        case SEARCH:
+            return "SEARCH";
             break;
         case COMMAND:
             return "COMMAND";
@@ -338,7 +342,7 @@ int main(int argc, char *argv[]) {
             wclear(status_bar);
             print_msg = 0;
         }
-        if(mode == COMMAND) {
+        if(mode == COMMAND || mode == SEARCH) {
             mvwprintw(status_bar, 1, 0, ":%.*s", (int)command_s, command);
         }
         mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
@@ -352,9 +356,9 @@ int main(int argc, char *argv[]) {
                 size_t print_index = i - line_render_start;
                 wattron(line_num_win, COLOR_PAIR(LINE_NUMS));
                 if(relative_nums) {
-                    if(buffer.row_index == print_index) mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
+                    if(buffer.row_index == i) mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
                     else mvwprintw(line_num_win, print_index, 0, "%4zu", 
-                                   (size_t)abs((int)buffer.row_index-(int)print_index));
+                                   (size_t)abs((int)i-(int)buffer.row_index));
                 } else {
                     mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
                 }
@@ -377,7 +381,7 @@ int main(int argc, char *argv[]) {
             wrefresh(status_bar);
         }
 
-        if(mode != COMMAND) {
+        if(mode != COMMAND && mode != SEARCH) {
             wmove(main_win, y, x);
             ch = wgetch(main_win);
         } else {
@@ -427,6 +431,11 @@ int main(int argc, char *argv[]) {
                             break;
                         case ':':
                             mode = COMMAND;
+                            buffer.cur_pos = 0;
+                            repeating_count = 1;
+                            break;
+                        case '/':
+                            mode = SEARCH;
                             buffer.cur_pos = 0;
                             repeating_count = 1;
                             break;
@@ -689,8 +698,51 @@ int main(int argc, char *argv[]) {
                         } break;
                     }
                 } break;
+                case SEARCH: {
+                    switch(ch) {
+                        case BACKSPACE: {
+                            if(buffer.cur_pos != 0) {
+                                shift_str_left(command, &command_s, --buffer.cur_pos);
+                                wmove(status_bar, 1, buffer.cur_pos);
+                            }
+                        } break;
+                        case ESCAPE:
+                            command_s = 0;
+                            mode = NORMAL;
+                            break;
+                        case ENTER: {
+                            for(size_t i = buffer.row_index; i <= buffer.row_s; i++) {
+                                Row *cur = &buffer.rows[i];
+                                for(size_t j = 0; j < cur->size; j++) {
+                                    if(strncmp(cur->contents+j, command, command_s) == 0) {
+                                        buffer.row_index = i;
+                                        buffer.cur_pos = j;
+                                        //wmove(main_win, i, j);
+                                    }
+                                }
+                            }
+                            memset(command, 0, command_s);
+                            command_s = 0;
+                            mode = NORMAL;
+                        } break;
+                        case LEFT_ARROW:
+                            if(buffer.cur_pos != 0) buffer.cur_pos--;
+                            break;
+                        case DOWN_ARROW:
+                            break;
+                        case UP_ARROW:
+                            break;
+                        case RIGHT_ARROW:
+                            if(buffer.cur_pos < command_s) buffer.cur_pos++;
+                            break;
+                        default: {
+                            shift_str_right(command, &command_s, buffer.cur_pos);
+                            command[buffer.cur_pos++] = ch;
+                        } break;
+                    }
+                } break;
             }
-            if(mode != COMMAND && buffer.cur_pos > buffer.rows[buffer.row_index].size) buffer.cur_pos = buffer.rows[buffer.row_index].size;
+            if(mode != COMMAND && mode != SEARCH && buffer.cur_pos > buffer.rows[buffer.row_index].size) buffer.cur_pos = buffer.rows[buffer.row_index].size;
             x = buffer.cur_pos;
             y = buffer.row_index;
             getyx(main_win, y, x);
