@@ -323,9 +323,9 @@ int main(int argc, char *argv[]) {
     size_t y = 0;
     while(ch != ctrl('q') && QUIT != 1) {
 #ifndef NO_CLEAR
-        wclear(main_win);
-        wclear(status_bar);
-        wclear(line_num_win);
+        werase(main_win);
+        werase(status_bar);
+        werase(line_num_win);
 #endif
         getmaxyx(main_win, row, col);
         // status bar
