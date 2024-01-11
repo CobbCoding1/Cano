@@ -437,6 +437,17 @@ int main(int argc, char *argv[]) {
                             buffer.cur_pos++;
                         }
                     } break;
+                    case 'o': {
+                        shift_rows_right(&buffer, buffer.row_index+1);
+                        buffer.row_index++; 
+                        buffer.cur_pos = 0;
+                        mode = INSERT;
+                    } break;
+                    case 'O': {
+                        shift_rows_right(&buffer, buffer.row_index);
+                        buffer.cur_pos = 0;
+                        mode = INSERT;
+                    } break;
                     case '%': {
                         Row *cur = &buffer.rows[buffer.row_index];
                         char initial_brace = cur->contents[buffer.cur_pos];

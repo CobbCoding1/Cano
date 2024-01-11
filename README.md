@@ -30,6 +30,8 @@ make
 |Normal| w        | Go to next word           |
 |Normal| b        | Go to last word           |
 |Normal| e        | Go to end of next word    |
+|Normal| o        | Create line below current |
+|Normal| O        | Create line above current |
 |Normal| %        | Go to corresponding brace |
 |Normal| Ctrl + S | Save and exit             |
 |Insert| Esc      | Exit insert mode          |
