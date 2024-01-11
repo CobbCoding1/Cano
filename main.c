@@ -154,10 +154,10 @@ void shift_row_left(Row *row, size_t index) {
 }
 
 void shift_row_right(Row *row, size_t index) {
-    row->size++;  
-    for(size_t i = row->size; i > index; i--) {
+    for(size_t i = row->size++; i > index; i--) {
         row->contents[i] = row->contents[i-1];
     }
+    row->contents[index] = ' ';
 }
 
 void shift_str_left(char *str, size_t *str_s, size_t index) {
@@ -549,9 +549,18 @@ int main(int argc, char *argv[]) {
                         wrefresh(main_win);
                         break;
                     default: {
+                        mvwprintw(main_win, 10, 10, "%d", ch);
                         Row *cur = &buffer.rows[buffer.row_index];
-                        shift_row_right(cur, buffer.cur_pos);
-                        cur->contents[buffer.cur_pos++] = ch;
+                        if(ch == 9) {
+                            // TODO: use tabs instead of just 4 spaces
+                            for(size_t i = 0; i < 4; i++) {
+                                cur->contents[buffer.cur_pos] = ' ';
+                                shift_row_right(cur, buffer.cur_pos++);
+                            }
+                        } else {
+                            shift_row_right(cur, buffer.cur_pos);
+                            cur->contents[buffer.cur_pos++] = ch;
+                        }
                         Brace next_ch = find_opposite_brace(ch); 
                         if(next_ch.brace != '0' && !next_ch.closing) {
                             shift_row_right(cur, buffer.cur_pos);
