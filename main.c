@@ -403,7 +403,7 @@ int main(int argc, char *argv[]) {
                         cur->size = 0;
                         if(buffer.row_s != 0) {
                             if(buffer.row_index == buffer.row_s) buffer.row_index--;
-                            shift_rows_left(&buffer, cur->index);
+                            shift_rows_left(&buffer, buffer.row_index);
                         }
                     } break;
                     case 'g':
