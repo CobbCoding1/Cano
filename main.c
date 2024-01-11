@@ -520,6 +520,9 @@ int main(int argc, char *argv[]) {
                     case RIGHT_ARROW:
                         if(buffer.cur_pos < buffer.rows[buffer.row_index].size) buffer.cur_pos++;
                         break;
+                    case KEY_RESIZE:
+                        wrefresh(main_win);
+                        break;
                     default: {
                         Row *cur = &buffer.rows[buffer.row_index];
                         shift_row_right(cur, buffer.cur_pos);
