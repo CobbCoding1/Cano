@@ -658,7 +658,8 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
 
     if(*repeating_count > 1) {
         *repeating_count -= 1;
-        handle_keys(buffer, main_win, status_bar, y, ch, command, command_s, repeating, repeating_count, normal_pos, is_print_msg, status_bar_msg);
+        handle_keys(buffer, main_win, status_bar, y, ch, command, command_s, repeating, 
+                    repeating_count, normal_pos, is_print_msg, status_bar_msg);
     }
 }
 
