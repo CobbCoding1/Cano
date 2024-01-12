@@ -356,15 +356,19 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     reset_command(command, command_s);
                     *repeating_count = 1;
                     break;
+                case LEFT_ARROW:
                 case 'h':
                     if(buffer->cur_pos != 0) buffer->cur_pos--;
                     break;
+                case DOWN_ARROW:
                 case 'j':
                     if(buffer->row_index < buffer->row_s) buffer->row_index++;
                     break;
+                case UP_ARROW:
                 case 'k':
                     if(buffer->row_index != 0) buffer->row_index--;
                     break;
+                case RIGHT_ARROW:
                 case 'l':
                     buffer->cur_pos++;
                     break;

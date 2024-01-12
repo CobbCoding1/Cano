@@ -8,4 +8,4 @@ build: $(SRC)main.c
 	$(CC) $^ $(LIBS) -o $(OUT)main $(CFLAGS)
 
 debug: $(SRC)main.c
-	$(CC) $^ $(LIBS) -o $(OUT)main $(CFLAGS) -ggdb2 
+	$(CC) $^ $(LIBS) -o $(OUT)debug $(CFLAGS) -ggdb2 
