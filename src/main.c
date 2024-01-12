@@ -46,8 +46,10 @@ typedef struct {
 } Row;
 
 #define MAX_ROWS 1024
+#define STARTING_ROW_SIZE 128
 typedef struct {
-    Row rows[MAX_ROWS];
+    Row *rows;
+    size_t row_capacity;
     size_t row_index;
     size_t cur_pos;
     size_t row_s;
@@ -79,6 +81,22 @@ char *stringify_mode() {
             break;
     }
     return "NORMAL";
+}
+
+void resize_rows(Buffer *buffer, size_t capacity) {
+    Row *rows = calloc(capacity*2, sizeof(Row));
+    if(rows == NULL) {
+        CRASH("no more ram");
+    }
+    memcpy(rows, buffer->rows, sizeof(Row)*buffer->row_capacity);
+    buffer->rows = rows;
+    for(size_t i = buffer->row_capacity; i < capacity*2; i++) {
+        buffer->rows[i].contents = calloc(MAX_STRING_SIZE, sizeof(char));
+        if(buffer->rows[i].contents == NULL) {
+            CRASH("no more ram");
+        }
+    }
+    buffer->row_capacity = capacity * 2;
 }
 
 void push_window(WINDOW *windows[16], size_t *windows_s, WINDOW *win) {
@@ -173,8 +191,11 @@ void shift_rows_left(Buffer *buf, size_t index) {
 }
 
 void shift_rows_right(Buffer *buf, size_t index) {
-    assert(buf->row_s+1 < MAX_ROWS);
+    if(buf->row_s > buf->row_capacity) resize_rows(buf, buf->row_capacity);
     char *new = calloc(MAX_STRING_SIZE, sizeof(char));
+    if(new == NULL) {
+        CRASH("no more ram");
+    }
     for(size_t i = buf->row_s+1; i > index; i--) {
         buf->rows[i] = buf->rows[i-1];
     }
@@ -233,6 +254,9 @@ void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t in
     assert(dest_index > 0);
     size_t final_s = *str_s - index;
     char *temp = calloc(final_s, sizeof(char));
+    if(temp == NULL) {
+        CRASH("no more ram");
+    }
     size_t temp_len = 0;
     for(size_t i = index; i < *str_s; i++) {
         temp[temp_len++] = buf->rows[dest_index-1].contents[i];
@@ -256,6 +280,7 @@ void read_file_to_buffer(Buffer *buffer, char *filename) {
     fseek(file, 0, SEEK_SET);
     char *buf = malloc(sizeof(char)*length);
     fread(buf, sizeof(char)*length, 1, file);
+    if(length > buffer->row_capacity) resize_rows(buffer, length);
     for(size_t i = 0; i+1 < length; i++) {
         if(buf[i] == '\n') {
             buffer->row_s++;
@@ -639,6 +664,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
 
 typedef enum {
     LINE_NUMS = 1,
+    BLUE_COLOR,
 } Color_Pairs;
 
 int main(int argc, char *argv[]) {
@@ -657,6 +683,7 @@ int main(int argc, char *argv[]) {
     // colors
     start_color();
     init_pair(LINE_NUMS, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
 
     noecho();
     raw();
@@ -683,8 +710,14 @@ int main(int argc, char *argv[]) {
     keypad(status_bar, TRUE);
 
     Buffer buffer = {0};
-    for(size_t i = 0; i < 1024; i++) {
+    buffer.row_capacity = STARTING_ROW_SIZE;
+    buffer.rows = malloc(buffer.row_capacity * sizeof(Row));
+    memset(buffer.rows, 0, sizeof(Row)*buffer.row_capacity);
+    for(size_t i = 0; i < buffer.row_capacity; i++) {
         buffer.rows[i].contents = calloc(MAX_STRING_SIZE, sizeof(char));
+        if(buffer.rows[i].contents == NULL) {
+            CRASH("no more ram");
+        }
     }
     if(filename != NULL) read_file_to_buffer(&buffer, filename);
     else buffer.filename = "out.txt";
@@ -742,7 +775,9 @@ int main(int argc, char *argv[]) {
                     mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
                 }
                 wattroff(line_num_win, COLOR_PAIR(LINE_NUMS));
-                mvwprintw(main_win, print_index, 0, "%s", buffer.rows[i].contents);
+                for(size_t j = 0; j < buffer.rows[i].size; j++) {
+                    mvwprintw(main_win, print_index, j, "%c", buffer.rows[i].contents[j]);
+                }
             }
         }
 
@@ -784,7 +819,9 @@ int main(int argc, char *argv[]) {
 
         wmove(main_win, y, x);
 
-        handle_keys(&buffer, main_win, status_bar, &y, ch, command, &command_s, &repeating, &repeating_count, &normal_pos, &is_print_msg, status_bar_msg);
+        // TODO: move a lot of these extra variables into buffer struct
+        handle_keys(&buffer, main_win, status_bar, &y, ch, command, &command_s, 
+                    &repeating, &repeating_count, &normal_pos, &is_print_msg, status_bar_msg);
         if(mode != COMMAND && mode != SEARCH && buffer.cur_pos > buffer.rows[buffer.row_index].size) {
             buffer.cur_pos = buffer.rows[buffer.row_index].size;
         }
