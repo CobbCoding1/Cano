@@ -74,6 +74,20 @@ char *stringify_mode() {
     return "NORMAL";
 }
 
+void search(Buffer *buffer, char *command, size_t command_s) {
+    for(size_t i = buffer->row_index; i <= buffer->row_s+buffer->row_index; i++) {
+        size_t index = (i + buffer->row_s+1) % (buffer->row_s+1);
+        Row *cur = &buffer->rows[index];
+        for(size_t j = 0; j < cur->size; j++) {
+            if(strncmp(cur->contents+j, command, command_s) == 0) {
+                buffer->row_index = index;
+                buffer->cur_pos = j;
+                return;
+            }
+        }
+    }
+}
+
 void handle_save(Buffer *buffer) {
     FILE *file = fopen(buffer->filename, "w"); 
     for(size_t i = 0; i <= buffer->row_s; i++) {
@@ -711,16 +725,7 @@ int main(int argc, char *argv[]) {
                             mode = NORMAL;
                             break;
                         case ENTER: {
-                            for(size_t i = buffer.row_index; i <= buffer.row_s; i++) {
-                                Row *cur = &buffer.rows[i];
-                                for(size_t j = 0; j < cur->size; j++) {
-                                    if(strncmp(cur->contents+j, command, command_s) == 0) {
-                                        buffer.row_index = i;
-                                        buffer.cur_pos = j;
-                                        //wmove(main_win, i, j);
-                                    }
-                                }
-                            }
+                            search(&buffer, command, command_s);
                             memset(command, 0, command_s);
                             command_s = 0;
                             mode = NORMAL;
