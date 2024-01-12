@@ -16,6 +16,7 @@ make
 |Mode  | Keybind  | Action                    |
 |------|----------|---------------------------|
 |Global| Ctrl + Q | Quit (regardless of mode) |
+|Global| Esc      | Enter Normal Mode         |
 |Normal| h        | Move left                 |
 |Normal| j        | Move down                 |
 |Normal| k        | Move up                   |
@@ -36,9 +37,10 @@ make
 |Normal| o        | Create line below current |
 |Normal| O        | Create line above current |
 |Normal| %        | Go to corresponding brace |
+|Normal| /        | Enter serach mode         |
+|Normal| n        | Jump to next search       |
 |Normal| Ctrl + S | Save and exit             |
 |Normal| r + (n)  | Repeat next motion n times|
-|Insert| Esc      | Exit insert mode          |
 
 ## Commands 
 | Command    | Action                    |
