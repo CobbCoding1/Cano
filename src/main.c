@@ -414,6 +414,11 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     mode = INSERT;
                     *repeating_count = 1;
                 } break;
+                case ctrl('o'): {
+                    shift_rows_right(buffer, buffer->row_index+1);
+                    buffer->row_index++; 
+                    buffer->cur_pos = 0;
+                } break;
                 case 'r':
                     *repeating = 1;
                     break;  
