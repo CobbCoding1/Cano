@@ -1,9 +1,11 @@
 CC = cc 
 CFLAGS = -Wall -Wextra -pedantic
 LIBS = -lcurses
+SRC = src/
+OUT = build/
 
-build:
-	$(CC) main.c $(LIBS) -o main $(CFLAGS) 
+build: $(SRC)main.c
+	$(CC) $^ $(LIBS) -o $(OUT)main $(CFLAGS)
 
-debug:
-	$(CC) main.c $(LIBS) -o main $(CFLAGS) -ggdb2 
+debug: $(SRC)main.c
+	$(CC) $^ $(LIBS) -o $(OUT)main $(CFLAGS) -ggdb2 
