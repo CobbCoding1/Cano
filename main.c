@@ -78,7 +78,8 @@ void search(Buffer *buffer, char *command, size_t command_s) {
     for(size_t i = buffer->row_index; i <= buffer->row_s+buffer->row_index; i++) {
         size_t index = (i + buffer->row_s+1) % (buffer->row_s+1);
         Row *cur = &buffer->rows[index];
-        for(size_t j = 0; j < cur->size; j++) {
+        size_t j = (i == buffer->row_index) ? buffer->cur_pos+1 : 0;
+        for(; j < cur->size; j++) {
             if(strncmp(cur->contents+j, command, command_s) == 0) {
                 buffer->row_index = index;
                 buffer->cur_pos = j;
@@ -339,6 +340,8 @@ int main(int argc, char *argv[]) {
     char command[64] = {0};
     size_t command_s = 0;
 
+    size_t normal_pos = 0;
+
     size_t x = 0; 
     size_t y = 0;
     while(ch != ctrl('q') && QUIT != 1) {
@@ -398,6 +401,9 @@ int main(int argc, char *argv[]) {
         if(mode != COMMAND && mode != SEARCH) {
             wmove(main_win, y, x);
             ch = wgetch(main_win);
+        } else if(mode == COMMAND){
+            wmove(status_bar, 1, buffer.cur_pos+1);
+            ch = wgetch(status_bar);
         } else {
             wmove(status_bar, 1, buffer.cur_pos+1);
             ch = wgetch(status_bar);
@@ -450,7 +456,10 @@ int main(int argc, char *argv[]) {
                             break;
                         case '/':
                             mode = SEARCH;
+                            normal_pos = buffer.cur_pos;
                             buffer.cur_pos = 0;
+                            memset(command, 0, command_s);
+                            command_s = 0;
                             repeating_count = 1;
                             break;
                         case 'h':
@@ -534,8 +543,11 @@ int main(int argc, char *argv[]) {
                             mode = INSERT;
                             repeating_count = 1;
                         } break;
-                        case 'r': {
+                        case 'r':
                             repeating = 1;
+                            break;  
+                        case 'n': {
+                            search(&buffer, command, command_s);
                         } break;
                         case '%': {
                             Row *cur = &buffer.rows[buffer.row_index];
@@ -574,6 +586,10 @@ int main(int argc, char *argv[]) {
                             QUIT = 1;
                             repeating_count = 1;
                         } break;
+                        case ESCAPE:
+                            memset(command, 0, command_s);
+                            command_s = 0;
+                            mode = NORMAL;
                         default:
                             continue;
                     }
@@ -668,6 +684,7 @@ int main(int argc, char *argv[]) {
                             }
                         } break;
                         case ESCAPE:
+                            memset(command, 0, command_s);
                             command_s = 0;
                             mode = NORMAL;
                             break;
@@ -721,13 +738,14 @@ int main(int argc, char *argv[]) {
                             }
                         } break;
                         case ESCAPE:
+                            memset(command, 0, command_s);
+                            buffer.cur_pos = normal_pos;
                             command_s = 0;
                             mode = NORMAL;
                             break;
                         case ENTER: {
                             search(&buffer, command, command_s);
-                            memset(command, 0, command_s);
-                            command_s = 0;
+                            buffer.cur_pos = normal_pos;
                             mode = NORMAL;
                         } break;
                         case LEFT_ARROW:
@@ -747,7 +765,9 @@ int main(int argc, char *argv[]) {
                     }
                 } break;
             }
-            if(mode != COMMAND && mode != SEARCH && buffer.cur_pos > buffer.rows[buffer.row_index].size) buffer.cur_pos = buffer.rows[buffer.row_index].size;
+            if(mode != COMMAND && mode != SEARCH && buffer.cur_pos > buffer.rows[buffer.row_index].size) {
+                buffer.cur_pos = buffer.rows[buffer.row_index].size;
+            }
             x = buffer.cur_pos;
             y = buffer.row_index;
             getyx(main_win, y, x);
