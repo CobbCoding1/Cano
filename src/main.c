@@ -7,6 +7,8 @@
 
 #include <curses.h>
 
+#include "lex.c"
+
 #define CRASH(str)                    \
         do {                          \
             endwin();                 \
@@ -677,6 +679,12 @@ typedef enum {
     BLUE_COLOR,
 } Color_Pairs;
 
+typedef struct {
+    size_t row;
+    size_t col;
+    size_t size;
+} Syntax_Highlighting;
+
 int main(int argc, char *argv[]) {
     char *program = argv[0];
     (void)program;
@@ -701,7 +709,7 @@ int main(int argc, char *argv[]) {
     int grow, gcol;
     getmaxyx(stdscr, grow, gcol);
     #define LINE_NUM_WIDTH 5
-    WINDOW *main_win = newwin(grow*0.95, gcol-LINE_NUM_WIDTH, 0, 5);
+    WINDOW *main_win = newwin(grow*0.95, gcol-LINE_NUM_WIDTH, 0, LINE_NUM_WIDTH);
     WINDOW *line_num_win = newwin(grow*0.95, LINE_NUM_WIDTH, 0, 0);
 
     int main_row, main_col;
@@ -749,6 +757,22 @@ int main(int argc, char *argv[]) {
 
     size_t normal_pos = 0;
 
+
+    Syntax_Highlighting token_indexes[128] = {0};
+    size_t token_indexes_s = 0;
+
+    /*
+    for(size_t i = 0; i < buffer.row_s; i++) {
+        size_t token_capacity = 32;
+        Token *token_arr = malloc(sizeof(Token)*token_capacity);
+        size_t token_s = generate_tokens(buffer.rows[i].contents, buffer.rows[i].size, token_arr, &token_capacity);
+        for(size_t j = 0; j < token_s; j++) {
+            token_indexes[token_indexes_s++] = (Syntax_Highlighting){.row = i, .col=token_arr[j].index, .size=token_arr[j].size};
+        }
+        free(token_arr);
+    }
+    */
+
     size_t x = 0; 
     size_t y = 0;
     while(ch != ctrl('q') && QUIT != 1) {
@@ -789,12 +813,25 @@ int main(int argc, char *argv[]) {
                     mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                 }
                 wattroff(line_num_win, COLOR_PAIR(LINE_NUMS));
+
+                size_t off_at = 0;
+
+                size_t token_capacity = 32;
+                Token *token_arr = malloc(sizeof(Token)*token_capacity);
+                size_t token_s = generate_tokens(buffer.rows[i].contents, 
+                                                 buffer.rows[i].size, token_arr, &token_capacity);
+                
                 for(size_t j = col_render_start; j <= col_render_start+main_col; j++) {
-                    if(i <= buffer.rows[i].size) {
-                        size_t print_index_x = j - col_render_start;
-                        mvwprintw(main_win, print_index_y, print_index_x, "%c", buffer.rows[i].contents[j]);
+                    size_t keyword_size = 0;
+                    if(is_in_tokens_index(token_arr, token_s, j, &keyword_size)) {
+                        wattron(main_win, COLOR_PAIR(BLUE_COLOR));
+                        off_at = j + keyword_size;
                     }
+                    if(j == off_at) wattroff(main_win, COLOR_PAIR(BLUE_COLOR));
+                    size_t print_index_x = j - col_render_start;
+                    mvwprintw(main_win, print_index_y, print_index_x, "%c", buffer.rows[i].contents[j]);
                 }
+                free(token_arr);
             }
         }
 
@@ -806,7 +843,7 @@ int main(int argc, char *argv[]) {
         x = buffer.cur_pos-col_render_start;
 
         if(repeating) {
-            mvwprintw(status_bar, 1, gcol-10, "r");
+            mvwprintw(status_bar, 1, gcol-5, "r");
             wrefresh(status_bar);
         }
 
@@ -826,7 +863,7 @@ int main(int argc, char *argv[]) {
             size_t num_s = 0;
             while(isdigit(ch)) {
                 num[num_s++] = ch;
-                mvwprintw(status_bar, 1, (gcol-10)+num_s, "%c", num[num_s-1]);
+                mvwprintw(status_bar, 1, (gcol-5)+num_s, "%c", num[num_s-1]);
                 wrefresh(status_bar);
                 ch = wgetch(main_win);
             }
