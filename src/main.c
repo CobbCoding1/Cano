@@ -674,11 +674,6 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
     }
 }
 
-typedef enum {
-    LINE_NUMS = 1,
-    BLUE_COLOR,
-} Color_Pairs;
-
 typedef struct {
     size_t row;
     size_t col;
@@ -700,8 +695,11 @@ int main(int argc, char *argv[]) {
 
     // colors
     start_color();
-    init_pair(LINE_NUMS, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
     init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
+    init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
+    init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
+    init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
 
     noecho();
     raw();
@@ -758,10 +756,10 @@ int main(int argc, char *argv[]) {
     size_t normal_pos = 0;
 
 
+    /*
     Syntax_Highlighting token_indexes[128] = {0};
     size_t token_indexes_s = 0;
 
-    /*
     for(size_t i = 0; i < buffer.row_s; i++) {
         size_t token_capacity = 32;
         Token *token_arr = malloc(sizeof(Token)*token_capacity);
@@ -804,7 +802,7 @@ int main(int argc, char *argv[]) {
         for(size_t i = line_render_start; i <= line_render_start+main_row; i++) {
             if(i <= buffer.row_s) {
                 size_t print_index_y = i - line_render_start;
-                wattron(line_num_win, COLOR_PAIR(LINE_NUMS));
+                wattron(line_num_win, COLOR_PAIR(YELLOW_COLOR));
                 if(relative_nums) {
                     if(buffer.row_index == i) mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                     else mvwprintw(line_num_win, print_index_y, 0, "%4zu", 
@@ -812,7 +810,7 @@ int main(int argc, char *argv[]) {
                 } else {
                     mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                 }
-                wattroff(line_num_win, COLOR_PAIR(LINE_NUMS));
+                wattroff(line_num_win, COLOR_PAIR(YELLOW_COLOR));
 
                 size_t off_at = 0;
 
@@ -821,13 +819,14 @@ int main(int argc, char *argv[]) {
                 size_t token_s = generate_tokens(buffer.rows[i].contents, 
                                                  buffer.rows[i].size, token_arr, &token_capacity);
                 
+                Color_Pairs color = YELLOW_COLOR; 
                 for(size_t j = col_render_start; j <= col_render_start+main_col; j++) {
                     size_t keyword_size = 0;
-                    if(is_in_tokens_index(token_arr, token_s, j, &keyword_size)) {
-                        wattron(main_win, COLOR_PAIR(BLUE_COLOR));
+                    if(is_in_tokens_index(token_arr, token_s, j, &keyword_size, &color)) {
+                        wattron(main_win, COLOR_PAIR(color));
                         off_at = j + keyword_size;
                     }
-                    if(j == off_at) wattroff(main_win, COLOR_PAIR(BLUE_COLOR));
+                    if(j == off_at) wattroff(main_win, COLOR_PAIR(color));
                     size_t print_index_x = j - col_render_start;
                     mvwprintw(main_win, print_index_y, print_index_x, "%c", buffer.rows[i].contents[j]);
                 }
