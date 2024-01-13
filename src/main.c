@@ -152,7 +152,7 @@ Command parse_command(char *command, size_t command_s) {
     if(args_start <= command_s) {
         for(size_t i = args_start+1; i < command_s; i++) {
             if(i == command_s-1 || command[i] == ' ') {
-                cmd.args[cmd.args_s] = malloc(sizeof(char)*i-args_start);
+                cmd.args[cmd.args_s] = malloc(sizeof(char)*i-args_start+1);
                 strncpy(cmd.args[cmd.args_s++], command+args_start+1, i-args_start);
                 args_start = i;
             }
