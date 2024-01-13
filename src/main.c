@@ -670,12 +670,6 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
             }
         } break;
     }
-
-    if(*repeating_count > 1) {
-        *repeating_count -= 1;
-        handle_keys(buffer, main_win, status_bar, y, ch, command, command_s, repeating, 
-                    repeating_count, normal_pos, is_print_msg, status_bar_msg);
-    }
 }
 
 typedef enum {
@@ -805,7 +799,7 @@ int main(int argc, char *argv[]) {
         x = buffer.cur_pos;
 
         if(repeating) {
-            mvwprintw(status_bar, 1, gcol-5, "r");
+            mvwprintw(status_bar, 1, gcol-10, "r");
             wrefresh(status_bar);
         }
 
@@ -821,11 +815,11 @@ int main(int argc, char *argv[]) {
         }
 
         if(repeating) {
-            char num[16] = {0};
+            char num[32] = {0};
             size_t num_s = 0;
             while(isdigit(ch)) {
                 num[num_s++] = ch;
-                mvwprintw(status_bar, 1, (gcol-5)+num_s, "%c", num[num_s-1]);
+                mvwprintw(status_bar, 1, (gcol-10)+num_s, "%c", num[num_s-1]);
                 wrefresh(status_bar);
                 ch = wgetch(main_win);
             }
@@ -836,8 +830,10 @@ int main(int argc, char *argv[]) {
         wmove(main_win, y, x);
 
         // TODO: move a lot of these extra variables into buffer struct
-        handle_keys(&buffer, main_win, status_bar, &y, ch, command, &command_s, 
-                    &repeating, &repeating_count, &normal_pos, &is_print_msg, status_bar_msg);
+        for(size_t i = 0; i < repeating_count; i++) {
+            handle_keys(&buffer, main_win, status_bar, &y, ch, command, &command_s, 
+                        &repeating, &repeating_count, &normal_pos, &is_print_msg, status_bar_msg);
+        }
         if(mode != COMMAND && mode != SEARCH && buffer.cur_pos > buffer.rows[buffer.row_index].size) {
             buffer.cur_pos = buffer.rows[buffer.row_index].size;
         }
