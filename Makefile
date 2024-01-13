@@ -9,4 +9,5 @@ build: $(SRC)main.c
 	$(CC) $^ $(LIBS) -o $(OUT)main $(CFLAGS)
 
 debug: $(SRC)main.c
+	@mkdir -p $(OUT) 
 	$(CC) $^ $(LIBS) -o $(OUT)debug $(CFLAGS) -ggdb2 
