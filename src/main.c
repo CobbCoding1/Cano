@@ -58,6 +58,7 @@ typedef struct {
 
 typedef struct {
     char *command;
+    size_t command_s;
     char *args[16];
     size_t args_s;
 } Command;
@@ -141,8 +142,9 @@ Command parse_command(char *command, size_t command_s) {
     size_t args_start = 0;
     for(size_t i = 0; i < command_s; i++) {
         if(i == command_s-1 || command[i] == ' ') {
-            cmd.command = malloc(sizeof(char)*i);
-            strncpy(cmd.command, command, i+1);
+            cmd.command_s = i+1;
+            cmd.command = malloc(sizeof(char)*cmd.command_s);
+            strncpy(cmd.command, command, cmd.command_s);
             args_start = i;
             break;
         }
@@ -160,18 +162,18 @@ Command parse_command(char *command, size_t command_s) {
 }
 
 int execute_command(Command *command, Buffer *buf) {
-    if(strncmp(command->command, "set-output", 10) == 0) {
+    if(command->command_s >= 10 && strncmp(command->command, "set-output", 10) == 0) {
         if(command->args_s < 1) return 1; 
         buf->filename = command->args[0];
         for(size_t i = 1; i < command->args_s; i++) free(command->args[i]);
-    } else if(strncmp(command->command, "quit", 4) == 0) {
+    } else if(command->command_s >= 4 && strncmp(command->command, "quit", 4) == 0) {
         QUIT = 1;
-    } else if(strncmp(command->command, "wquit", 5) == 0) {
+    } else if(command->command_s >= 5 && strncmp(command->command, "wquit", 5) == 0) {
         handle_save(buf);
         QUIT = 1;
-    } else if(strncmp(command->command, "w", 1) == 0) {
+    } else if(command->command_s >= 1 && strncmp(command->command, "w", 1) == 0) {
         handle_save(buf);
-    } else if(strncmp(command->command, "relative", 8) == 0) {
+    } else if(command->command_s >= 8 && strncmp(command->command, "relative", 8) == 0) {
         relative_nums = !relative_nums;
     } else {
         return 1;
@@ -319,7 +321,8 @@ Brace find_opposite_brace(char opening) {
     return (Brace){.brace = '0'};
 }
 
-void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, char *command, size_t *command_s, int *repeating, size_t *repeating_count, size_t *normal_pos, int *is_print_msg, char *status_bar_msg) {
+void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, 
+                 char *command, size_t *command_s, int *repeating, size_t *repeating_count, size_t *normal_pos, int *is_print_msg, char *status_bar_msg) {
     switch(mode) {
         case NORMAL:
             switch(ch) {
@@ -517,6 +520,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                 case ESCAPE:
                     mode = NORMAL;
                     break;
+                case KEY_ENTER:
                 case ENTER: {
                     Row *cur = &buffer->rows[buffer->row_index]; 
                     create_and_cut_row(buffer, buffer->row_index+1,
@@ -586,6 +590,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     reset_command(command, command_s);
                     mode = NORMAL;
                     break;
+                case KEY_ENTER:
                 case ENTER: {
                     if(command[0] == '!') {
                         shift_str_left(command, command_s, 0);
