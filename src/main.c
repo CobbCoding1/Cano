@@ -842,7 +842,7 @@ int main(int argc, char *argv[]) {
         x = buffer.cur_pos-col_render_start;
 
         if(repeating) {
-            mvwprintw(status_bar, 1, gcol-5, "r");
+            mvwprintw(status_bar, 1, gcol-10, "r");
             wrefresh(status_bar);
         }
 
@@ -862,7 +862,7 @@ int main(int argc, char *argv[]) {
             size_t num_s = 0;
             while(isdigit(ch)) {
                 num[num_s++] = ch;
-                mvwprintw(status_bar, 1, (gcol-5)+num_s, "%c", num[num_s-1]);
+                mvwprintw(status_bar, 1, (gcol-10)+num_s, "%c", num[num_s-1]);
                 wrefresh(status_bar);
                 ch = wgetch(main_win);
             }
