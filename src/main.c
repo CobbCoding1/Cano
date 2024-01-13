@@ -738,7 +738,7 @@ int main(int argc, char *argv[]) {
     int repeating = 0;
 
     size_t line_render_start = 0;
-    char command[64] = {0};
+    char *command = malloc(sizeof(char)*64);
     size_t command_s = 0;
 
     size_t normal_pos = 0;
