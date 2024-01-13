@@ -5,8 +5,7 @@
 #define VIEW_IMPLEMENTATION
 #include "view.h"
 
-typedef enum {
-    YELLOW_COLOR = 1,
+typedef enum { YELLOW_COLOR = 1,
     BLUE_COLOR,
     GREEN_COLOR,
     RED_COLOR,
@@ -115,6 +114,7 @@ Token generate_word(String_View *view, char *contents) {
     char word[32] = {0};
     size_t word_s = 0;
     while(view->len > 0 && (isalpha(view->data[0]) || view->data[0] == '_')) {
+        if(word_s >= 32) break;
         word[word_s++] = view->data[0]; 
         view->data++;
         view->len--;
