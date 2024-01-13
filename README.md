@@ -8,7 +8,6 @@ Icon from [LocalTexan](https://github.com/LocalTexan)
 ## Quick Start
 Dependencies: CC, Make, ncurses
 ```sh
-mkdir build
 make -B
 ./main
 ```

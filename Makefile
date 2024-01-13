@@ -5,6 +5,7 @@ SRC = src/
 OUT = build/
 
 build: $(SRC)main.c
+	@mkdir -p $(OUT) 
 	$(CC) $^ $(LIBS) -o $(OUT)main $(CFLAGS)
 
 debug: $(SRC)main.c
