@@ -4,9 +4,9 @@ LIBS = -lcurses
 SRC = src/
 OUT = build/
 
-build: $(SRC)main.c
+cano: $(SRC)main.c
 	@mkdir -p $(OUT) 
-	$(CC) $^ $(LIBS) -o $(OUT)main $(CFLAGS)
+	$(CC) $^ $(LIBS) -o $(OUT)cano $(CFLAGS)
 
 debug: $(SRC)main.c
 	@mkdir -p $(OUT) 
