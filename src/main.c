@@ -500,7 +500,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
             break;
         case INSERT: {
             switch(ch) {
-                case BACKSPACE: {
+                case KEY_BACKSPACE: {
                     if(buffer->cur_pos == 0) {
                         if(buffer->row_index != 0) {
                             Row *cur = &buffer->rows[--buffer->row_index];
@@ -576,7 +576,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
          } break;
         case COMMAND: {
             switch(ch) {
-                case BACKSPACE: {
+                case KEY_BACKSPACE: {
                     if(buffer->cur_pos != 0) {
                         shift_str_left(command, command_s, --buffer->cur_pos);
                         wmove(status_bar, 1, buffer->cur_pos);
@@ -626,7 +626,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
         } break;
         case SEARCH: {
             switch(ch) {
-                case BACKSPACE: {
+                case KEY_BACKSPACE: {
                     if(buffer->cur_pos != 0) {
                         shift_str_left(command, command_s, --buffer->cur_pos);
                         wmove(status_bar, 1, buffer->cur_pos);
