@@ -700,12 +700,12 @@ int main(int argc, char *argv[]) {
 
     int grow, gcol;
     getmaxyx(stdscr, grow, gcol);
-    WINDOW *main_win = newwin(grow*0.95, gcol+5, 0, 5);
-    WINDOW *line_num_win = newwin(grow*0.95, 5, 0, 0);
+    #define LINE_NUM_WIDTH 5
+    WINDOW *main_win = newwin(grow*0.95, gcol-LINE_NUM_WIDTH, 0, 5);
+    WINDOW *line_num_win = newwin(grow*0.95, LINE_NUM_WIDTH, 0, 0);
 
     int main_row, main_col;
     getmaxyx(main_win, main_row, main_col);
-    (void)main_col;
 
     WINDOW *status_bar = newwin(grow*0.05, gcol, grow-2, 0);
 
@@ -743,6 +743,7 @@ int main(int argc, char *argv[]) {
     int repeating = 0;
 
     size_t line_render_start = 0;
+    size_t col_render_start = 0;
     char *command = malloc(sizeof(char)*64);
     size_t command_s = 0;
 
@@ -772,21 +773,27 @@ int main(int argc, char *argv[]) {
 
         if(buffer.row_index <= line_render_start) line_render_start = buffer.row_index;
         if(buffer.row_index >= line_render_start+main_row) line_render_start = buffer.row_index-main_row+1;
+
+        if(buffer.cur_pos <= col_render_start) col_render_start = buffer.cur_pos;
+        if(buffer.cur_pos >= col_render_start+main_col) col_render_start = buffer.cur_pos-main_col+1;
         
         for(size_t i = line_render_start; i <= line_render_start+main_row; i++) {
             if(i <= buffer.row_s) {
-                size_t print_index = i - line_render_start;
+                size_t print_index_y = i - line_render_start;
                 wattron(line_num_win, COLOR_PAIR(LINE_NUMS));
                 if(relative_nums) {
-                    if(buffer.row_index == i) mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
-                    else mvwprintw(line_num_win, print_index, 0, "%4zu", 
+                    if(buffer.row_index == i) mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
+                    else mvwprintw(line_num_win, print_index_y, 0, "%4zu", 
                                    (size_t)abs((int)i-(int)buffer.row_index));
                 } else {
-                    mvwprintw(line_num_win, print_index, 0, "%4zu", i+1);
+                    mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                 }
                 wattroff(line_num_win, COLOR_PAIR(LINE_NUMS));
-                for(size_t j = 0; j < buffer.rows[i].size; j++) {
-                    mvwprintw(main_win, print_index, j, "%c", buffer.rows[i].contents[j]);
+                for(size_t j = col_render_start; j <= col_render_start+main_col; j++) {
+                    if(i <= buffer.rows[i].size) {
+                        size_t print_index_x = j - col_render_start;
+                        mvwprintw(main_win, print_index_y, print_index_x, "%c", buffer.rows[i].contents[j]);
+                    }
                 }
             }
         }
@@ -796,7 +803,7 @@ int main(int argc, char *argv[]) {
         size_t repeating_count = 1;
 
         y = buffer.row_index-line_render_start;
-        x = buffer.cur_pos;
+        x = buffer.cur_pos-col_render_start;
 
         if(repeating) {
             mvwprintw(status_bar, 1, gcol-10, "r");
