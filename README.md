@@ -44,14 +44,14 @@ make -B
 |Normal| r + (n)  | Repeat next motion n times                      |
 
 ## Commands 
-| Command             | Action                    |
-|---------------------|---------------------------|
-| set-output          | change output file        |
-| quit                | Quit                      |
-| wquit               | Write and quit            |
-| w                   | Write without quitting    |
-| set-var  <var> <val>| Change a config variable  |
-| !(command)          | Execute a shell command   |
+| Command               | Action                    |
+|-----------------------|---------------------------|
+| set-output            | change output file        |
+| quit                  | Quit                      |
+| wquit                 | Write and quit            |
+| w                     | Write without quitting    |
+| set-var (var) (value) | Change a config variable  |
+| !(command)            | Execute a shell command   |
 
 # Installing
 Currently, the only way to install is to build the package, or use the AUR.
