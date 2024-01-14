@@ -38,6 +38,8 @@ int ESCDELAY = 10;
 
 // global config vars
 int relative_nums = 1;
+int auto_indent = 1;
+int syntax = 1;
 size_t indent = 4;
 
 #define MAX_STRING_SIZE 1025
@@ -60,9 +62,14 @@ typedef struct {
 } Buffer;
 
 typedef struct {
+    size_t size;
+    char *arg;
+} Arg;
+
+typedef struct {
     char *command;
     size_t command_s;
-    char *args[16];
+    Arg args[16];
     size_t args_s;
 } Command;
 
@@ -210,8 +217,9 @@ Command parse_command(char *command, size_t command_s) {
     if(args_start <= command_s) {
         for(size_t i = args_start+1; i < command_s; i++) {
             if(i == command_s-1 || command[i] == ' ') {
-                cmd.args[cmd.args_s] = malloc(sizeof(char)*i-args_start+1);
-                strncpy(cmd.args[cmd.args_s++], command+args_start+1, i-args_start);
+                cmd.args[cmd.args_s].arg = malloc(sizeof(char)*i-args_start+1);
+                strncpy(cmd.args[cmd.args_s].arg, command+args_start+1, i-args_start);
+                cmd.args[cmd.args_s++].size = i-args_start;
                 args_start = i;
             }
         }
@@ -219,25 +227,55 @@ Command parse_command(char *command, size_t command_s) {
     return cmd;
 }
 
+typedef enum {
+    NO_ERROR,
+    UNKNOWN_COMMAND,
+    INVALID_ARG,
+    INVALID_VALUE,
+} Command_Errors;
+
 int execute_command(Command *command, Buffer *buf) {
     if(command->command_s >= 10 && strncmp(command->command, "set-output", 10) == 0) {
-        if(command->args_s < 1) return 1; 
-        buf->filename = command->args[0];
-        for(size_t i = 1; i < command->args_s; i++) free(command->args[i]);
-    } else if(command->command_s >= 4 && strncmp(command->command, "quit", 4) == 0) {
+        if(command->args_s < 1) return INVALID_ARG; 
+        buf->filename = command->args[0].arg;
+        for(size_t i = 1; i < command->args_s; i++) free(command->args[i].arg);
+    } else if(command->command_s >= 1 && strncmp(command->command, "e", 1) == 0) {
         QUIT = 1;
-    } else if(command->command_s >= 5 && strncmp(command->command, "wquit", 5) == 0) {
+    } else if(command->command_s >= 2 && strncmp(command->command, "we", 2) == 0) {
         handle_save(buf);
         QUIT = 1;
     } else if(command->command_s >= 1 && strncmp(command->command, "w", 1) == 0) {
         handle_save(buf);
-    } else if(command->command_s >= 8 && strncmp(command->command, "relative", 8) == 0) {
-        relative_nums = !relative_nums;
+    } else if(command->command_s >= 7 && strncmp(command->command, "set-var", 7) == 0) {
+        if(command->args_s != 2) return INVALID_ARG;
+        if(command->args[0].size >= 8 && strncmp(command->args[0].arg, "relative", 8) == 0) {
+            if(command->args[1].size < 1) return INVALID_VALUE;
+            int value = atoi(command->args[1].arg);
+            if(value != 0 && value != 1) return INVALID_VALUE;
+            relative_nums = value;
+        } else if(command->args[0].size >= 11 && strncmp(command->args[0].arg, "auto_indent", 11) == 0) {
+            if(command->args[1].size < 1) return INVALID_VALUE;
+            int value = atoi(command->args[1].arg);
+            if(value != 0 && value != 1) return INVALID_VALUE;
+            auto_indent = value;
+        } else if(command->args[0].size >= 6 && strncmp(command->args[0].arg, "indent", 6) == 0) {
+            if(command->args[1].size < 1) return INVALID_VALUE;
+            int value = atoi(command->args[1].arg);
+            if(value < 0) return INVALID_VALUE;
+            indent = value;
+        } else if(command->args[0].size >= 6 && strncmp(command->args[0].arg, "syntax", 6) == 0) {
+            if(command->args[1].size < 1) return INVALID_VALUE;
+            int value = atoi(command->args[1].arg);
+            if(value < 0) return INVALID_VALUE;
+            syntax = value;
+        } else {
+            return UNKNOWN_COMMAND;
+        }
     } else {
-        return 1;
+        return UNKNOWN_COMMAND;
     }
     free(command->command);
-    return 0;
+    return NO_ERROR;
 }
 
 // shift_rows_* functions shift the entire array of rows
@@ -330,6 +368,7 @@ void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t in
 }
 
 void create_newline_indent(Buffer *buffer, size_t num_of_braces) {
+    if(!auto_indent) return;
     Row *cur = &buffer->rows[buffer->row_index];
     Brace brace = find_opposite_brace(cur->contents[buffer->cur_pos]);
     if(brace.brace != '0' && brace.closing) {
@@ -671,9 +710,25 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     } else {
                         Command cmd = parse_command(command, *command_s);
                         int err = execute_command(&cmd, buffer);
-                        if(err != 0) {
-                            sprintf(status_bar_msg, "Unnown command: %s", cmd.command);
-                            *is_print_msg = 1;
+                        switch(err) {
+                            case NO_ERROR:
+                                break;
+                            case UNKNOWN_COMMAND:
+                                sprintf(status_bar_msg, "Unnown command: %s", cmd.command);
+                                *is_print_msg = 1;
+                                break;
+                            case INVALID_ARG:
+                                sprintf(status_bar_msg, "Invalid arg %s\n", cmd.args[0].arg);
+                                *is_print_msg = 1;
+                                break;
+                            case INVALID_VALUE:
+                                sprintf(status_bar_msg, "Invalid value %s\n", cmd.args[1].arg);
+                                *is_print_msg = 1;
+                                break;
+                            default:
+                                sprintf(status_bar_msg, "err");
+                                *is_print_msg = 1;
+                                break;
                         }
                     }
                     reset_command(command, command_s);
@@ -877,17 +932,20 @@ int main(int argc, char *argv[]) {
 
                 size_t token_capacity = 32;
                 Token *token_arr = malloc(sizeof(Token)*token_capacity);
-                size_t token_s = generate_tokens(buffer.rows[i].contents, 
-                                                 buffer.rows[i].size, token_arr, &token_capacity);
+                size_t token_s = 0;
+                if(syntax) {
+                    token_s = generate_tokens(buffer.rows[i].contents, 
+                                                     buffer.rows[i].size, token_arr, &token_capacity);
+                }
                 
                 Color_Pairs color = YELLOW_COLOR; 
                 for(size_t j = col_render_start; j <= col_render_start+main_col; j++) {
                     size_t keyword_size = 0;
-                    if(is_in_tokens_index(token_arr, token_s, j, &keyword_size, &color)) {
+                    if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, &color)) {
                         wattron(main_win, COLOR_PAIR(color));
                         off_at = j + keyword_size;
                     }
-                    if(j == off_at) wattroff(main_win, COLOR_PAIR(color));
+                    if(syntax && j == off_at) wattroff(main_win, COLOR_PAIR(color));
                     size_t print_index_x = j - col_render_start;
                     mvwprintw(main_win, print_index_y, print_index_x, "%c", buffer.rows[i].contents[j]);
                 }
