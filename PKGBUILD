@@ -1,11 +1,12 @@
 # Maintainer: CobbCoding 
-pkgname='cano'
-pkgver='r91.83ca80e'
+pkgname='cano-git'
+pkgver=r92.cde2854
 pkgrel=1
 pkgdesc="Terminal-based modal text editor"
 arch=('x86_64')
 url="https://github.com/CobbCoding1/cano"
-license=('Apache 2.0')
+license=('APACHE')
+depends=('ncurses' 'glibc')
 makedepends=('git' 'make' 'ncurses' 'gcc')
 source=("$pkgname::git+https://github.com/CobbCoding1/$pkgname.git")
 md5sums=('SKIP')
