@@ -38,6 +38,7 @@ int ESCDELAY = 10;
 
 // global config vars
 int relative_nums = 1;
+size_t indent = 4;
 
 #define MAX_STRING_SIZE 1025
 
@@ -86,6 +87,36 @@ char *stringify_mode() {
     return "NORMAL";
 }
 
+typedef struct {
+    char brace;
+    int closing;
+} Brace;
+
+Brace find_opposite_brace(char opening) {
+    switch(opening) {
+        case '(':
+            return (Brace){.brace = ')', .closing = 0};
+            break;
+        case '{':
+            return (Brace){.brace = '}', .closing = 0};
+            break;
+        case '[':
+            return (Brace){.brace = ']', .closing = 0};
+            break;
+        case ')':
+            return (Brace){.brace = '(', .closing = 1};
+            break;
+        case '}':
+            return (Brace){.brace = '{', .closing = 1};
+            break;
+        case ']':
+            return (Brace){.brace = '[', .closing = 1};
+            break;
+    }
+    return (Brace){.brace = '0'};
+}
+
+
 void resize_rows(Buffer *buffer, size_t capacity) {
     Row *rows = calloc(capacity*2, sizeof(Row));
     if(rows == NULL) {
@@ -124,6 +155,31 @@ void search(Buffer *buffer, char *command, size_t command_s) {
         }
     }
 }
+
+size_t num_of_open_braces(Buffer *buffer) {
+    int posy = buffer->row_index;
+    int posx = buffer->cur_pos;
+    int count = 0;
+    Row *cur = &buffer->rows[posy];
+    while(posy >= 0) {
+        posx--;
+        if(posx < 0) {
+            posy--;
+            if(posy < 0) break;
+            cur = &buffer->rows[posy];
+            posx = cur->size;
+        }
+
+        Brace brace = find_opposite_brace(cur->contents[posx]);
+        if(brace.brace != '0') {
+            if(!brace.closing) count++; 
+            if(brace.closing) count--; 
+        }
+    }
+    if(count < 0) return 0;
+    return count;
+}
+
 
 void reset_command(char *command, size_t *command_s) {
     memset(command, 0, *command_s);
@@ -273,6 +329,23 @@ void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t in
     free(temp);
 }
 
+void create_newline_indent(Buffer *buffer, size_t num_of_braces) {
+    Row *cur = &buffer->rows[buffer->row_index];
+    Brace brace = find_opposite_brace(cur->contents[buffer->cur_pos]);
+    if(brace.brace != '0' && brace.closing) {
+        create_and_cut_row(buffer, buffer->row_index+1,
+                    &cur->size, buffer->cur_pos);
+        for(size_t i = 0; i < indent*(num_of_braces-1); i++) {
+            shift_row_right(&buffer->rows[buffer->row_index+1], i);
+        }
+    }
+    for(size_t i = 0; i < indent*num_of_braces; i++) {
+        cur->contents[buffer->cur_pos] = ' ';
+        shift_row_right(cur, buffer->cur_pos++);
+    }
+}
+
+
 void read_file_to_buffer(Buffer *buffer, char *filename) {
     buffer->filename = filename;
     FILE *file = fopen(filename, "a+");
@@ -292,35 +365,6 @@ void read_file_to_buffer(Buffer *buffer, char *filename) {
         }
         buffer->rows[buffer->row_s].contents[buffer->rows[buffer->row_s].size++] = buf[i];
     }
-}
-
-typedef struct {
-    char brace;
-    int closing;
-} Brace;
-
-Brace find_opposite_brace(char opening) {
-    switch(opening) {
-        case '(':
-            return (Brace){.brace = ')', .closing = 0};
-            break;
-        case '{':
-            return (Brace){.brace = '}', .closing = 0};
-            break;
-        case '[':
-            return (Brace){.brace = ']', .closing = 0};
-            break;
-        case ')':
-            return (Brace){.brace = '(', .closing = 1};
-            break;
-        case '}':
-            return (Brace){.brace = '{', .closing = 1};
-            break;
-        case ']':
-            return (Brace){.brace = '[', .closing = 1};
-            break;
-    }
-    return (Brace){.brace = '0'};
 }
 
 void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, 
@@ -439,12 +483,20 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     shift_rows_right(buffer, buffer->row_index+1);
                     buffer->row_index++; 
                     buffer->cur_pos = 0;
+                    size_t num_of_braces = num_of_open_braces(buffer);
+                    if(num_of_braces > 0) {
+                        create_newline_indent(buffer, num_of_braces);
+                    }
                     mode = INSERT;
                     *repeating_count = 1;
                 } break;
                 case 'O': {
                     shift_rows_right(buffer, buffer->row_index);
                     buffer->cur_pos = 0;
+                    size_t num_of_braces = num_of_open_braces(buffer);
+                    if(num_of_braces > 0) {
+                        create_newline_indent(buffer, num_of_braces);
+                    }
                     mode = INSERT;
                     *repeating_count = 1;
                 } break;
@@ -452,6 +504,10 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     shift_rows_right(buffer, buffer->row_index+1);
                     buffer->row_index++; 
                     buffer->cur_pos = 0;
+                    size_t num_of_braces = num_of_open_braces(buffer);
+                    if(num_of_braces > 0) {
+                        create_newline_indent(buffer, num_of_braces);
+                    }
                 } break;
                 case 'r':
                     *repeating = 1;
@@ -531,6 +587,10 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                                 &cur->size, buffer->cur_pos);
                     buffer->row_index++; 
                     buffer->cur_pos = 0;
+                    size_t num_of_braces = num_of_open_braces(buffer);
+                    if(num_of_braces > 0) {
+                        create_newline_indent(buffer, num_of_braces);
+                    }
                 } break;
                 case LEFT_ARROW:
                     if(buffer->cur_pos != 0) buffer->cur_pos--;
@@ -562,7 +622,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     };
                     if(ch == 9) {
                         // TODO: use tabs instead of just 4 spaces
-                        for(size_t i = 0; i < 4; i++) {
+                        for(size_t i = 0; i < indent; i++) {
                             cur->contents[buffer->cur_pos] = ' ';
                             shift_row_right(cur, buffer->cur_pos++);
                         }
