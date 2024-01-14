@@ -10,6 +10,7 @@ typedef enum { YELLOW_COLOR = 1,
     GREEN_COLOR,
     RED_COLOR,
     CYAN_COLOR,
+    MAGENTA_COLOR,
 } Color_Pairs;
 
 char *types[] = {
@@ -58,6 +59,7 @@ typedef enum {
     Type_Keyword,
     Type_Type,
     Type_Preprocessor,
+    Type_String,
     Type_Comment,
 } Token_Type;
 
@@ -98,6 +100,9 @@ int is_in_tokens_index(Token *token_arr, size_t token_s, size_t index, size_t *s
                     break;
                 case Type_Preprocessor:
                     *color = CYAN_COLOR;
+                    break;
+                case Type_String:
+                    *color = MAGENTA_COLOR;
                     break;
                 case Type_Comment:
                     *color = GREEN_COLOR;
@@ -158,9 +163,24 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
                 .size = view.len,
             };
             token_arr[token_arr_s++] = token;
+        } else if(view.data[0] == '"') {
+            Token token = {
+                .type = Type_String,
+                .index = view.data-line,
+            };
+            size_t string_s = 1;
+            view.len--;
+            view.data++;
+            while(view.len > 0 && view.data[0] != '"') {
+                string_s++;
+                view.len--;
+                view.data++;
+            }
+            token.size = ++string_s;
+            token_arr[token_arr_s++] = token;
         }
-        view.data++;
         if(view.len == 0) break;
+        view.data++;
         view.len--;
     }
 
