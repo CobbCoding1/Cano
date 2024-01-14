@@ -662,8 +662,8 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     if(ch == 9) {
                         // TODO: use tabs instead of just 4 spaces
                         for(size_t i = 0; i < indent; i++) {
-                            cur->contents[buffer->cur_pos] = ' ';
-                            shift_row_right(cur, buffer->cur_pos++);
+                            shift_row_right(cur, buffer->cur_pos);
+                            cur->contents[buffer->cur_pos++] = ' ';
                         }
                     } else {
                         shift_row_right(cur, buffer->cur_pos);
