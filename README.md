@@ -53,6 +53,14 @@ make -B
 | relative   | Toggle relative line nums |
 | !(command) | Execute a shell command   |
 
+# Installing
+Currently, the only way to install is to build the package, or use the AUR.
+
+If using yay, do the following:
+```sh
+yay -S cano-git
+```
+
 ## Contributing
 Cano is open to contributors. That does not mean that your pull request will be merged. \
 Please structure your pull request as something reasonably small, \
