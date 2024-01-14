@@ -5,13 +5,24 @@
 #define VIEW_IMPLEMENTATION
 #include "view.h"
 
-typedef enum { YELLOW_COLOR = 1,
+typedef enum { 
+    YELLOW_COLOR = 1,
     BLUE_COLOR,
     GREEN_COLOR,
     RED_COLOR,
     CYAN_COLOR,
     MAGENTA_COLOR,
 } Color_Pairs;
+
+typedef enum {
+    Type_None = 0,
+    Type_Keyword,
+    Type_Type,
+    Type_Preprocessor,
+    Type_String,
+    Type_Comment,
+    Type_Word,
+} Token_Type;
 
 char *types[] = {
     "char",
@@ -54,15 +65,6 @@ char *keywords[] = {
 #define NUM_KEYWORDS sizeof(keywords)/sizeof(*keywords)
 #define NUM_TYPES sizeof(types)/sizeof(*types)
 
-typedef enum {
-    Type_None = 0,
-    Type_Keyword,
-    Type_Type,
-    Type_Preprocessor,
-    Type_String,
-    Type_Comment,
-} Token_Type;
-
 typedef struct {
     Token_Type type;
     size_t index;
@@ -93,7 +95,7 @@ int is_in_tokens_index(Token *token_arr, size_t token_s, size_t index, size_t *s
                 case Type_None:
                     break;
                 case Type_Keyword:
-                    *color = BLUE_COLOR;
+                    *color = RED_COLOR;
                     break;
                 case Type_Type:
                     *color = YELLOW_COLOR;
@@ -106,6 +108,9 @@ int is_in_tokens_index(Token *token_arr, size_t token_s, size_t index, size_t *s
                     break;
                 case Type_Comment:
                     *color = GREEN_COLOR;
+                    break;
+                case Type_Word:
+                    *color = BLUE_COLOR;
                     break;
             }
             return 1;
@@ -130,6 +135,8 @@ Token generate_word(String_View *view, char *contents) {
         return (Token){.type = Type_Keyword, .index = index, .size = word_s};
     } else if(is_type(word, word_s)) {
         return (Token){.type = Type_Type, .index = index, .size = word_s};
+    } else {
+        return (Token){.type = Type_Word, .index = index, .size = word_s};
     }
     return (Token){Type_None};
 }
@@ -155,6 +162,11 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
                 .index = 0,
                 .size = view.len,
             };
+
+            while(view.len > 0 && view.data[0] != '\n') {
+                view.len--;
+                view.data++;
+            }
             token_arr[token_arr_s++] = token;
         } else if(view.len >= 2 && view.data[0] == '/' && view.data[1] == '/') {
             Token token = {
@@ -162,6 +174,10 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
                 .index = view.data-line,
                 .size = view.len,
             };
+            while(view.len > 0 && view.data[0] != '\n') {
+                view.len--;
+                view.data++;
+            }
             token_arr[token_arr_s++] = token;
         } else if(view.data[0] == '"') {
             Token token = {
