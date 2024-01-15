@@ -543,9 +543,11 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     shift_rows_right(buffer, buffer->row_index+1);
                     buffer->row_index++; 
                     buffer->cur_pos = 0;
-                    size_t num_of_braces = num_of_open_braces(buffer);
-                    if(num_of_braces > 0) {
-                        create_newline_indent(buffer, num_of_braces);
+                    if(auto_indent) {
+                        size_t num_of_braces = num_of_open_braces(buffer);
+                        if(num_of_braces > 0) {
+                            create_newline_indent(buffer, num_of_braces);
+                        }
                     }
                 } break;
                 case 'r':
@@ -822,9 +824,9 @@ int main(int argc, char *argv[]) {
 
     int grow, gcol;
     getmaxyx(stdscr, grow, gcol);
-    #define LINE_NUM_WIDTH 5
-    WINDOW *main_win = newwin(grow*0.95, gcol-LINE_NUM_WIDTH, 0, LINE_NUM_WIDTH);
-    WINDOW *line_num_win = newwin(grow*0.95, LINE_NUM_WIDTH, 0, 0);
+    int line_num_width = 5;
+    WINDOW *main_win = newwin(grow*0.95, gcol-line_num_width, 0, line_num_width);
+    WINDOW *line_num_win = newwin(grow*0.95, line_num_width, 0, 0);
 
     int main_row, main_col;
     getmaxyx(main_win, main_row, main_col);
@@ -890,6 +892,7 @@ int main(int argc, char *argv[]) {
     size_t x = 0; 
     size_t y = 0;
     while(ch != ctrl('q') && QUIT != 1) {
+        getmaxyx(main_win, main_row, main_col);
 #ifndef NO_CLEAR
         werase(main_win);
         werase(status_bar);
