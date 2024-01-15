@@ -280,7 +280,6 @@ int execute_command(Command *command, Buffer *buf) {
 
 // shift_rows_* functions shift the entire array of rows
 void shift_rows_left(Buffer *buf, size_t index) {
-    assert(buf->row_s+1 < MAX_ROWS);
     for(size_t i = index; i < buf->row_s; i++) {
         buf->rows[i] = buf->rows[i+1];
     }
