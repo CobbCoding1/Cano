@@ -151,7 +151,6 @@ Brace find_opposite_brace(char opening) {
     return (Brace){.brace = '0'};
 }
 
-
 void resize_rows(Buffer *buffer, size_t capacity) {
     Row *rows = calloc(capacity*2, sizeof(Row));
     if(rows == NULL) {
@@ -345,6 +344,25 @@ void shift_row_right(Row *row, size_t index) {
     row->contents[index] = ' ';
 }
 
+void delete_char(Buffer *buffer, size_t row, size_t col, size_t *y, WINDOW *main_win) {
+    Row *cur = &buffer->rows[row];
+    if(cur->size > 0 && col < cur->size) {
+        cur->contents[cur->size] = '\0';
+        shift_row_left(cur, col);
+        wmove(main_win, *y, col);
+    }
+}
+
+void delete_row(Buffer *buffer, size_t row) {
+    Row *cur = &buffer->rows[row];
+    memset(cur->contents, 0, cur->size);
+    cur->size = 0;
+    if(buffer->row_s != 0) {
+        shift_rows_left(buffer, row);
+        if(row > buffer->row_s) row--;
+    }
+}
+
 void shift_str_left(char *str, size_t *str_s, size_t index) {
     for(size_t i = index; i < *str_s; i++) {
         str[i] = str[i+1];
@@ -371,7 +389,8 @@ void append_rows(Row *a, Row *b) {
 
 void delete_and_append_row(Buffer *buf, size_t index) {
     append_rows(&buf->rows[index-1], &buf->rows[index]);
-    shift_rows_left(buf, index); 
+    delete_row(buf, index);
+    //shift_rows_left(buf, index); 
 }
 
 void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t index) {
@@ -430,25 +449,6 @@ void read_file_to_buffer(Buffer *buffer, char *filename) {
             continue;
         }
         buffer->rows[buffer->row_s].contents[buffer->rows[buffer->row_s].size++] = buf[i];
-    }
-}
-
-void delete_char(Buffer *buffer, size_t row, size_t col, size_t *y, WINDOW *main_win) {
-    Row *cur = &buffer->rows[row];
-    if(cur->size > 0 && col < cur->size) {
-        cur->contents[cur->size] = '\0';
-        shift_row_left(cur, col);
-        wmove(main_win, *y, col);
-    }
-}
-
-void delete_row(Buffer *buffer, size_t row) {
-    Row *cur = &buffer->rows[row];
-    memset(cur->contents, 0, cur->size);
-    cur->size = 0;
-    if(buffer->row_s != 0) {
-        shift_rows_left(buffer, row);
-        if(row > buffer->row_s) row--;
     }
 }
 
@@ -653,7 +653,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                             Row *cur = &buffer->rows[--buffer->row_index];
                             buffer->cur_pos = cur->size;
                             wmove(main_win, buffer->row_index, buffer->cur_pos);
-                            delete_and_append_row(buffer, cur->index+1);
+                            delete_and_append_row(buffer, buffer->row_index+1);
                         }
                     } else {
                         Row *cur = &buffer->rows[buffer->row_index];
