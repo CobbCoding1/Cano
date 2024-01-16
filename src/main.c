@@ -872,6 +872,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     buffer->visual.ending_pos.x = buffer->cur_pos;
                     buffer->visual.ending_pos.y = buffer->row_index;
                     break;
+		case 'd':
                 case 'x':
                     if(buffer->visual.starting_pos.y > buffer->visual.ending_pos.y || 
                       (buffer->visual.starting_pos.y == buffer->visual.ending_pos.y &&
@@ -902,10 +903,8 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                             }
                         }
                     }
-                    buffer->visual.ending_pos.x = buffer->cur_pos;
-                    buffer->visual.ending_pos.y = buffer->row_index;
-                    buffer->visual.starting_pos.x = buffer->cur_pos;
-                    buffer->visual.starting_pos.y = buffer->row_index;
+		    mode = NORMAL;
+		    curs_set(1);
                     break;
                 default: {
                 } break;
