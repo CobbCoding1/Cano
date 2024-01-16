@@ -12,6 +12,13 @@ make -B
 ./main
 ```
 
+## Modes
+Normal - For motions and deletion \
+Insert - For inserting text \
+Visual - For selecting text and performing actions on them \
+Search - For searching of text in the current buffer \
+Command - For executing commands \
+
 ## Keybinds
 |Mode  | Keybind  | Action                                          |
 |------|----------|-------------------------------------------------|
@@ -42,6 +49,8 @@ make -B
 |Normal| n        | Jump to next search                             |
 |Normal| Ctrl + S | Save and exit                                   |
 |Normal| r + (n)  | Repeat next motion n times                      |
+
+Visual mode works the same as Normal mode, except works on the entire selection, instead of character by character.
 
 ## Commands 
 | Command               | Action                    |
