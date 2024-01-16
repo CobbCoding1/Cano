@@ -62,7 +62,6 @@ typedef struct {
 typedef struct {
     Point starting_pos;
     Point ending_pos;
-    int swapped;
 } Visual;
 
 typedef struct {
@@ -89,6 +88,18 @@ typedef struct {
 
 Mode mode = NORMAL;
 int QUIT = 0;
+
+int is_between(Point a, Point b, Point c) {
+    if(a.y == b.y) {
+        if(c.y == a.y && c.x <= b.x && c.x >= a.x) return 1;
+    } else if ((a.y <= c.y && c.y <= b.y) || (b.y <= c.y && c.y <= a.y)) {
+        if(c.y == b.y && c.x > b.x) return 0;
+        if(c.y == a.y && c.x < a.x) return 0;
+        return 1;  
+    }
+    return 0; 
+}
+
 
 char *stringify_mode() {
     switch(mode) {
@@ -422,6 +433,25 @@ void read_file_to_buffer(Buffer *buffer, char *filename) {
     }
 }
 
+void delete_char(Buffer *buffer, size_t row, size_t col, size_t *y, WINDOW *main_win) {
+    Row *cur = &buffer->rows[row];
+    if(cur->size > 0 && col < cur->size) {
+        cur->contents[cur->size] = '\0';
+        shift_row_left(cur, col);
+        wmove(main_win, *y, col);
+    }
+}
+
+void delete_row(Buffer *buffer, size_t row) {
+    Row *cur = &buffer->rows[row];
+    memset(cur->contents, 0, cur->size);
+    cur->size = 0;
+    if(buffer->row_s != 0) {
+        shift_rows_left(buffer, row);
+        if(row > buffer->row_s) row--;
+    }
+}
+
 void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, 
                  char *command, size_t *command_s, int *repeating, size_t *repeating_count, size_t *normal_pos, int *is_print_msg, char *status_bar_msg) {
     switch(mode) {
@@ -484,21 +514,11 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     buffer->cur_pos++;
                     break;
                 case 'x': {
-                    Row *cur = &buffer->rows[buffer->row_index];
-                    if(cur->size > 0 && buffer->cur_pos < cur->size) {
-                        cur->contents[cur->size] = '\0';
-                        shift_row_left(cur, buffer->cur_pos);
-                        wmove(main_win, *y, buffer->cur_pos);
-                    }
+                    delete_char(buffer, buffer->row_index, buffer->cur_pos, y, main_win);
                 } break;
                 case 'd': {
-                    Row *cur = &buffer->rows[buffer->row_index];
-                    memset(cur->contents, 0, cur->size);
-                    cur->size = 0;
-                    if(buffer->row_s != 0) {
-                        shift_rows_left(buffer, buffer->row_index);
-                        if(buffer->row_index > buffer->row_s) buffer->row_index--;
-                    }
+                    delete_row(buffer, buffer->row_index);
+                    if(buffer->row_index != 0) buffer->row_index--;
                 } break;
                 case 'g':
                     if(*repeating_count-1 > 1 && *repeating_count-1 <= buffer->row_s) {
@@ -812,12 +832,14 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
             }
         } break;
         case VISUAL: {
+            curs_set(0);
             switch(ch) {
                 case '\b':
                 case 127:
                 case KEY_BACKSPACE: {
                 } break;
                 case ESCAPE:
+                    curs_set(1);
                     mode = NORMAL;
                     buffer->visual.ending_pos.x = 0;
                     buffer->visual.ending_pos.y = 0;
@@ -829,46 +851,61 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                 case LEFT_ARROW:
                 case 'h':
                     if(buffer->cur_pos != 0) buffer->cur_pos--;
-                    if(buffer->visual.swapped) {
-                        buffer->visual.starting_pos.x = buffer->cur_pos;
-                        buffer->visual.starting_pos.y = buffer->row_index;
-                    } else {
-                        buffer->visual.ending_pos.x = buffer->cur_pos;
-                        buffer->visual.ending_pos.y = buffer->row_index;
-                    }
+                    buffer->visual.ending_pos.x = buffer->cur_pos;
+                    buffer->visual.ending_pos.y = buffer->row_index;
                     break;
                 case DOWN_ARROW:
                 case 'j':
                     if(buffer->row_index < buffer->row_s) buffer->row_index++;
-                    if(buffer->visual.swapped) {
-                        buffer->visual.starting_pos.x = buffer->cur_pos;
-                        buffer->visual.starting_pos.y = buffer->row_index;
-                    } else {
-                        buffer->visual.ending_pos.x = buffer->cur_pos;
-                        buffer->visual.ending_pos.y = buffer->row_index;
-                    }
+                    buffer->visual.ending_pos.x = buffer->cur_pos;
+                    buffer->visual.ending_pos.y = buffer->row_index;
                     break;
                 case UP_ARROW:
                 case 'k':
                     if(buffer->row_index != 0) buffer->row_index--;
-                    if(buffer->visual.swapped) {
-                        buffer->visual.starting_pos.x = buffer->cur_pos;
-                        buffer->visual.starting_pos.y = buffer->row_index;
-                    } else {
-                        buffer->visual.ending_pos.x = buffer->cur_pos;
-                        buffer->visual.ending_pos.y = buffer->row_index;
-                    }
+                    buffer->visual.ending_pos.x = buffer->cur_pos;
+                    buffer->visual.ending_pos.y = buffer->row_index;
                     break;
                 case RIGHT_ARROW:
                 case 'l':
                     buffer->cur_pos++;
-                    if(buffer->visual.swapped) {
-                        buffer->visual.starting_pos.x = buffer->cur_pos;
-                        buffer->visual.starting_pos.y = buffer->row_index;
+                    buffer->visual.ending_pos.x = buffer->cur_pos;
+                    buffer->visual.ending_pos.y = buffer->row_index;
+                    break;
+                case 'x':
+                    if(buffer->visual.starting_pos.y > buffer->visual.ending_pos.y || 
+                      (buffer->visual.starting_pos.y == buffer->visual.ending_pos.y &&
+                       buffer->visual.starting_pos.x > buffer->visual.ending_pos.x)) {
+                        for(int i = buffer->visual.starting_pos.y; i >= (int)buffer->visual.ending_pos.y; i--) {
+                            Row *cur = &buffer->rows[i];
+                            if(i > (int)buffer->visual.ending_pos.y && i < (int)buffer->visual.starting_pos.y) delete_row(buffer, i);
+                            else {
+                                for(int j = cur->size-1; j >= 0; j--) {
+                                    Point point = {.x = j, .y = i};
+                                    if(is_between(buffer->visual.ending_pos, buffer->visual.starting_pos, point)) {
+                                        delete_char(buffer, i, j, y, main_win);
+                                    }
+                                }
+                            }
+                        }
                     } else {
-                        buffer->visual.ending_pos.x = buffer->cur_pos;
-                        buffer->visual.ending_pos.y = buffer->row_index;
+                        for(int i = buffer->visual.ending_pos.y; i >= (int)buffer->visual.starting_pos.y; i--) {
+                            Row *cur = &buffer->rows[i];
+                            if(i > (int)buffer->visual.starting_pos.y && i < (int)buffer->visual.ending_pos.y) delete_row(buffer, i);
+                            else {
+                                for(int j = cur->size-1; j >= 0; j--) {
+                                    Point point = {.x = j, .y = i};
+                                    if(is_between(buffer->visual.starting_pos, buffer->visual.ending_pos, point)) {
+                                        delete_char(buffer, i, j, y, main_win);
+                                    }
+                                }
+                            }
+                        }
                     }
+                    buffer->visual.ending_pos.x = buffer->cur_pos;
+                    buffer->visual.ending_pos.y = buffer->row_index;
+                    buffer->visual.starting_pos.x = buffer->cur_pos;
+                    buffer->visual.starting_pos.y = buffer->row_index;
                     break;
                 default: {
                 } break;
@@ -882,17 +919,6 @@ typedef struct {
     size_t col;
     size_t size;
 } Syntax_Highlighting;
-
-int is_between(Point a, Point b, Point c) {
-    if(a.y == b.y) {
-        if(c.y == a.y && c.x <= b.x && c.x >= a.x) return 1;
-    } else if ((a.y <= c.y && c.y <= b.y) || (b.y <= c.y && c.y <= a.y)) {
-        if(c.y == b.y && c.x > b.x) return 0;
-        if(c.y == a.y && c.x < a.x) return 0;
-        return 1;  
-    }
-    return 0; 
-}
 
 int main(int argc, char *argv[]) {
     char *program = argv[0];
@@ -1052,13 +1078,13 @@ int main(int argc, char *argv[]) {
                         }
                         Point point = {.x = j, .y = i};
                         int between = 0;
-                        if(buffer.visual.starting_pos.y > buffer.visual.ending_pos.y ||
-                        (buffer.visual.starting_pos.y == buffer.visual.ending_pos.y &&
-                         buffer.visual.starting_pos.x > buffer.visual.ending_pos.x
-                        )) 
+                        if(buffer.visual.starting_pos.y > buffer.visual.ending_pos.y || 
+                          (buffer.visual.starting_pos.y == buffer.visual.ending_pos.y &&
+                           buffer.visual.starting_pos.x > buffer.visual.ending_pos.x)) {
                             between = is_between(buffer.visual.ending_pos, buffer.visual.starting_pos, point);
-                        else 
+                        } else {
                             between = is_between(buffer.visual.starting_pos, buffer.visual.ending_pos, point);
+                        }
                         if(between) {
                             wattron(main_win, A_STANDOUT);
                         }
