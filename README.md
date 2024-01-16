@@ -17,7 +17,7 @@ Normal - For motions and deletion \
 Insert - For inserting text \
 Visual - For selecting text and performing actions on them \
 Search - For searching of text in the current buffer \
-Command - For executing commands \
+Command - For executing commands
 
 ## Keybinds
 |Mode  | Keybind  | Action                                          |
