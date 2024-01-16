@@ -32,6 +32,7 @@ typedef enum {
     INSERT,
     SEARCH,
     COMMAND,
+    VISUAL,
 } Mode;
 
 int ESCDELAY = 10;
@@ -52,6 +53,18 @@ typedef struct {
 
 #define MAX_ROWS 1024
 #define STARTING_ROW_SIZE 128
+
+typedef struct {
+    size_t x;
+    size_t y;
+} Point;
+
+typedef struct {
+    Point starting_pos;
+    Point ending_pos;
+    int swapped;
+} Visual;
+
 typedef struct {
     Row *rows;
     size_t row_capacity;
@@ -59,6 +72,7 @@ typedef struct {
     size_t cur_pos;
     size_t row_s;
     char *filename;
+    Visual visual;
 } Buffer;
 
 typedef struct {
@@ -89,6 +103,9 @@ char *stringify_mode() {
             break;
         case COMMAND:
             return "COMMAND";
+            break;
+        case VISUAL:
+            return "VISUAL";
             break;
     }
     return "NORMAL";
@@ -443,6 +460,13 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     reset_command(command, command_s);
                     *repeating_count = 1;
                     break;
+                case 'v':
+                    mode = VISUAL;
+                    buffer->visual.starting_pos.x = buffer->cur_pos;
+                    buffer->visual.starting_pos.y = buffer->row_index;
+                    buffer->visual.ending_pos.x = buffer->cur_pos;
+                    buffer->visual.ending_pos.y = buffer->row_index;
+                    break;
                 case LEFT_ARROW:
                 case 'h':
                     if(buffer->cur_pos != 0) buffer->cur_pos--;
@@ -787,6 +811,69 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                 } break;
             }
         } break;
+        case VISUAL: {
+            switch(ch) {
+                case '\b':
+                case 127:
+                case KEY_BACKSPACE: {
+                } break;
+                case ESCAPE:
+                    mode = NORMAL;
+                    buffer->visual.ending_pos.x = 0;
+                    buffer->visual.ending_pos.y = 0;
+                    buffer->visual.starting_pos.x = 0;
+                    buffer->visual.starting_pos.y = 0;
+                    break;
+                case ENTER: {
+                } break;
+                case LEFT_ARROW:
+                case 'h':
+                    if(buffer->cur_pos != 0) buffer->cur_pos--;
+                    if(buffer->visual.swapped) {
+                        buffer->visual.starting_pos.x = buffer->cur_pos;
+                        buffer->visual.starting_pos.y = buffer->row_index;
+                    } else {
+                        buffer->visual.ending_pos.x = buffer->cur_pos;
+                        buffer->visual.ending_pos.y = buffer->row_index;
+                    }
+                    break;
+                case DOWN_ARROW:
+                case 'j':
+                    if(buffer->row_index < buffer->row_s) buffer->row_index++;
+                    if(buffer->visual.swapped) {
+                        buffer->visual.starting_pos.x = buffer->cur_pos;
+                        buffer->visual.starting_pos.y = buffer->row_index;
+                    } else {
+                        buffer->visual.ending_pos.x = buffer->cur_pos;
+                        buffer->visual.ending_pos.y = buffer->row_index;
+                    }
+                    break;
+                case UP_ARROW:
+                case 'k':
+                    if(buffer->row_index != 0) buffer->row_index--;
+                    if(buffer->visual.swapped) {
+                        buffer->visual.starting_pos.x = buffer->cur_pos;
+                        buffer->visual.starting_pos.y = buffer->row_index;
+                    } else {
+                        buffer->visual.ending_pos.x = buffer->cur_pos;
+                        buffer->visual.ending_pos.y = buffer->row_index;
+                    }
+                    break;
+                case RIGHT_ARROW:
+                case 'l':
+                    buffer->cur_pos++;
+                    if(buffer->visual.swapped) {
+                        buffer->visual.starting_pos.x = buffer->cur_pos;
+                        buffer->visual.starting_pos.y = buffer->row_index;
+                    } else {
+                        buffer->visual.ending_pos.x = buffer->cur_pos;
+                        buffer->visual.ending_pos.y = buffer->row_index;
+                    }
+                    break;
+                default: {
+                } break;
+            }
+        } break;
     }
 }
 
@@ -795,6 +882,17 @@ typedef struct {
     size_t col;
     size_t size;
 } Syntax_Highlighting;
+
+int is_between(Point a, Point b, Point c) {
+    if(a.y == b.y) {
+        if(c.y == a.y && c.x <= b.x && c.x >= a.x) return 1;
+    } else if ((a.y <= c.y && c.y <= b.y) || (b.y <= c.y && c.y <= a.y)) {
+        if(c.y == b.y && c.x > b.x) return 0;
+        if(c.y == a.y && c.x < a.x) return 0;
+        return 1;  
+    }
+    return 0; 
+}
 
 int main(int argc, char *argv[]) {
     char *program = argv[0];
@@ -948,8 +1046,26 @@ int main(int argc, char *argv[]) {
                         off_at = j + keyword_size;
                     }
                     if(syntax && j == off_at) wattroff(main_win, COLOR_PAIR(color));
+                    if(mode == VISUAL) {
+                        if(buffer.visual.starting_pos.y == buffer.visual.ending_pos.y) {
+
+                        }
+                        Point point = {.x = j, .y = i};
+                        int between = 0;
+                        if(buffer.visual.starting_pos.y > buffer.visual.ending_pos.y ||
+                        (buffer.visual.starting_pos.y == buffer.visual.ending_pos.y &&
+                         buffer.visual.starting_pos.x > buffer.visual.ending_pos.x
+                        )) 
+                            between = is_between(buffer.visual.ending_pos, buffer.visual.starting_pos, point);
+                        else 
+                            between = is_between(buffer.visual.starting_pos, buffer.visual.ending_pos, point);
+                        if(between) {
+                            wattron(main_win, A_STANDOUT);
+                        }
+                    }
                     size_t print_index_x = j - col_render_start;
                     mvwprintw(main_win, print_index_y, print_index_x, "%c", buffer.rows[i].contents[j]);
+                    wattroff(main_win, A_STANDOUT);
                 }
                 free(token_arr);
             }
