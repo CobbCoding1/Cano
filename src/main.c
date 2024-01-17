@@ -161,7 +161,7 @@ void resize_rows(Buffer *buffer, size_t capacity) {
     }
     memcpy(rows, buffer->rows, sizeof(Row)*buffer->row_capacity);
     buffer->rows = rows;
-    for(size_t i = buffer->row_capacity; i < capacity*2; i++) {
+    for(size_t i = buffer->row_s; i < capacity*2; i++) {
         buffer->rows[i].contents = calloc(MAX_STRING_SIZE, sizeof(char));
         if(buffer->rows[i].contents == NULL) {
             CRASH("no more ram");
@@ -318,7 +318,7 @@ void shift_rows_left(Buffer *buf, size_t index) {
 }
 
 void shift_rows_right(Buffer *buf, size_t index) {
-    if(buf->row_s > buf->row_capacity) resize_rows(buf, buf->row_capacity);
+    if(buf->row_s+1 >= buf->row_capacity) resize_rows(buf, buf->row_capacity);
     char *new = calloc(MAX_STRING_SIZE, sizeof(char));
     if(new == NULL) {
         CRASH("no more ram");
@@ -600,8 +600,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     *repeating_count = 1;
                 } break;
                 case ctrl('o'): {
-                    shift_rows_right(buffer, buffer->row_index+1);
-                    buffer->row_index++; 
+                    shift_rows_right(buffer, ++buffer->row_index);
                     buffer->cur_pos = 0;
                     if(auto_indent) {
                         size_t num_of_braces = num_of_open_braces(buffer);
