@@ -62,6 +62,7 @@ typedef struct {
 typedef struct {
     Point starting_pos;
     Point ending_pos;
+    int is_line;
 } Visual;
 
 typedef struct {
@@ -554,9 +555,18 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     break;
                 case 'v':
                     mode = VISUAL;
+                    buffer->visual.is_line = 0;
                     buffer->visual.starting_pos.x = buffer->cur_pos;
                     buffer->visual.starting_pos.y = buffer->row_index;
                     buffer->visual.ending_pos.x = buffer->cur_pos;
+                    buffer->visual.ending_pos.y = buffer->row_index;
+                    break;
+                case 'V':
+                    mode = VISUAL;
+                    buffer->visual.is_line = 1;
+                    buffer->visual.starting_pos.x = 0;
+                    buffer->visual.starting_pos.y = buffer->row_index;
+                    buffer->visual.ending_pos.x = buffer->rows[buffer->row_index].size;
                     buffer->visual.ending_pos.y = buffer->row_index;
                     break;
                 case 'x': {
@@ -893,6 +903,18 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     break;
                 default: {
                     handle_motion_keys(buffer, ch, repeating_count);
+                    if(buffer->visual.is_line) {
+                        size_t cur_size = buffer->rows[buffer->row_index].size;
+                        if(buffer->row_index <= buffer->visual.starting_pos.y) {
+                            buffer->visual.ending_pos.x = 0;
+                            buffer->visual.starting_pos.x = cur_size;
+                            buffer->visual.ending_pos.y = buffer->row_index;
+                        } else {
+                            buffer->visual.ending_pos.x = cur_size;
+                            buffer->visual.ending_pos.y = buffer->row_index;
+                        }
+                        break;
+                    }
                     buffer->visual.ending_pos.x = buffer->cur_pos;
                     buffer->visual.ending_pos.y = buffer->row_index;
                 } break;
