@@ -452,6 +452,68 @@ void read_file_to_buffer(Buffer *buffer, char *filename) {
     }
 }
 
+void handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
+    switch(ch) {
+        case 'g':
+            if(*repeating_count-1 > 1 && *repeating_count-1 <= buffer->row_s) {
+                buffer->row_index = *repeating_count-1;
+                *repeating_count = 1;
+            } else buffer->row_index = 0;
+            break;
+        case 'G':
+            if(*repeating_count-1 > 1 && *repeating_count-1 <= buffer->row_s) {
+                buffer->row_index = *repeating_count-1;
+                *repeating_count = 1;
+            } else buffer->row_index = buffer->row_s;
+            break;
+        case '0':
+            buffer->cur_pos = 0;
+            break;
+        case '$':
+            buffer->cur_pos = buffer->rows[buffer->row_index].size;
+            break;
+        case 'e': {
+            Row *cur = &buffer->rows[buffer->row_index];
+            while(buffer->cur_pos+1 < cur->size && cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
+            if(cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
+            while(cur->contents[buffer->cur_pos+1] != ' ' && buffer->cur_pos+1 < cur->size) {
+                buffer->cur_pos++;
+            }
+        } break;
+        case 'b': {
+            Row *cur = &buffer->rows[buffer->row_index];
+            if(cur->contents[buffer->cur_pos-1] == ' ') buffer->cur_pos--;
+            while(cur->contents[buffer->cur_pos-1] != ' ' && buffer->cur_pos > 0) {
+                buffer->cur_pos--;
+            }
+        } break;
+        case 'w': {
+            Row *cur = &buffer->rows[buffer->row_index];
+            while(buffer->cur_pos+1 < cur->size && cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
+            if(cur->contents[buffer->cur_pos-1] == ' ') buffer->cur_pos++;
+            while(cur->contents[buffer->cur_pos-1] != ' ' && buffer->cur_pos < cur->size) {
+                buffer->cur_pos++;
+            }
+        } break;
+        case LEFT_ARROW:
+        case 'h':
+            if(buffer->cur_pos != 0) buffer->cur_pos--;
+            break;
+        case DOWN_ARROW:
+        case 'j':
+            if(buffer->row_index < buffer->row_s) buffer->row_index++;
+            break;
+        case UP_ARROW:
+        case 'k':
+            if(buffer->row_index != 0) buffer->row_index--;
+            break;
+        case RIGHT_ARROW:
+        case 'l':
+            buffer->cur_pos++;
+            break;
+    }
+}
+
 void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, 
                  char *command, size_t *command_s, int *repeating, size_t *repeating_count, size_t *normal_pos, int *is_print_msg, char *status_bar_msg) {
     switch(mode) {
@@ -497,69 +559,12 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     buffer->visual.ending_pos.x = buffer->cur_pos;
                     buffer->visual.ending_pos.y = buffer->row_index;
                     break;
-                case LEFT_ARROW:
-                case 'h':
-                    if(buffer->cur_pos != 0) buffer->cur_pos--;
-                    break;
-                case DOWN_ARROW:
-                case 'j':
-                    if(buffer->row_index < buffer->row_s) buffer->row_index++;
-                    break;
-                case UP_ARROW:
-                case 'k':
-                    if(buffer->row_index != 0) buffer->row_index--;
-                    break;
-                case RIGHT_ARROW:
-                case 'l':
-                    buffer->cur_pos++;
-                    break;
                 case 'x': {
                     delete_char(buffer, buffer->row_index, buffer->cur_pos, y, main_win);
                 } break;
                 case 'd': {
                     delete_row(buffer, buffer->row_index);
                     if(buffer->row_index != 0) buffer->row_index--;
-                } break;
-                case 'g':
-                    if(*repeating_count-1 > 1 && *repeating_count-1 <= buffer->row_s) {
-                        buffer->row_index = *repeating_count-1;
-                        *repeating_count = 1;
-                    } else buffer->row_index = 0;
-                    break;
-                case 'G':
-                    if(*repeating_count-1 > 1 && *repeating_count-1 <= buffer->row_s) {
-                        buffer->row_index = *repeating_count-1;
-                        *repeating_count = 1;
-                    } else buffer->row_index = buffer->row_s;
-                    break;
-                case '0':
-                    buffer->cur_pos = 0;
-                    break;
-                case '$':
-                    buffer->cur_pos = buffer->rows[buffer->row_index].size;
-                    break;
-                case 'e': {
-                    Row *cur = &buffer->rows[buffer->row_index];
-                    while(buffer->cur_pos+1 < cur->size && cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
-                    if(cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
-                    while(cur->contents[buffer->cur_pos+1] != ' ' && buffer->cur_pos+1 < cur->size) {
-                        buffer->cur_pos++;
-                    }
-                } break;
-                case 'b': {
-                    Row *cur = &buffer->rows[buffer->row_index];
-                    if(cur->contents[buffer->cur_pos-1] == ' ') buffer->cur_pos--;
-                    while(cur->contents[buffer->cur_pos-1] != ' ' && buffer->cur_pos > 0) {
-                        buffer->cur_pos--;
-                    }
-                } break;
-                case 'w': {
-                    Row *cur = &buffer->rows[buffer->row_index];
-                    while(buffer->cur_pos+1 < cur->size && cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
-                    if(cur->contents[buffer->cur_pos-1] == ' ') buffer->cur_pos++;
-                    while(cur->contents[buffer->cur_pos-1] != ' ' && buffer->cur_pos < cur->size) {
-                        buffer->cur_pos++;
-                    }
                 } break;
                 case 'o': {
                     shift_rows_right(buffer, buffer->row_index+1);
@@ -595,6 +600,8 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                 } break;
                 case 'r':
                     *repeating = 1;
+                    break;  
+                case 'R':
                     break;  
                 case 'n': {
                     search(buffer, command, *command_s);
@@ -639,7 +646,9 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                 case ESCAPE:
                     reset_command(command, command_s);
                     mode = NORMAL;
+                    break;
                 default:
+                    handle_motion_keys(buffer, ch, repeating_count);
                     break;
             }
             break;
@@ -841,38 +850,10 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                 case ESCAPE:
                     curs_set(1);
                     mode = NORMAL;
-                    buffer->visual.ending_pos.x = 0;
-                    buffer->visual.ending_pos.y = 0;
-                    buffer->visual.starting_pos.x = 0;
-                    buffer->visual.starting_pos.y = 0;
                     break;
                 case ENTER: {
                 } break;
-                case LEFT_ARROW:
-                case 'h':
-                    if(buffer->cur_pos != 0) buffer->cur_pos--;
-                    buffer->visual.ending_pos.x = buffer->cur_pos;
-                    buffer->visual.ending_pos.y = buffer->row_index;
-                    break;
-                case DOWN_ARROW:
-                case 'j':
-                    if(buffer->row_index < buffer->row_s) buffer->row_index++;
-                    buffer->visual.ending_pos.x = buffer->cur_pos;
-                    buffer->visual.ending_pos.y = buffer->row_index;
-                    break;
-                case UP_ARROW:
-                case 'k':
-                    if(buffer->row_index != 0) buffer->row_index--;
-                    buffer->visual.ending_pos.x = buffer->cur_pos;
-                    buffer->visual.ending_pos.y = buffer->row_index;
-                    break;
-                case RIGHT_ARROW:
-                case 'l':
-                    buffer->cur_pos++;
-                    buffer->visual.ending_pos.x = buffer->cur_pos;
-                    buffer->visual.ending_pos.y = buffer->row_index;
-                    break;
-		case 'd':
+                case 'd':
                 case 'x':
                     if(buffer->visual.starting_pos.y > buffer->visual.ending_pos.y || 
                       (buffer->visual.starting_pos.y == buffer->visual.ending_pos.y &&
@@ -903,10 +884,13 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                             }
                         }
                     }
-		    mode = NORMAL;
-		    curs_set(1);
+                    mode = NORMAL;
+                    curs_set(1);
                     break;
                 default: {
+                    handle_motion_keys(buffer, ch, repeating_count);
+                    buffer->visual.ending_pos.x = buffer->cur_pos;
+                    buffer->visual.ending_pos.y = buffer->row_index;
                 } break;
             }
         } break;
