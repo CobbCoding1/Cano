@@ -425,8 +425,8 @@ void create_newline_indent(Buffer *buffer, size_t num_of_braces) {
         }
     }
     for(size_t i = 0; i < indent*num_of_braces; i++) {
-        cur->contents[buffer->cur_pos] = ' ';
-        shift_row_right(cur, buffer->cur_pos++);
+        shift_row_right(cur, buffer->cur_pos);
+        cur->contents[buffer->cur_pos++] = ' ';
     }
 }
 
