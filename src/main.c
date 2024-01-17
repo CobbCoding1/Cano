@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
 
 #include <curses.h>
 
@@ -715,7 +716,6 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     wrefresh(main_win);
                     break;
                 default: {
-                    mvwprintw(main_win, 10, 10, "%d", ch);
                     Row *cur = &buffer->rows[buffer->row_index];
                     Brace cur_brace = find_opposite_brace(cur->contents[buffer->cur_pos]);
                     if(
@@ -961,7 +961,9 @@ int main(int argc, char *argv[]) {
     WINDOW *line_num_win = newwin(grow*0.95, line_num_width, 0, 0);
 
     int main_row, main_col;
+    int line_num_row, line_num_col;
     getmaxyx(main_win, main_row, main_col);
+    getmaxyx(line_num_win, line_num_row, line_num_col);
 
     WINDOW *status_bar = newwin(grow*0.05, gcol, grow-2, 0);
 
@@ -1030,6 +1032,16 @@ int main(int argc, char *argv[]) {
         werase(status_bar);
         werase(line_num_win);
 #endif
+        int row_s_len = (int)log10(buffer.row_s)+2;
+        if(row_s_len > line_num_col) {
+            wresize(main_win, main_row, main_col-(row_s_len-line_num_width));
+            wresize(line_num_win, line_num_row, row_s_len);
+            mvwin(main_win, 0, row_s_len);
+            getmaxyx(main_win, main_row, main_col);
+            getmaxyx(line_num_win, line_num_row, line_num_col);
+            line_num_width = row_s_len;
+        }
+
         // status bar
         if(is_print_msg) {
             mvwprintw(status_bar, 1, 0, "%s", status_bar_msg);
@@ -1074,7 +1086,8 @@ int main(int argc, char *argv[]) {
                 }
                 
                 Color_Pairs color = YELLOW_COLOR; 
-                for(size_t j = col_render_start; j <= col_render_start+main_col; j++) {
+                size_t j = 0;
+                for(j = col_render_start; j <= col_render_start+main_col; j++) {
                     size_t keyword_size = 0;
                     if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, &color)) {
                         wattron(main_win, COLOR_PAIR(color));
@@ -1103,6 +1116,7 @@ int main(int argc, char *argv[]) {
                     wattroff(main_win, A_STANDOUT);
                 }
                 free(token_arr);
+
             }
         }
 

@@ -1,6 +1,6 @@
 CC = cc 
 CFLAGS = -Wall -Wextra -pedantic -Wpedantic
-LIBS = -lcurses
+LIBS = -lcurses -lm
 SRC = src/
 OUT = build/
 
