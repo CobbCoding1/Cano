@@ -598,10 +598,14 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                         }
                     }
                 } break;
-                case 'r':
-                    *repeating = 1;
-                    break;  
                 case 'R':
+                    *repeating = 1;
+                    break;
+                case 'r':
+                    curs_set(0);
+                    ch = wgetch(main_win);
+                    buffer->rows[buffer->row_index].contents[buffer->cur_pos] = ch;
+                    curs_set(1);
                     break;  
                 case 'n': {
                     search(buffer, command, *command_s);

@@ -48,7 +48,8 @@ Command - For executing commands
 |Normal| /        | Enter serach mode                               |
 |Normal| n        | Jump to next search                             |
 |Normal| Ctrl + S | Save and exit                                   |
-|Normal| r + (n)  | Repeat next motion n times                      |
+|Normal| r        | Replace current char with next char inputted    |
+|Normal| R + (n)  | Repeat next motion n times                      |
 
 Visual mode works the same as Normal mode, except works on the entire selection, instead of character by character.
 
