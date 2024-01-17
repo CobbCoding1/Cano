@@ -237,7 +237,7 @@ Command parse_command(char *command, size_t command_s) {
     size_t args_start = 0;
     for(size_t i = 0; i < command_s; i++) {
         if(i == command_s-1 || command[i] == ' ') {
-            cmd.command_s = i;
+            cmd.command_s = (i == command_s-1) ? i+1 : i;
             cmd.command = malloc(sizeof(char)*cmd.command_s);
             strncpy(cmd.command, command, cmd.command_s);
             args_start = i+1;
@@ -265,18 +265,18 @@ typedef enum {
 } Command_Errors;
 
 int execute_command(Command *command, Buffer *buf) {
-    if(command->command_s >= 10 && strncmp(command->command, "set-output", 10) == 0) {
+    if(command->command_s == 10 && strncmp(command->command, "set-output", 10) == 0) {
         if(command->args_s < 1) return INVALID_ARG; 
         buf->filename = command->args[0].arg;
         for(size_t i = 1; i < command->args_s; i++) free(command->args[i].arg);
-    } else if(command->command_s >= 1 && strncmp(command->command, "e", 1) == 0) {
+    } else if(command->command_s == 1 && strncmp(command->command, "e", 1) == 0) {
         QUIT = 1;
-    } else if(command->command_s >= 2 && strncmp(command->command, "we", 2) == 0) {
+    } else if(command->command_s == 2 && strncmp(command->command, "we", 2) == 0) {
         handle_save(buf);
         QUIT = 1;
-    } else if(command->command_s >= 1 && strncmp(command->command, "w", 1) == 0) {
+    } else if(command->command_s == 1 && strncmp(command->command, "w", 1) == 0) {
         handle_save(buf);
-    } else if(command->command_s >= 7 && strncmp(command->command, "set-var", 7) == 0) {
+    } else if(command->command_s == 7 && strncmp(command->command, "set-var", 7) == 0) {
         if(command->args_s != 2) return INVALID_ARG;
         if(command->args[0].size >= 8 && strncmp(command->args[0].arg, "relative", 8) == 0) {
             if(command->args[1].size < 1) return INVALID_VALUE;
