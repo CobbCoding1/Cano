@@ -199,6 +199,50 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
         view.data++;
         view.len--;
     }
-
     return token_arr_s;
+}
+
+int read_file_by_lines(char *filename, char **lines, size_t *lines_s) {
+    FILE *file = fopen(filename, "r");
+    if(file == NULL) {
+        return 1;
+    }
+    fseek(file, 0, SEEK_END);
+    size_t length = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    if(length == 0) {
+        fclose(file);
+        return 1;
+    }
+
+    char *contents = malloc(sizeof(char)*length);
+    fread(contents, 1, length, file);
+    fclose(file);
+
+    size_t line_count = 0;
+    for(size_t i = 0; i < length; i++) {
+        if(contents[i] == '\n') line_count++;
+    }
+    free(lines);
+
+    char **new_lines = malloc(sizeof(*lines)*line_count);
+
+    char current_line[128] = {0};
+    size_t current_line_s = 0;
+    for(size_t i = 0; i < length; i++) {
+        if(contents[i] == '\n') {
+            new_lines[*lines_s] = malloc(sizeof(char)*current_line_s+1);
+            strncpy(new_lines[*lines_s], current_line, current_line_s+1);
+            current_line_s = 0;
+            memset(current_line, 0, current_line_s);
+            *lines_s += 1;
+            continue;
+        }
+        current_line[current_line_s++] = contents[i];
+    }
+
+    lines = new_lines;
+
+    free(contents);
+    return 0;
 }

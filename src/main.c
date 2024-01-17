@@ -5,10 +5,16 @@
 #include <string.h>
 #include <unistd.h>
 #include <math.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
 
 #include <curses.h>
 
+#include "config.h"
 #include "lex.c"
+// global config vars
 
 #define CRASH(str)                    \
         do {                          \
@@ -38,11 +44,6 @@ typedef enum {
 
 int ESCDELAY = 10;
 
-// global config vars
-int relative_nums = 1;
-int auto_indent = 1;
-int syntax = 1;
-size_t indent = 4;
 
 #define MAX_STRING_SIZE 1025
 
@@ -236,20 +237,20 @@ Command parse_command(char *command, size_t command_s) {
     size_t args_start = 0;
     for(size_t i = 0; i < command_s; i++) {
         if(i == command_s-1 || command[i] == ' ') {
-            cmd.command_s = i+1;
+            cmd.command_s = i;
             cmd.command = malloc(sizeof(char)*cmd.command_s);
             strncpy(cmd.command, command, cmd.command_s);
-            args_start = i;
+            args_start = i+1;
             break;
         }
     }
     if(args_start <= command_s) {
-        for(size_t i = args_start+1; i < command_s; i++) {
+        for(size_t i = args_start; i < command_s; i++) {
             if(i == command_s-1 || command[i] == ' ') {
-                cmd.args[cmd.args_s].arg = malloc(sizeof(char)*i-args_start+1);
-                strncpy(cmd.args[cmd.args_s].arg, command+args_start+1, i-args_start);
-                cmd.args[cmd.args_s++].size = i-args_start;
-                args_start = i;
+                cmd.args[cmd.args_s].arg = malloc(sizeof(char)*i-args_start);
+                strncpy(cmd.args[cmd.args_s].arg, command+args_start, i-args_start+1);
+                cmd.args[cmd.args_s++].size = i-args_start+1;
+                args_start = i+1;
             }
         }
     } 
@@ -282,7 +283,7 @@ int execute_command(Command *command, Buffer *buf) {
             int value = atoi(command->args[1].arg);
             if(value != 0 && value != 1) return INVALID_VALUE;
             relative_nums = value;
-        } else if(command->args[0].size >= 11 && strncmp(command->args[0].arg, "auto_indent", 11) == 0) {
+        } else if(command->args[0].size >= 11 && strncmp(command->args[0].arg, "auto-indent", 11) == 0) {
             if(command->args[1].size < 1) return INVALID_VALUE;
             int value = atoi(command->args[1].arg);
             if(value != 0 && value != 1) return INVALID_VALUE;
@@ -929,13 +930,27 @@ typedef struct {
     size_t size;
 } Syntax_Highlighting;
 
-int main(int argc, char *argv[]) {
-    char *program = argv[0];
-    (void)program;
+int main(int argc, char **argv) {
+    (void)argc;
+    char *program = *argv++;
+    char *flag = *argv++;
+    char *config_filename = NULL;
     char *filename = NULL;
-    if(argc > 1) {
-        filename = argv[1];
+    while(flag != NULL) {
+        if(strcmp(flag, "--config") == 0) {
+            flag = *argv++;
+            if(flag == NULL) {
+                fprintf(stderr, "usage: %s --config <config.cano> <filename>\n", program);
+                exit(1);
+            }
+            config_filename = flag;
+            flag = *argv++;
+        } else {
+            filename = flag;
+            flag = *argv++;
+        }
     }
+
     initscr();
 
     if(has_colors() == FALSE) {
@@ -957,15 +972,15 @@ int main(int argc, char *argv[]) {
     int grow, gcol;
     getmaxyx(stdscr, grow, gcol);
     int line_num_width = 5;
-    WINDOW *main_win = newwin(grow*0.95, gcol-line_num_width, 0, line_num_width);
-    WINDOW *line_num_win = newwin(grow*0.95, line_num_width, 0, 0);
+    WINDOW *main_win = newwin(grow-2, gcol-line_num_width, 0, line_num_width);
+    WINDOW *line_num_win = newwin(grow-2, line_num_width, 0, 0);
 
     int main_row, main_col;
     int line_num_row, line_num_col;
     getmaxyx(main_win, main_row, main_col);
     getmaxyx(line_num_win, line_num_row, line_num_col);
 
-    WINDOW *status_bar = newwin(grow*0.05, gcol, grow-2, 0);
+    WINDOW *status_bar = newwin(2, gcol, grow-2, 0);
 
     WINDOW *windows[16] = {0};
     size_t  windows_s = 0; 
@@ -1007,6 +1022,30 @@ int main(int argc, char *argv[]) {
 
     size_t normal_pos = 0;
 
+    // load config
+    if(config_filename == NULL) {
+        char default_config_filename[128] = {0};
+        char config_dir[64] = {0};
+        sprintf(config_dir, "%s/.config/cano", getenv("HOME"));
+        struct stat st = {0};
+        if(stat(config_dir, &st) == -1) {
+            mkdir(config_dir, 0755);
+        }
+        sprintf(default_config_filename, "%s/config.cano", config_dir);
+        config_filename = default_config_filename;
+    }
+    char **lines = malloc(sizeof(char)*2);
+    size_t lines_s = 0;
+    int err = read_file_by_lines(config_filename, lines, &lines_s);
+    if(err == 0) {
+        for(size_t i = 0; i < lines_s; i++) {
+            Command command = parse_command(lines[i], strlen(lines[i]));
+            execute_command(&command, &buffer);
+            free(lines[i]);
+        }
+    }
+    free(lines);
+    
 
     /*
     Syntax_Highlighting token_indexes[128] = {0};
