@@ -59,11 +59,24 @@ Visual mode works the same as Normal mode, except works on the entire selection,
 | Command               | Action                    |
 |-----------------------|---------------------------|
 | set-output            | change output file        |
-| quit                  | Quit                      |
-| wquit                 | Write and quit            |
-| w                     | Write without quitting    |
+| q                     | Quit                      |
+| we                    | Write and quit            |
+| e                     | Write without quitting    |
 | set-var (var) (value) | Change a config variable  |
 | !(command)            | Execute a shell command   |
+
+## Config file
+The config file is stored in ~/.config/cano/config.cano by default, or can be set at runtime like so:
+```sh
+./cano --config <config_file>
+```
+
+The format of the file is the same as commands, it is line separated, which is important.
+Example:
+```sh
+set-var syntax 1 
+set-var indent 2 
+```
 
 # Installing
 Currently, the only way to install is to build the package, or use the AUR.
