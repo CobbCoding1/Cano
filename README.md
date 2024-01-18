@@ -47,7 +47,7 @@ Command - For executing commands
 |Normal| A        | Insert mode at end of line                      |
 |Normal| v        | Enter visual mode                               |
 |Normal| V        | Enter visual mode by line                       |
-|Normal| /        | Enter serach mode                               |
+|Normal| /        | Enter search mode                               |
 |Normal| n        | Jump to next search                             |
 |Normal| Ctrl + S | Save and exit                                   |
 |Normal| r        | Replace current char with next char inputted    |
