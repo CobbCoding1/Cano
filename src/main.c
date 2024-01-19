@@ -1312,5 +1312,11 @@ int main(int argc, char **argv) {
     endwin();
 
     free_buffer(&buffer);
+    for(size_t i = 0; i < state.undo_stack.buf_stack_s; i++) {
+        free_buffer(&state.undo_stack.buf_stack[i]);
+    }
+    for(size_t i = 0; i < state.redo_stack.buf_stack_s; i++) {
+        free_buffer(&state.redo_stack.buf_stack[i]);
+    }
     return 0;
 }
