@@ -653,36 +653,50 @@ int handle_modifying_keys(Buffer *buffer, int ch, WINDOW *main_win, size_t *y) {
     return 1;
 }
 
+int handle_normal_to_insert_keys(Buffer *buffer, int ch) {
+    switch(ch) {
+        case 'i':
+            break;
+        case 'I': {
+            Row *cur = &buffer->rows[buffer->row_index];
+            buffer->cur_pos = 0;
+            while(buffer->cur_pos < cur->size && cur->contents[buffer->cur_pos] == ' ') buffer->cur_pos++;
+        } break;
+        case 'a':
+            if(buffer->cur_pos < buffer->rows[buffer->row_index].size) buffer->cur_pos++;
+            break;
+        case 'A':
+            buffer->cur_pos = buffer->rows[buffer->row_index].size;
+            break;
+        case 'o': {
+            shift_rows_right(buffer, buffer->row_index+1);
+            buffer->row_index++; 
+            buffer->cur_pos = 0;
+            size_t num_of_braces = num_of_open_braces(buffer);
+            if(num_of_braces > 0) {
+                create_newline_indent(buffer, num_of_braces);
+            }
+        } break;
+        case 'O': {
+            shift_rows_right(buffer, buffer->row_index);
+            buffer->cur_pos = 0;
+            size_t num_of_braces = num_of_open_braces(buffer);
+            if(num_of_braces > 0) {
+                create_newline_indent(buffer, num_of_braces);
+            }
+        } break;
+        default: {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, 
                  char *command, size_t *command_s, int *repeating, size_t *repeating_count, size_t *normal_pos, int *is_print_msg, char *status_bar_msg) {
     switch(mode) {
         case NORMAL:
             switch(ch) {
-                case 'i':
-                    push_undo(&state->undo_stack, buffer);
-                    mode = INSERT;
-                    *repeating_count = 1;
-                    break;
-                case 'I': {
-                    push_undo(&state->undo_stack, buffer);
-                    Row *cur = &buffer->rows[buffer->row_index];
-                    buffer->cur_pos = 0;
-                    while(buffer->cur_pos < cur->size && cur->contents[buffer->cur_pos] == ' ') buffer->cur_pos++;
-                    mode = INSERT;
-                    *repeating_count = 1;
-                } break;
-                case 'a':
-                    push_undo(&state->undo_stack, buffer);
-                    if(buffer->cur_pos < buffer->rows[buffer->row_index].size) buffer->cur_pos++;
-                    mode = INSERT;
-                    *repeating_count = 1;
-                    break;
-                case 'A':
-                    push_undo(&state->undo_stack, buffer);
-                    buffer->cur_pos = buffer->rows[buffer->row_index].size;
-                    mode = INSERT;
-                    *repeating_count = 1;
-                    break;
                 case ':':
                     mode = COMMAND;
                     buffer->cur_pos = 0;
@@ -711,29 +725,6 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                     buffer->visual.ending_pos.x = buffer->rows[buffer->row_index].size;
                     buffer->visual.ending_pos.y = buffer->row_index;
                     break;
-                case 'o': {
-                    push_undo(&state->undo_stack, buffer);
-                    shift_rows_right(buffer, buffer->row_index+1);
-                    buffer->row_index++; 
-                    buffer->cur_pos = 0;
-                    size_t num_of_braces = num_of_open_braces(buffer);
-                    if(num_of_braces > 0) {
-                        create_newline_indent(buffer, num_of_braces);
-                    }
-                    mode = INSERT;
-                    *repeating_count = 1;
-                } break;
-                case 'O': {
-                    push_undo(&state->undo_stack, buffer);
-                    shift_rows_right(buffer, buffer->row_index);
-                    buffer->cur_pos = 0;
-                    size_t num_of_braces = num_of_open_braces(buffer);
-                    if(num_of_braces > 0) {
-                        create_newline_indent(buffer, num_of_braces);
-                    }
-                    mode = INSERT;
-                    *repeating_count = 1;
-                } break;
                 case ctrl('o'): {
                     shift_rows_right(buffer, ++buffer->row_index);
                     buffer->cur_pos = 0;
@@ -778,7 +769,12 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                     handle_motion_keys(buffer, ch, repeating_count);
                     push_undo(&state->undo_stack, buffer);
                     int modified = handle_modifying_keys(buffer, ch, main_win, y);
-                    if(!modified) pop_undo(&state->undo_stack);
+                    int switched = handle_normal_to_insert_keys(buffer, ch);
+                    if(!modified && !switched) pop_undo(&state->undo_stack);
+                    if(switched) {
+                        mode = INSERT;
+                        *repeating_count = 1;
+                    }
                     break;
             }
             break;
