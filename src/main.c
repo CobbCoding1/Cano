@@ -237,8 +237,15 @@ void refresh_all(WINDOW *windows[16], size_t windows_s) {
     for(size_t i = 0; i < windows_s; i++) wrefresh(windows[i]);
 }
 
-void search(Buffer *buffer, char *command, size_t command_s) {
+Point search(Buffer *buffer, char *command, size_t command_s) {
+
+    Point point = {
+            point.x = buffer -> cur_pos,
+            point.y = buffer -> row_index
+    };
+
     for(size_t i = buffer->row_index; i <= buffer->row_s+buffer->row_index; i++) {
+
         size_t index = (i + buffer->row_s+1) % (buffer->row_s+1);
         Row *cur = &buffer->rows[index];
         size_t j = (i == buffer->row_index) ? buffer->cur_pos+1 : 0;
@@ -246,10 +253,44 @@ void search(Buffer *buffer, char *command, size_t command_s) {
             if(strncmp(cur->contents+j, command, command_s) == 0) {
                 buffer->row_index = index;
                 buffer->cur_pos = j;
-                return;
+
+                // result found and will return the location of the word.
+
+                point.x = j;
+                point.y = buffer -> row_index;
+
+                return point;
             }
         }
     }
+
+    // if there is no results.
+
+    point.x = -1;
+    point.y = -1;
+    return point;
+
+}
+
+void replace(Buffer *buffer, int position, char *old_str, char *new_str, size_t old_str_s, size_t new_str_s) {
+
+    Row *cur = &buffer -> rows[buffer->row_index];
+    memmove(cur->contents + position + new_str_s, cur->contents + position + 
+    old_str_s, cur->size - position - old_str_s);
+
+    memcpy(cur->contents + position, new_str, new_str_s);
+
+    cur -> size = cur -> size - old_str_s + new_str_s;
+
+}
+
+void findAndReplace(Buffer *buffer, char *old_str, char *new_str, size_t old_str_s, size_t new_str_s) { 
+
+    Point position = search(buffer, old_str, old_str_s);
+    if (position.x != -1 && position.y != -1){
+        replace(buffer, position.x, old_str, new_str, old_str_s, new_str_s);
+    }
+
 }
 
 size_t num_of_open_braces(Buffer *buffer) {
