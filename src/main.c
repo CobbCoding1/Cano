@@ -596,6 +596,38 @@ void handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
         case 'l':
             buffer->cur_pos++;
             break;
+        case '%': {
+            Row *cur = &buffer->rows[buffer->row_index];
+            char initial_brace = cur->contents[buffer->cur_pos];
+            Brace initial_opposite = find_opposite_brace(initial_brace);
+            if(initial_opposite.brace == '0') break;
+            size_t brace_stack_s = 0;
+            int posx = buffer->cur_pos;
+            int posy = buffer->row_index;
+            int dif = (initial_opposite.closing) ? -1 : 1;
+            Brace opposite = {0};
+            while(posy >= 0 && (size_t)posy <= buffer->row_s) {
+                posx += dif;
+                if(posx < 0 || (size_t)posx > cur->size) {
+                    if(posy == 0 && dif == -1) break;
+                    posy += dif;
+                    cur = &buffer->rows[posy];
+                    posx = (posx < 0) ? cur->size : 0;
+                }
+                opposite = find_opposite_brace(cur->contents[posx]);
+                if(opposite.brace == '0') continue; 
+                if((opposite.closing && dif == -1) || (!opposite.closing && dif == 1)) {
+                    brace_stack_s++;
+                } else {
+                    if(brace_stack_s-- == 0 && opposite.brace == initial_brace) break;
+                }
+            }
+            if((posx >= 0 && posy >= 0) && ((size_t)posy <= buffer->row_s)) {
+                buffer->cur_pos = posx;
+                buffer->row_index = posy;
+            }
+            break;
+        }
     }
 }
 
@@ -720,38 +752,6 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                     buffer->cur_pos = new_pos.x;
                     buffer->row_index = new_pos.y;
                 } break;
-                case '%': {
-                    Row *cur = &buffer->rows[buffer->row_index];
-                    char initial_brace = cur->contents[buffer->cur_pos];
-                    Brace initial_opposite = find_opposite_brace(initial_brace);
-                    if(initial_opposite.brace == '0') break;
-                    size_t brace_stack_s = 0;
-                    int posx = buffer->cur_pos;
-                    int posy = buffer->row_index;
-                    int dif = (initial_opposite.closing) ? -1 : 1;
-                    Brace opposite = {0};
-                    while(posy >= 0 && (size_t)posy <= buffer->row_s) {
-                        posx += dif;
-                        if(posx < 0 || (size_t)posx > cur->size) {
-                            if(posy == 0 && dif == -1) break;
-                            posy += dif;
-                            cur = &buffer->rows[posy];
-                            posx = (posx < 0) ? cur->size : 0;
-                        }
-                        opposite = find_opposite_brace(cur->contents[posx]);
-                        if(opposite.brace == '0') continue; 
-                        if((opposite.closing && dif == -1) || (!opposite.closing && dif == 1)) {
-                            brace_stack_s++;
-                        } else {
-                            if(brace_stack_s-- == 0 && opposite.brace == initial_brace) break;
-                        }
-                    }
-                    if((posx >= 0 && posy >= 0) && ((size_t)posy <= buffer->row_s)) {
-                        buffer->cur_pos = posx;
-                        buffer->row_index = posy;
-                    }
-                    break;
-                }
                 case 'u': {
                     Buffer new_buf = pop_undo(&state->undo_stack);
                     push_undo(&state->redo_stack, buffer);
@@ -989,6 +989,7 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                 } break;
                 case 'd':
                 case 'x':
+                    push_undo(&state->undo_stack, buffer);
                     if(buffer->visual.starting_pos.y > buffer->visual.ending_pos.y || 
                       (buffer->visual.starting_pos.y == buffer->visual.ending_pos.y &&
                        buffer->visual.starting_pos.x > buffer->visual.ending_pos.x)) {
