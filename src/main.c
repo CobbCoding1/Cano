@@ -261,27 +261,6 @@ Point search(Buffer *buffer, char *command, size_t command_s) {
 
 }
 
-void replace(Buffer *buffer, int position, char *old_str, char *new_str, size_t old_str_s, size_t new_str_s) {
-
-    Row *cur = &buffer -> rows[buffer->row_index];
-    memmove(cur->contents + position + new_str_s, cur->contents + position + 
-    old_str_s, cur->size - position - old_str_s);
-
-    memcpy(cur->contents + position, new_str, new_str_s);
-
-    cur -> size = cur -> size - old_str_s + new_str_s;
-
-}
-
-void findAndReplace(Buffer *buffer, char *old_str, char *new_str, size_t old_str_s, size_t new_str_s) { 
-
-    Point position = search(buffer, old_str, old_str_s);
-    if (position.x != -1 && position.y != -1){
-        replace(buffer, position.x, old_str, new_str, old_str_s, new_str_s);
-    }
-
-}
-
 size_t num_of_open_braces(Buffer *buffer) {
     int posy = buffer->row_index;
     int posx = buffer->cur_pos;
@@ -620,6 +599,28 @@ void handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
     }
 }
 
+int handle_modifying_keys(Buffer *buffer, int ch, WINDOW *main_win, size_t *y) {
+    switch(ch) {
+        case 'x': {
+            delete_char(buffer, buffer->row_index, buffer->cur_pos, y, main_win);
+        } break;
+        case 'd': {
+            delete_row(buffer, buffer->row_index);
+            if(buffer->row_index != 0) buffer->row_index--;
+        } break;
+        case 'r': {
+            curs_set(0);
+            ch = wgetch(main_win);
+            buffer->rows[buffer->row_index].contents[buffer->cur_pos] = ch;
+            curs_set(1);
+        } break;
+        default: {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, 
                  char *command, size_t *command_s, int *repeating, size_t *repeating_count, size_t *normal_pos, int *is_print_msg, char *status_bar_msg) {
     switch(mode) {
@@ -678,13 +679,6 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                     buffer->visual.ending_pos.x = buffer->rows[buffer->row_index].size;
                     buffer->visual.ending_pos.y = buffer->row_index;
                     break;
-                case 'x': {
-                    delete_char(buffer, buffer->row_index, buffer->cur_pos, y, main_win);
-                } break;
-                case 'd': {
-                    delete_row(buffer, buffer->row_index);
-                    if(buffer->row_index != 0) buffer->row_index--;
-                } break;
                 case 'o': {
                     push_undo(&state->undo_stack, buffer);
                     shift_rows_right(buffer, buffer->row_index+1);
@@ -721,12 +715,6 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                 case 'R':
                     *repeating = 1;
                     break;
-                case 'r':
-                    curs_set(0);
-                    ch = wgetch(main_win);
-                    buffer->rows[buffer->row_index].contents[buffer->cur_pos] = ch;
-                    curs_set(1);
-                    break;  
                 case 'n': {
                     Point new_pos = search(buffer, command, *command_s);
                     buffer->cur_pos = new_pos.x;
@@ -788,6 +776,9 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                     break;
                 default:
                     handle_motion_keys(buffer, ch, repeating_count);
+                    push_undo(&state->undo_stack, buffer);
+                    int modified = handle_modifying_keys(buffer, ch, main_win, y);
+                    if(!modified) pop_undo(&state->undo_stack);
                     break;
             }
             break;
