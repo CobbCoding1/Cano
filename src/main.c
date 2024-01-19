@@ -44,7 +44,6 @@ typedef enum {
 
 int ESCDELAY = 10;
 
-
 #define MAX_STRING_SIZE 1025
 
 typedef struct {
@@ -89,6 +88,16 @@ typedef struct {
     size_t args_s;
 } Command;
 
+typedef struct {
+    Buffer *buf_stack;
+    size_t buf_stack_s;
+    size_t buf_capacity;
+} Undo;
+
+typedef struct {
+    Undo undo_stack;
+} State;
+
 Mode mode = NORMAL;
 int QUIT = 0;
 
@@ -102,7 +111,6 @@ int is_between(Point a, Point b, Point c) {
     }
     return 0; 
 }
-
 
 char *stringify_mode() {
     switch(mode) {
@@ -152,6 +160,56 @@ Brace find_opposite_brace(char opening) {
             break;
     }
     return (Brace){.brace = '0'};
+}
+
+void free_buffer(Buffer *buffer) {
+    for(size_t i = 0; i < buffer->row_capacity; i++) {
+        free(buffer->rows[i].contents);
+    }
+    free(buffer->rows);
+}
+
+Buffer copy_buffer(Buffer *buffer) {
+    Buffer buf = {0};
+    buf.row_capacity = buffer->row_capacity;
+    buf.row_index = buffer->row_index;
+    buf.cur_pos = buffer->cur_pos;
+    buf.row_s = buffer->row_s;
+    buf.visual = buffer->visual;
+    size_t filename_s = strlen(buffer->filename);
+    buf.filename = malloc(sizeof(char)*filename_s);
+    strncpy(buf.filename, buffer->filename, filename_s);
+    buf.rows = calloc(buffer->row_capacity, sizeof(Row));
+    for(size_t i = 0; i < buffer->row_capacity; i++) {
+        buf.rows[i].contents = calloc(MAX_STRING_SIZE, sizeof(char));
+    }
+    for(size_t i = 0; i < buffer->row_s+1; i++) {
+        Row *cur = &buffer->rows[i];
+        buf.rows[i].size = cur->size; 
+        buf.rows[i].index = cur->index; 
+        strncpy(buf.rows[i].contents, cur->contents, buffer->rows[i].size);
+    }
+    return buf;
+}
+
+void shift_undo_left(Undo *undo) {
+    free_buffer(&undo->buf_stack[0]);
+    for(size_t i = 1; i < undo->buf_stack_s; i++) {
+        undo->buf_stack[i-1] = undo->buf_stack[i];
+    }
+    undo->buf_stack_s--;
+}
+
+void push_undo(Undo *undo, Buffer *buf) {
+    if(undo->buf_stack_s >= undo->buf_capacity) {
+        shift_undo_left(undo); 
+    }
+    undo->buf_stack[undo->buf_stack_s++] = copy_buffer(buf);
+}
+
+Buffer pop_undo(Undo *undo) {
+    if(undo->buf_stack_s == 0) return (Buffer){0};
+    return undo->buf_stack[--undo->buf_stack_s];
 }
 
 void resize_rows(Buffer *buffer, size_t capacity) {
@@ -264,7 +322,7 @@ typedef enum {
     INVALID_VALUE,
 } Command_Errors;
 
-int execute_command(Command *command, Buffer *buf) {
+int execute_command(Command *command, Buffer *buf, State *state) {
     if(command->command_s == 10 && strncmp(command->command, "set-output", 10) == 0) {
         if(command->args_s < 1) return INVALID_ARG; 
         buf->filename = command->args[0].arg;
@@ -298,6 +356,20 @@ int execute_command(Command *command, Buffer *buf) {
             int value = atoi(command->args[1].arg);
             if(value < 0) return INVALID_VALUE;
             syntax = value;
+        } else if(command->args[0].size >= 9 && strncmp(command->args[0].arg, "undo-size", 9) == 0) {
+            if(command->args[1].size < 1) return INVALID_VALUE;
+            int value = atoi(command->args[1].arg);
+            if(value < 0) return INVALID_VALUE;
+            undo_size = value;
+            state->undo_stack.buf_capacity = undo_size;
+            for(size_t i = 0; i < state->undo_stack.buf_stack_s; i++) {
+                free_buffer(&state->undo_stack.buf_stack[i]);
+            }
+            state->undo_stack.buf_stack_s = 0;
+            free(state->undo_stack.buf_stack);
+            state->undo_stack.buf_stack = calloc(state->undo_stack.buf_capacity, sizeof(Buffer));
+            Buffer temp_buf = copy_buffer(buf);
+            push_undo(&state->undo_stack, &temp_buf);
         } else {
             return UNKNOWN_COMMAND;
         }
@@ -517,16 +589,18 @@ void handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
     }
 }
 
-void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, 
+void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, 
                  char *command, size_t *command_s, int *repeating, size_t *repeating_count, size_t *normal_pos, int *is_print_msg, char *status_bar_msg) {
     switch(mode) {
         case NORMAL:
             switch(ch) {
                 case 'i':
+                    push_undo(&state->undo_stack, buffer);
                     mode = INSERT;
                     *repeating_count = 1;
                     break;
                 case 'I': {
+                    push_undo(&state->undo_stack, buffer);
                     Row *cur = &buffer->rows[buffer->row_index];
                     buffer->cur_pos = 0;
                     while(buffer->cur_pos < cur->size && cur->contents[buffer->cur_pos] == ' ') buffer->cur_pos++;
@@ -534,11 +608,13 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     *repeating_count = 1;
                 } break;
                 case 'a':
+                    push_undo(&state->undo_stack, buffer);
                     if(buffer->cur_pos < buffer->rows[buffer->row_index].size) buffer->cur_pos++;
                     mode = INSERT;
                     *repeating_count = 1;
                     break;
                 case 'A':
+                    push_undo(&state->undo_stack, buffer);
                     buffer->cur_pos = buffer->rows[buffer->row_index].size;
                     mode = INSERT;
                     *repeating_count = 1;
@@ -579,6 +655,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     if(buffer->row_index != 0) buffer->row_index--;
                 } break;
                 case 'o': {
+                    push_undo(&state->undo_stack, buffer);
                     shift_rows_right(buffer, buffer->row_index+1);
                     buffer->row_index++; 
                     buffer->cur_pos = 0;
@@ -590,6 +667,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     *repeating_count = 1;
                 } break;
                 case 'O': {
+                    push_undo(&state->undo_stack, buffer);
                     shift_rows_right(buffer, buffer->row_index);
                     buffer->cur_pos = 0;
                     size_t num_of_braces = num_of_open_braces(buffer);
@@ -653,6 +731,11 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                     }
                     break;
                 }
+                case 'u': {
+                    Buffer new_buf = pop_undo(&state->undo_stack);
+                    if(new_buf.row_capacity == 0) break;
+                    *buffer = new_buf;
+                } break;
                 case ctrl('s'): {
                     handle_save(buffer);
                     QUIT = 1;
@@ -777,7 +860,7 @@ void handle_keys(Buffer *buffer, WINDOW *main_win, WINDOW *status_bar, size_t *y
                         pclose(file);
                     } else {
                         Command cmd = parse_command(command, *command_s);
-                        int err = execute_command(&cmd, buffer);
+                        int err = execute_command(&cmd, buffer, state);
                         switch(err) {
                             case NO_ERROR:
                                 break;
@@ -1021,6 +1104,12 @@ int main(int argc, char **argv) {
 
     size_t normal_pos = 0;
 
+    State state = {0};
+    state.undo_stack.buf_capacity = undo_size;
+    state.undo_stack.buf_stack = calloc(state.undo_stack.buf_capacity, sizeof(Buffer));
+    Buffer temp_buf = copy_buffer(&buffer);
+    push_undo(&state.undo_stack, &temp_buf);
+
     // load config
     if(config_filename == NULL) {
         char default_config_filename[128] = {0};
@@ -1039,12 +1128,11 @@ int main(int argc, char **argv) {
     if(err == 0) {
         for(size_t i = 0; i < lines_s; i++) {
             Command command = parse_command(lines[i], strlen(lines[i]));
-            execute_command(&command, &buffer);
+            execute_command(&command, &buffer, &state);
             free(lines[i]);
         }
     }
     free(lines);
-    
 
     /*
     Syntax_Highlighting token_indexes[128] = {0};
@@ -1198,7 +1286,7 @@ int main(int argc, char **argv) {
 
         // TODO: move a lot of these extra variables into buffer struct
         for(size_t i = 0; i < repeating_count; i++) {
-            handle_keys(&buffer, main_win, status_bar, &y, ch, command, &command_s, 
+            handle_keys(&buffer, &state, main_win, status_bar, &y, ch, command, &command_s, 
                         &repeating, &repeating_count, &normal_pos, &is_print_msg, status_bar_msg);
         }
         if(mode != COMMAND && mode != SEARCH && buffer.cur_pos > buffer.rows[buffer.row_index].size) {
@@ -1211,5 +1299,7 @@ int main(int argc, char **argv) {
 
     refresh_all(windows, windows_s);
     endwin();
+
+    free_buffer(&buffer);
     return 0;
 }

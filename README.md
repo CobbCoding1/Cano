@@ -47,6 +47,7 @@ Command - For executing commands
 |Normal| A        | Insert mode at end of line                      |
 |Normal| v        | Enter visual mode                               |
 |Normal| V        | Enter visual mode by line                       |
+|Normal| u        | Undo                                            |
 |Normal| /        | Enter search mode                               |
 |Normal| n        | Jump to next search                             |
 |Normal| Ctrl + S | Save and exit                                   |
@@ -84,6 +85,7 @@ relative # toggle relative line numbers
 auto-indent # toggle auto indentation on-off
 syntax # toggle syntax highlighting on-off
 indent # set indent
+undo-size # size of undo history 
 ```
 
 # Installing
