@@ -78,6 +78,14 @@ set-var syntax 1
 set-var indent 2 
 ```
 
+## Config Variables
+```sh
+relative // toggle relative line numbers
+auto-indent // toggle auto indentation on-off
+syntax // toggle syntax highlighting on-off
+indent // set indent
+```
+
 # Installing
 Currently, the only way to install is to build the package, or use the AUR.
 
