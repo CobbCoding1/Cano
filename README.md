@@ -80,10 +80,10 @@ set-var indent 2
 
 ## Config Variables
 ```sh
-relative // toggle relative line numbers
-auto-indent // toggle auto indentation on-off
-syntax // toggle syntax highlighting on-off
-indent // set indent
+relative # toggle relative line numbers
+auto-indent # toggle auto indentation on-off
+syntax # toggle syntax highlighting on-off
+indent # set indent
 ```
 
 # Installing
