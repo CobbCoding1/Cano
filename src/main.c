@@ -238,12 +238,10 @@ void refresh_all(WINDOW *windows[16], size_t windows_s) {
 }
 
 Point search(Buffer *buffer, char *command, size_t command_s) {
-
     Point point = {
-            point.x = buffer -> cur_pos,
-            point.y = buffer -> row_index
+            .x = buffer -> cur_pos,
+            .y = buffer -> row_index,
     };
-
     for(size_t i = buffer->row_index; i <= buffer->row_s+buffer->row_index; i++) {
 
         size_t index = (i + buffer->row_s+1) % (buffer->row_s+1);
@@ -251,23 +249,14 @@ Point search(Buffer *buffer, char *command, size_t command_s) {
         size_t j = (i == buffer->row_index) ? buffer->cur_pos+1 : 0;
         for(; j < cur->size; j++) {
             if(strncmp(cur->contents+j, command, command_s) == 0) {
-                buffer->row_index = index;
-                buffer->cur_pos = j;
-
                 // result found and will return the location of the word.
-
                 point.x = j;
-                point.y = buffer -> row_index;
-
+                point.y = index;
                 return point;
             }
         }
     }
 
-    // if there is no results.
-
-    point.x = -1;
-    point.y = -1;
     return point;
 
 }
@@ -739,7 +728,9 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                     curs_set(1);
                     break;  
                 case 'n': {
-                    search(buffer, command, *command_s);
+                    Point new_pos = search(buffer, command, *command_s);
+                    buffer->cur_pos = new_pos.x;
+                    buffer->row_index = new_pos.y;
                 } break;
                 case '%': {
                     Row *cur = &buffer->rows[buffer->row_index];
@@ -967,8 +958,13 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                     mode = NORMAL;
                     break;
                 case ENTER: {
-                    search(buffer, command, *command_s);
-                    buffer->cur_pos = *normal_pos;
+                    if(*command_s > 2 && strncmp(command, "s/", 2) == 0) {
+                        // search and replace
+                        break;
+                    } 
+                    Point new_pos = search(buffer, command, *command_s);
+                    buffer->cur_pos = new_pos.x;
+                    buffer->row_index = new_pos.y;
                     mode = NORMAL;
                 } break;
                 case LEFT_ARROW:
