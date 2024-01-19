@@ -957,13 +957,59 @@ int main(int argc, char **argv) {
     }
 
     // colors
+
     start_color();
-    init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
-    init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
-    init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
-    init_pair(MAGENTA_COLOR, COLOR_MAGENTA, COLOR_BLACK);
-    init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
+
+    // opening colors file to set the color based off users preference
+    // opens file "colors, read mode"
+
+    FILE *file = fopen("colors", "r");
+    int curline = 0;
+
+    if (file == NULL) {
+        CRASH("failed to open 'colors' file");
+        return -1;
+    }
+
+    char line [100]; // buffer to store line
+
+    while (fgets(line, sizeof(line), file) != NULL) {
+        ++curline;
+        if (curline == 12) {
+
+            // set color for text from the colors file
+            // TODO: implement feature as a command.
+
+            if (strcmp(line, "YELLOW") == 0){
+                init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
+            }
+            else if(strcmp(line,"BLUE") == 0){
+                init_pair(YELLOW_COLOR, COLOR_BLUE, COLOR_BLACK);
+            }
+            else if(strcmp(line, "GREEN") == 0){
+                init_pair(YELLOW_COLOR, COLOR_GREEN, COLOR_BLACK);
+            }
+            else if(strcmp(line, "RED") == 0){
+                init_pair(YELLOW_COLOR, COLOR_RED, COLOR_BLACK);
+            }
+            else if(strcmp(line, "MAGENTA") == 0){
+                init_pair(YELLOW_COLOR, COLOR_MAGENTA, COLOR_BLACK);
+            }
+            else if(strcmp(line, "CYAN") == 0){
+                init_pair(YELLOW_COLOR, COLOR_CYAN, COLOR_BLACK);
+            }
+            else{
+                // default option
+                init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
+            }
+        }
+    }
+
+    fclose(file);
+    free(line);
+    free(curline);
+
+    
 
     noecho();
     raw();
