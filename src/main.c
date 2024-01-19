@@ -96,6 +96,7 @@ typedef struct {
 
 typedef struct {
     Undo undo_stack;
+    Undo redo_stack;
 } State;
 
 Mode mode = NORMAL;
@@ -733,7 +734,15 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                 }
                 case 'u': {
                     Buffer new_buf = pop_undo(&state->undo_stack);
+                    push_undo(&state->redo_stack, buffer);
                     if(new_buf.row_capacity == 0) break;
+                    *buffer = new_buf;
+                } break;
+                case 'U': {
+                    if(state->redo_stack.buf_stack_s >= state->redo_stack.buf_capacity) break;
+                    Buffer new_buf = pop_undo(&state->redo_stack);
+                    if(new_buf.row_capacity == 0) break; 
+                    state->undo_stack.buf_stack_s++;
                     *buffer = new_buf;
                 } break;
                 case ctrl('s'): {
@@ -1106,7 +1115,9 @@ int main(int argc, char **argv) {
 
     State state = {0};
     state.undo_stack.buf_capacity = undo_size;
+    state.redo_stack.buf_capacity = undo_size;
     state.undo_stack.buf_stack = calloc(state.undo_stack.buf_capacity, sizeof(Buffer));
+    state.redo_stack.buf_stack = calloc(state.undo_stack.buf_capacity, sizeof(Buffer));
     Buffer temp_buf = copy_buffer(&buffer);
     push_undo(&state.undo_stack, &temp_buf);
 

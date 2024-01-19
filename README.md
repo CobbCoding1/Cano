@@ -48,6 +48,7 @@ Command - For executing commands
 |Normal| v        | Enter visual mode                               |
 |Normal| V        | Enter visual mode by line                       |
 |Normal| u        | Undo                                            |
+|Normal| U        | Redo                                            |
 |Normal| /        | Enter search mode                               |
 |Normal| n        | Jump to next search                             |
 |Normal| Ctrl + S | Save and exit                                   |
