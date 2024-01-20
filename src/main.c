@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <time.h>
 
 #include <curses.h>
 
@@ -43,6 +44,10 @@ typedef enum {
 } Mode;
 
 int ESCDELAY = 10;
+time_t rawtime;
+struct tm *timeinfo;
+
+char run_time[80];
 
 #define MAX_STRING_SIZE 1025
 
@@ -98,6 +103,9 @@ typedef struct {
     Undo undo_stack;
     Undo redo_stack;
 } State;
+
+void shift_rows_left(Buffer *buf, size_t index);
+void shift_row_left(Row *row, size_t index);
 
 Mode mode = NORMAL;
 int QUIT = 0;
@@ -238,9 +246,9 @@ void refresh_all(WINDOW *windows[16], size_t windows_s) {
 }
 
 void write_log(const char *message) {
-    FILE *file = fopen("logs/log.txt", "a");
+    FILE *file = fopen("logs/cano.log", "a");
     if (file == NULL) {
-        printf("Failed to open log file.\n");
+        printf("COULD NOT WRITE LOG\n");
         return;
     }
     
@@ -274,31 +282,39 @@ Point search(Buffer *buffer, char *command, size_t command_s) {
 
 
 
-void replace(Buffer *buffer, int position, char *new_str, size_t old_str_s, size_t new_str_s) { 
+void replace(Buffer *buffer, Point position, char *new_str, size_t old_str_s, size_t new_str_s) { 
     if (buffer == NULL || new_str == NULL) {
         write_log("Error: null pointer");
         return;
     }
 
-    Row *cur = &buffer->rows[buffer->row_index];
+    Row *cur = &buffer->rows[position.y];
     if (cur == NULL || cur->contents == NULL) {
         write_log("Error: null pointer");
         return;
     }
 
-    if (position + new_str_s > cur->size || position + old_str_s > cur->size) {
+    /*
+    if (position.x + new_str_s > cur->size || position.x + old_str_s > cur->size) {
         write_log("Error: array index out of bounds");
         return;
     }
+    */
+    size_t old_s = cur->size;
+    size_t new_s = cur->size + new_str_s - old_str_s;
+
+    if(old_str_s > new_str_s) {
+        for(size_t i = 0; i < old_s-new_s; i++) {
+            shift_row_left(cur, old_str_s-1-i);
+        }
+    }
+    cur->size = new_s;
 
     // Move the contents after the old substring to make space for the new string
-    memmove(cur->contents + position + new_str_s, cur->contents + position + old_str_s, cur->size - position - old_str_s);
+    memmove(cur->contents + position.x + new_str_s, cur->contents + position.x + old_str_s, cur->size - position.x - old_str_s);
 
     // Copy the new string into the buffer at the specified position
-    memcpy(cur->contents + position, new_str, new_str_s);
-
-    // Update the size of the row after replacing the substring
-    cur->size = cur->size - old_str_s + new_str_s;
+    memcpy(cur->contents + position.x, new_str, new_str_s);
 }
 
 
@@ -314,7 +330,7 @@ void find_and_replace(Buffer *buffer, char *old_str, char *new_str) {
     if (position.x != (buffer->cur_pos) && position.y != (buffer->row_index)){
         write_log("true");
         // If the old string is found, replace it with the new string
-        replace(buffer, position.x, new_str, old_str_s, new_str_s);
+        replace(buffer, position, new_str, old_str_s, new_str_s);
     }
     char message[50];
     sprintf(message, "position.x: %zu ran find_and_replace", position.x);
@@ -1021,7 +1037,7 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                         */
 
                         // search and replace
-                        char str[100]; // replace with the maximum length of your command
+                        char str[128]; // replace with the maximum length of your command
                         strncpy(str, command+2, *command_s-2);
                         str[*command_s-2] = '\0'; // ensure null termination
 
