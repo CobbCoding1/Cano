@@ -9,7 +9,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
-#include <time.h>
 
 #include <curses.h>
 
@@ -44,12 +43,6 @@ typedef enum {
 } Mode;
 
 int ESCDELAY = 10;
-
-time_t rawtime;
-struct tm *timeinfo;
-
-// get current time
-char run_time[80];
 
 #define MAX_STRING_SIZE 1025
 
