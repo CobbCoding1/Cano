@@ -304,9 +304,6 @@ void replace(Buffer *buffer, Point position, char *new_str, size_t old_str_s, si
         shift_row_left(cur, position.x);
     }
     cur->size = new_s;
-    char message[20] = {0};
-    sprintf(message, "%zu, %zu", position.x, position.x+old_str_s);
-    write_log(message);
 
     // Move the contents after the old substring to make space for the new string
     for(size_t i = position.x; i < position.x+new_str_s; i++) {
@@ -325,18 +322,10 @@ void find_and_replace(Buffer *buffer, char *old_str, char *new_str) {
 
     // Search for the old string in the buffer
     Point position = search(buffer, old_str, old_str_s);
-    char messages[100];
-    sprintf(messages, "position.x: %zu ran find_and_replace", position.x);
-    write_log(messages);
     if (position.x != (buffer->cur_pos) && position.y != (buffer->row_index)){
-        write_log("true");
         // If the old string is found, replace it with the new string
         replace(buffer, position, new_str, old_str_s, new_str_s);
     }
-    char message[50];
-    sprintf(message, "position.x: %zu ran find_and_replace", position.x);
-
-    write_log(message);
 }
 
 size_t num_of_open_braces(Buffer *buffer) {
@@ -817,6 +806,42 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                     *repeating = 1;
                     break;
                 case 'n': {
+                    if(*command_s > 2 && strncmp(command, "s/", 2) == 0) {
+                        // search and replace
+                        char str[128]; // replace with the maximum length of your command
+                        strncpy(str, command+2, *command_s-2);
+                        str[*command_s-2] = '\0'; // ensure null termination
+
+                        char *token = strtok(str, "/");
+                        int count = 0;
+                        char args[2][100];
+
+                        while (token != NULL) {
+                            char temp_buffer[100];
+                            strcpy(temp_buffer, token);
+                            if(count == 0) {
+                                strcpy(args[0], temp_buffer);
+                            } else if(count == 1) {
+                                strcpy(args[1], temp_buffer);
+                            }
+                            ++count;
+
+                            // temp message buffer
+                            char message[100];
+                            // format string to be logged later on
+                            sprintf(message, "%s", token);
+
+                            // log for args.
+                            write_log(message);
+                            token = strtok(NULL, "/");
+                        }
+                        Point new_pos = search(buffer, args[0], strlen(args[0]));
+                        find_and_replace(buffer, args[0], args[1]);
+                        buffer->cur_pos = new_pos.x;
+                        buffer->row_index = new_pos.y;
+                        break;
+
+                    } 
                     Point new_pos = search(buffer, command, *command_s);
                     buffer->cur_pos = new_pos.x;
                     buffer->row_index = new_pos.y;
@@ -1065,7 +1090,11 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                             write_log(message);
                             token = strtok(NULL, "/");
                         }
+                        Point new_pos = search(buffer, args[0], strlen(args[0]));
                         find_and_replace(buffer, args[0], args[1]);
+                        buffer->cur_pos = new_pos.x;
+                        buffer->row_index = new_pos.y;
+                        mode = NORMAL;
                         break;
 
                     } 
