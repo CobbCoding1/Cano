@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <time.h>
 
 #include <curses.h>
 
@@ -43,6 +44,12 @@ typedef enum {
 } Mode;
 
 int ESCDELAY = 10;
+
+time_t rawtime;
+struct tm *timeinfo;
+
+// get current time
+char run_time[80];
 
 #define MAX_STRING_SIZE 1025
 
@@ -237,6 +244,17 @@ void refresh_all(WINDOW *windows[16], size_t windows_s) {
     for(size_t i = 0; i < windows_s; i++) wrefresh(windows[i]);
 }
 
+void write_log(const char *message) {
+    FILE *file = fopen("logs/log.txt", "a");
+    if (file == NULL) {
+        printf("Failed to open log file.\n");
+        return;
+    }
+    
+    fprintf(file, "%s\n", message);
+    fclose(file);
+}
+
 Point search(Buffer *buffer, char *command, size_t command_s) {
     Point point = {
             .x = buffer -> cur_pos,
@@ -259,6 +277,56 @@ Point search(Buffer *buffer, char *command, size_t command_s) {
 
     return point;
 
+}
+
+
+
+void replace(Buffer *buffer, int position, char *new_str, size_t old_str_s, size_t new_str_s) { 
+    if (buffer == NULL || new_str == NULL) {
+        write_log("Error: null pointer");
+        return;
+    }
+
+    Row *cur = &buffer->rows[buffer->row_index];
+    if (cur == NULL || cur->contents == NULL) {
+        write_log("Error: null pointer");
+        return;
+    }
+
+    if (position + new_str_s > cur->size || position + old_str_s > cur->size) {
+        write_log("Error: array index out of bounds");
+        return;
+    }
+
+    // Move the contents after the old substring to make space for the new string
+    memmove(cur->contents + position + new_str_s, cur->contents + position + old_str_s, cur->size - position - old_str_s);
+
+    // Copy the new string into the buffer at the specified position
+    memcpy(cur->contents + position, new_str, new_str_s);
+
+    // Update the size of the row after replacing the substring
+    cur->size = cur->size - old_str_s + new_str_s;
+}
+
+
+void find_and_replace(Buffer *buffer, char *old_str, char *new_str) { 
+    size_t old_str_s = strlen(old_str);
+    size_t new_str_s = strlen(new_str);
+
+    // Search for the old string in the buffer
+    Point position = search(buffer, old_str, old_str_s);
+    char messages[100];
+    sprintf(messages, "position.x: %zu ran find_and_replace", position.x);
+    write_log(messages);
+    if (position.x != (buffer->cur_pos) && position.y != (buffer->row_index)){
+        write_log("true");
+        // If the old string is found, replace it with the new string
+        replace(buffer, position.x, new_str, old_str_s, new_str_s);
+    }
+    char message[50];
+    sprintf(message, "position.x: %zu ran find_and_replace", position.x);
+
+    write_log(message);
 }
 
 size_t num_of_open_braces(Buffer *buffer) {
@@ -946,8 +1014,50 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                     break;
                 case ENTER: {
                     if(*command_s > 2 && strncmp(command, "s/", 2) == 0) {
+                        /*
+                        the search and replace works by taking the command and splitting it into two parts
+                        to initialize the search and replace function. The first part is the search string
+                        go in search mode and first type "s/" followed by the search string. Then type "/"
+                        followed by what you want to replace it with.
+
+                        Example:
+
+                        s/Hello/World
+
+                        This will replace all instances of "Hello" with "World" in the file.
+                        */
+
                         // search and replace
+                        char str[100]; // replace with the maximum length of your command
+                        strncpy(str, command+2, *command_s-2);
+                        str[*command_s-2] = '\0'; // ensure null termination
+
+                        char *token = strtok(str, "/");
+                        int count = 0;
+                        char args[2][100];
+
+                        while (token != NULL) {
+                            char temp_buffer[100];
+                            strcpy(temp_buffer, token);
+                            if(count == 0) {
+                                strcpy(args[0], temp_buffer);
+                            } else if(count == 1) {
+                                strcpy(args[1], temp_buffer);
+                            }
+                            ++count;
+
+                            // temp message buffer
+                            char message[100];
+                            // format string to be logged later on
+                            sprintf(message, "%s", token);
+
+                            // log for args.
+                            write_log(message);
+                            token = strtok(NULL, "/");
+                        }
+                        find_and_replace(buffer, args[0], args[1]);
                         break;
+
                     } 
                     Point new_pos = search(buffer, command, *command_s);
                     buffer->cur_pos = new_pos.x;
@@ -1047,6 +1157,19 @@ typedef struct {
 } Syntax_Highlighting;
 
 int main(int argc, char **argv) {
+
+    write_log("starting (int main)");
+
+    time_t rawtime;
+    struct tm *timeinfo;
+
+    // get current time
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+
+    strftime(run_time, sizeof(run_time), "%Y-%m-%d %H:%M:%S", timeinfo);
+
+
     (void)argc;
     char *program = *argv++;
     char *flag = *argv++;
@@ -1146,6 +1269,9 @@ int main(int argc, char **argv) {
     Buffer temp_buf = copy_buffer(&buffer);
     push_undo(&state.undo_stack, &temp_buf);
 
+    write_log("finished loading");
+    write_log("loading config");
+
     // load config
     if(config_filename == NULL) {
         char default_config_filename[128] = {0};
@@ -1169,6 +1295,9 @@ int main(int argc, char **argv) {
         }
     }
     free(lines);
+
+    write_log("finished loading config");
+
 
     /*
     Syntax_Highlighting token_indexes[128] = {0};
