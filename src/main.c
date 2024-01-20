@@ -106,6 +106,7 @@ typedef struct {
 
 void shift_rows_left(Buffer *buf, size_t index);
 void shift_row_left(Row *row, size_t index);
+void shift_row_right(Row *row, size_t index);
 
 Mode mode = NORMAL;
 int QUIT = 0;
@@ -248,7 +249,6 @@ void refresh_all(WINDOW *windows[16], size_t windows_s) {
 void write_log(const char *message) {
     FILE *file = fopen("logs/cano.log", "a");
     if (file == NULL) {
-        printf("COULD NOT WRITE LOG\n");
         return;
     }
     
@@ -280,8 +280,6 @@ Point search(Buffer *buffer, char *command, size_t command_s) {
 
 }
 
-
-
 void replace(Buffer *buffer, Point position, char *new_str, size_t old_str_s, size_t new_str_s) { 
     if (buffer == NULL || new_str == NULL) {
         write_log("Error: null pointer");
@@ -300,18 +298,21 @@ void replace(Buffer *buffer, Point position, char *new_str, size_t old_str_s, si
         return;
     }
     */
-    size_t old_s = cur->size;
     size_t new_s = cur->size + new_str_s - old_str_s;
 
-    if(old_str_s > new_str_s) {
-        for(size_t i = 0; i < old_s-new_s; i++) {
-            shift_row_left(cur, old_str_s-1-i);
-        }
+    for(size_t i = position.x; i < position.x+old_str_s; i++) {
+        shift_row_left(cur, position.x);
     }
     cur->size = new_s;
+    char message[20] = {0};
+    sprintf(message, "%zu, %zu", position.x, position.x+old_str_s);
+    write_log(message);
 
     // Move the contents after the old substring to make space for the new string
-    memmove(cur->contents + position.x + new_str_s, cur->contents + position.x + old_str_s, cur->size - position.x - old_str_s);
+    for(size_t i = position.x; i < position.x+new_str_s; i++) {
+        shift_row_right(cur, position.x);
+    }
+    //memmove(cur->contents + position.x + new_str_s, cur->contents + position.x + old_str_s, cur->size - position.x - old_str_s);
 
     // Copy the new string into the buffer at the specified position
     memcpy(cur->contents + position.x, new_str, new_str_s);
