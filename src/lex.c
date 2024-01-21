@@ -62,6 +62,9 @@ char *keywords[] = {
     "volatile",
     "while",
 };
+
+char *comments = "//";
+
 #define NUM_KEYWORDS sizeof(keywords)/sizeof(*keywords)
 #define NUM_TYPES sizeof(types)/sizeof(*types)
 

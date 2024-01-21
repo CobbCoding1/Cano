@@ -94,7 +94,7 @@ typedef struct {
 } Command;
 
 typedef struct {
-    Buffer *buf_stack;
+    Buffer **buf_stack;
     size_t buf_stack_s;
     size_t buf_capacity;
 } Undo;
@@ -107,6 +107,7 @@ typedef struct {
 void shift_rows_left(Buffer *buf, size_t index);
 void shift_row_left(Row *row, size_t index);
 void shift_row_right(Row *row, size_t index);
+void write_log(const char *message);
 
 Mode mode = NORMAL;
 int QUIT = 0;
@@ -173,53 +174,77 @@ Brace find_opposite_brace(char opening) {
 }
 
 void free_buffer(Buffer *buffer) {
+    write_log("before");
     for(size_t i = 0; i < buffer->row_capacity; i++) {
+        char msg[21] = {0};
+        sprintf(msg, "%zu", i);
+        write_log(msg);
         free(buffer->rows[i].contents);
     }
-    free(buffer->rows);
+    write_log("after");
+    //free(buffer->rows);
+    *buffer = (Buffer){0};
 }
 
-Buffer copy_buffer(Buffer *buffer) {
-    Buffer buf = {0};
-    buf.row_capacity = buffer->row_capacity;
-    buf.row_index = buffer->row_index;
-    buf.cur_pos = buffer->cur_pos;
-    buf.row_s = buffer->row_s;
-    buf.visual = buffer->visual;
-    size_t filename_s = strlen(buffer->filename);
-    buf.filename = malloc(sizeof(char)*filename_s);
-    strncpy(buf.filename, buffer->filename, filename_s);
-    buf.rows = calloc(buffer->row_capacity, sizeof(Row));
+Buffer *copy_buffer(Buffer *buffer) {
+    write_log("copy b4");
+    Buffer *buf = malloc(sizeof(Buffer));
+    *buf = *buffer;
+    size_t filename_s = strlen(buffer->filename)+1;
+    buf->filename = malloc(filename_s*sizeof(char));
+    strncpy(buf->filename, buffer->filename, filename_s);
+    buf->rows = malloc(buffer->row_capacity*sizeof(Row));
     for(size_t i = 0; i < buffer->row_capacity; i++) {
-        buf.rows[i].contents = calloc(MAX_STRING_SIZE, sizeof(char));
+        buf->rows[i].contents = malloc(MAX_STRING_SIZE*sizeof(char));
+        memset(buf->rows[i].contents, 0, MAX_STRING_SIZE);
     }
     for(size_t i = 0; i < buffer->row_s+1; i++) {
         Row *cur = &buffer->rows[i];
-        buf.rows[i].size = cur->size; 
-        buf.rows[i].index = cur->index; 
-        strncpy(buf.rows[i].contents, cur->contents, buffer->rows[i].size);
+        char siz[64] = {0};
+        sprintf(siz, "%zu, %zu, %zu, %zu", buffer->rows[i].size, cur->size, buffer->row_s, buffer->row_capacity);
+        buf->rows[i].size = cur->size; 
+        buf->rows[i].index = cur->index; 
+        write_log(siz);
+        write_log(cur->contents);
+        write_log("copy b5");
+        strncpy(buf->rows[i].contents, cur->contents, buffer->rows[i].size);
     }
     return buf;
 }
 
-void shift_undo_left(Undo *undo) {
-    free_buffer(&undo->buf_stack[0]);
-    for(size_t i = 1; i < undo->buf_stack_s; i++) {
-        undo->buf_stack[i-1] = undo->buf_stack[i];
+void shift_undo_left(Undo *undo, size_t amount) {
+    for(size_t j = 0; j < amount; j++) {
+        free_buffer(undo->buf_stack[0]);
+        write_log("free");
+        for(size_t i = 1; i < undo->buf_stack_s; i++) {
+            undo->buf_stack[i-1] = undo->buf_stack[i];
+        }
+        if(undo->buf_stack[undo->buf_stack_s] != NULL) {
+            free_buffer(undo->buf_stack[undo->buf_stack_s]);
+        }
+        undo->buf_stack_s--;
     }
-    undo->buf_stack_s--;
 }
 
 void push_undo(Undo *undo, Buffer *buf) {
     if(undo->buf_stack_s >= undo->buf_capacity) {
-        shift_undo_left(undo); 
+        shift_undo_left(undo, 1); 
     }
-    undo->buf_stack[undo->buf_stack_s++] = copy_buffer(buf);
+    Buffer *result = copy_buffer(buf); 
+    write_log("push undo");
+    undo->buf_stack[undo->buf_stack_s++] = result;
+    write_log("push undo2");
 }
 
-Buffer pop_undo(Undo *undo) {
-    if(undo->buf_stack_s == 0) return (Buffer){0};
-    return undo->buf_stack[--undo->buf_stack_s];
+Buffer *pop_undo(Undo *undo) {
+    if(undo->buf_stack_s == 0) return NULL;
+    Buffer *result = undo->buf_stack[--undo->buf_stack_s]; 
+    //shift_undo_left(undo, 1);
+    if(result != NULL && undo->buf_stack[undo->buf_stack_s+1] != NULL) {
+        write_log("freed");
+        free_buffer(undo->buf_stack[undo->buf_stack_s+1]);
+    }
+    return result;
 }
 
 void resize_rows(Buffer *buffer, size_t capacity) {
@@ -440,13 +465,12 @@ int execute_command(Command *command, Buffer *buf, State *state) {
             undo_size = value;
             state->undo_stack.buf_capacity = undo_size;
             for(size_t i = 0; i < state->undo_stack.buf_stack_s; i++) {
-                free_buffer(&state->undo_stack.buf_stack[i]);
+                free_buffer(state->undo_stack.buf_stack[i]);
             }
             state->undo_stack.buf_stack_s = 0;
             free(state->undo_stack.buf_stack);
             state->undo_stack.buf_stack = calloc(state->undo_stack.buf_capacity, sizeof(Buffer));
-            Buffer temp_buf = copy_buffer(buf);
-            push_undo(&state->undo_stack, &temp_buf);
+            push_undo(&state->undo_stack, buf);
         } else {
             return UNKNOWN_COMMAND;
         }
@@ -604,7 +628,7 @@ void read_file_to_buffer(Buffer *buffer, char *filename) {
     }
 }
 
-void handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
+int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
     switch(ch) {
         case 'g':
             if(*repeating_count-1 > 1 && *repeating_count-1 <= buffer->row_s) {
@@ -695,7 +719,11 @@ void handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
             }
             break;
         }
+        default: {
+            return 0;
+        } 
     }
+    return 1;
 }
 
 int handle_modifying_keys(Buffer *buffer, int ch, WINDOW *main_win, size_t *y) {
@@ -760,7 +788,8 @@ int handle_normal_to_insert_keys(Buffer *buffer, int ch) {
 }
 
 void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, 
-                 char *command, size_t *command_s, int *repeating, size_t *repeating_count, size_t *normal_pos, int *is_print_msg, char *status_bar_msg) {
+                 char *command, size_t *command_s, int *repeating, size_t *repeating_count, size_t *normal_pos, 
+                 int *is_print_msg, char *status_bar_msg) {
     switch(mode) {
         case NORMAL:
             switch(ch) {
@@ -847,17 +876,16 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                     buffer->row_index = new_pos.y;
                 } break;
                 case 'u': {
-                    Buffer new_buf = pop_undo(&state->undo_stack);
-                    push_undo(&state->redo_stack, buffer);
-                    if(new_buf.row_capacity == 0) break;
-                    *buffer = new_buf;
+                    Buffer *new_buf = pop_undo(&state->undo_stack);
+                    if(new_buf == NULL) break;
+                    //push_undo(&state->redo_stack, buffer);
+                    *buffer = *new_buf;
                 } break;
                 case 'U': {
-                    if(state->redo_stack.buf_stack_s >= state->redo_stack.buf_capacity) break;
-                    Buffer new_buf = pop_undo(&state->redo_stack);
-                    if(new_buf.row_capacity == 0) break; 
-                    state->undo_stack.buf_stack_s++;
-                    *buffer = new_buf;
+                    Buffer *new_buf = pop_undo(&state->redo_stack);
+                    if(new_buf == NULL) break; 
+                    push_undo(&state->undo_stack, buffer);
+                    *buffer = *new_buf;
                 } break;
                 case ctrl('s'): {
                     handle_save(buffer);
@@ -868,17 +896,20 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                     reset_command(command, command_s);
                     mode = NORMAL;
                     break;
-                default:
-                    handle_motion_keys(buffer, ch, repeating_count);
+                default: {
+                    int motion = handle_motion_keys(buffer, ch, repeating_count);
+                    if(motion) break;
+                    write_log("default1");
                     push_undo(&state->undo_stack, buffer);
+                    write_log("default2");
                     int modified = handle_modifying_keys(buffer, ch, main_win, y);
+                    (void)modified;
                     int switched = handle_normal_to_insert_keys(buffer, ch);
-                    if(!modified && !switched) pop_undo(&state->undo_stack);
                     if(switched) {
                         mode = INSERT;
                         *repeating_count = 1;
                     }
-                    break;
+                }break;
             }
             break;
         case INSERT: {
@@ -1270,18 +1301,18 @@ int main(int argc, char **argv) {
     keypad(main_win, TRUE);
     keypad(status_bar, TRUE);
 
-    Buffer buffer = {0};
-    buffer.row_capacity = STARTING_ROW_SIZE;
-    buffer.rows = malloc(buffer.row_capacity * sizeof(Row));
-    memset(buffer.rows, 0, sizeof(Row)*buffer.row_capacity);
-    for(size_t i = 0; i < buffer.row_capacity; i++) {
-        buffer.rows[i].contents = calloc(MAX_STRING_SIZE, sizeof(char));
-        if(buffer.rows[i].contents == NULL) {
+    Buffer *buffer = malloc(sizeof(Buffer));
+    buffer->row_capacity = STARTING_ROW_SIZE;
+    buffer->rows = malloc(buffer->row_capacity * sizeof(Row));
+    memset(buffer->rows, 0, sizeof(Row)*buffer->row_capacity);
+    for(size_t i = 0; i < buffer->row_capacity; i++) {
+        buffer->rows[i].contents = calloc(MAX_STRING_SIZE, sizeof(char));
+        if(buffer->rows[i].contents == NULL) {
             CRASH("no more ram");
         }
     }
-    if(filename != NULL) read_file_to_buffer(&buffer, filename);
-    else buffer.filename = "out.txt";
+    if(filename != NULL) read_file_to_buffer(buffer, filename);
+    else buffer->filename = "out.txt";
 
     mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
     wmove(main_win, 0, 0);
@@ -1305,8 +1336,7 @@ int main(int argc, char **argv) {
     state.redo_stack.buf_capacity = undo_size;
     state.undo_stack.buf_stack = calloc(state.undo_stack.buf_capacity, sizeof(Buffer));
     state.redo_stack.buf_stack = calloc(state.undo_stack.buf_capacity, sizeof(Buffer));
-    Buffer temp_buf = copy_buffer(&buffer);
-    push_undo(&state.undo_stack, &temp_buf);
+    push_undo(&state.undo_stack, buffer);
 
     write_log("finished loading");
     write_log("loading config");
@@ -1329,7 +1359,7 @@ int main(int argc, char **argv) {
     if(err == 0) {
         for(size_t i = 0; i < lines_s; i++) {
             Command command = parse_command(lines[i], strlen(lines[i]));
-            execute_command(&command, &buffer, &state);
+            execute_command(&command, buffer, &state);
             free(lines[i]);
         }
     }
@@ -1342,10 +1372,10 @@ int main(int argc, char **argv) {
     Syntax_Highlighting token_indexes[128] = {0};
     size_t token_indexes_s = 0;
 
-    for(size_t i = 0; i < buffer.row_s; i++) {
+    for(size_t i = 0; i < buffer->row_s; i++) {
         size_t token_capacity = 32;
         Token *token_arr = malloc(sizeof(Token)*token_capacity);
-        size_t token_s = generate_tokens(buffer.rows[i].contents, buffer.rows[i].size, token_arr, &token_capacity);
+        size_t token_s = generate_tokens(buffer->rows[i].contents, buffer->rows[i].size, token_arr, &token_capacity);
         for(size_t j = 0; j < token_s; j++) {
             token_indexes[token_indexes_s++] = (Syntax_Highlighting){.row = i, .col=token_arr[j].index, .size=token_arr[j].size};
         }
@@ -1362,7 +1392,7 @@ int main(int argc, char **argv) {
         werase(status_bar);
         werase(line_num_win);
 #endif
-        int row_s_len = (int)log10(buffer.row_s)+2;
+        int row_s_len = (int)log10(buffer->row_s)+2;
         if(row_s_len > line_num_col) {
             wresize(main_win, main_row, main_col-(row_s_len-line_num_width));
             wresize(line_num_win, line_num_row, row_s_len);
@@ -1384,22 +1414,22 @@ int main(int argc, char **argv) {
             mvwprintw(status_bar, 1, 0, ":%.*s", (int)command_s, command);
         }
         mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
-        mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer.row_index+1, buffer.cur_pos+1);
+        mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer->row_index+1, buffer->cur_pos+1);
 
-        if(buffer.row_index <= line_render_start) line_render_start = buffer.row_index;
-        if(buffer.row_index >= line_render_start+main_row) line_render_start = buffer.row_index-main_row+1;
+        if(buffer->row_index <= line_render_start) line_render_start = buffer->row_index;
+        if(buffer->row_index >= line_render_start+main_row) line_render_start = buffer->row_index-main_row+1;
 
-        if(buffer.cur_pos <= col_render_start) col_render_start = buffer.cur_pos;
-        if(buffer.cur_pos >= col_render_start+main_col) col_render_start = buffer.cur_pos-main_col+1;
+        if(buffer->cur_pos <= col_render_start) col_render_start = buffer->cur_pos;
+        if(buffer->cur_pos >= col_render_start+main_col) col_render_start = buffer->cur_pos-main_col+1;
         
         for(size_t i = line_render_start; i <= line_render_start+main_row; i++) {
-            if(i <= buffer.row_s) {
+            if(i <= buffer->row_s) {
                 size_t print_index_y = i - line_render_start;
                 wattron(line_num_win, COLOR_PAIR(YELLOW_COLOR));
                 if(relative_nums) {
-                    if(buffer.row_index == i) mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
+                    if(buffer->row_index == i) mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                     else mvwprintw(line_num_win, print_index_y, 0, "%4zu", 
-                                   (size_t)abs((int)i-(int)buffer.row_index));
+                                   (size_t)abs((int)i-(int)buffer->row_index));
                 } else {
                     mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                 }
@@ -1411,8 +1441,8 @@ int main(int argc, char **argv) {
                 Token *token_arr = malloc(sizeof(Token)*token_capacity);
                 size_t token_s = 0;
                 if(syntax) {
-                    token_s = generate_tokens(buffer.rows[i].contents, 
-                                                     buffer.rows[i].size, token_arr, &token_capacity);
+                    token_s = generate_tokens(buffer->rows[i].contents, 
+                                                     buffer->rows[i].size, token_arr, &token_capacity);
                 }
                 
                 Color_Pairs color = YELLOW_COLOR; 
@@ -1425,24 +1455,24 @@ int main(int argc, char **argv) {
                     }
                     if(syntax && j == off_at) wattroff(main_win, COLOR_PAIR(color));
                     if(mode == VISUAL) {
-                        if(buffer.visual.starting_pos.y == buffer.visual.ending_pos.y) {
+                        if(buffer->visual.starting_pos.y == buffer->visual.ending_pos.y) {
 
                         }
                         Point point = {.x = j, .y = i};
                         int between = 0;
-                        if(buffer.visual.starting_pos.y > buffer.visual.ending_pos.y || 
-                          (buffer.visual.starting_pos.y == buffer.visual.ending_pos.y &&
-                           buffer.visual.starting_pos.x > buffer.visual.ending_pos.x)) {
-                            between = is_between(buffer.visual.ending_pos, buffer.visual.starting_pos, point);
+                        if(buffer->visual.starting_pos.y > buffer->visual.ending_pos.y || 
+                          (buffer->visual.starting_pos.y == buffer->visual.ending_pos.y &&
+                           buffer->visual.starting_pos.x > buffer->visual.ending_pos.x)) {
+                            between = is_between(buffer->visual.ending_pos, buffer->visual.starting_pos, point);
                         } else {
-                            between = is_between(buffer.visual.starting_pos, buffer.visual.ending_pos, point);
+                            between = is_between(buffer->visual.starting_pos, buffer->visual.ending_pos, point);
                         }
                         if(between) {
                             wattron(main_win, A_STANDOUT);
                         }
                     }
                     size_t print_index_x = j - col_render_start;
-                    mvwprintw(main_win, print_index_y, print_index_x, "%c", buffer.rows[i].contents[j]);
+                    mvwprintw(main_win, print_index_y, print_index_x, "%c", buffer->rows[i].contents[j]);
                     wattroff(main_win, A_STANDOUT);
                 }
                 free(token_arr);
@@ -1454,8 +1484,8 @@ int main(int argc, char **argv) {
 
         size_t repeating_count = 1;
 
-        y = buffer.row_index-line_render_start;
-        x = buffer.cur_pos-col_render_start;
+        y = buffer->row_index-line_render_start;
+        x = buffer->cur_pos-col_render_start;
 
         if(repeating) {
             mvwprintw(status_bar, 1, gcol-10, "r");
@@ -1466,10 +1496,10 @@ int main(int argc, char **argv) {
             wmove(main_win, y, x);
             ch = wgetch(main_win);
         } else if(mode == COMMAND){
-            wmove(status_bar, 1, buffer.cur_pos+1);
+            wmove(status_bar, 1, buffer->cur_pos+1);
             ch = wgetch(status_bar);
         } else {
-            wmove(status_bar, 1, buffer.cur_pos+1);
+            wmove(status_bar, 1, buffer->cur_pos+1);
             ch = wgetch(status_bar);
         }
 
@@ -1490,26 +1520,30 @@ int main(int argc, char **argv) {
 
         // TODO: move a lot of these extra variables into buffer struct
         for(size_t i = 0; i < repeating_count; i++) {
-            handle_keys(&buffer, &state, main_win, status_bar, &y, ch, command, &command_s, 
+            handle_keys(buffer, &state, main_win, status_bar, &y, ch, command, &command_s, 
                         &repeating, &repeating_count, &normal_pos, &is_print_msg, status_bar_msg);
         }
-        if(mode != COMMAND && mode != SEARCH && buffer.cur_pos > buffer.rows[buffer.row_index].size) {
-            buffer.cur_pos = buffer.rows[buffer.row_index].size;
+        if(mode != COMMAND && mode != SEARCH && buffer->cur_pos > buffer->rows[buffer->row_index].size) {
+            buffer->cur_pos = buffer->rows[buffer->row_index].size;
         }
-        x = buffer.cur_pos;
-        y = buffer.row_index;
+        x = buffer->cur_pos;
+        y = buffer->row_index;
         getyx(main_win, y, x);
     }
 
     refresh_all(windows, windows_s);
     endwin();
 
-    free_buffer(&buffer);
-    for(size_t i = 0; i < state.undo_stack.buf_stack_s; i++) {
-        free_buffer(&state.undo_stack.buf_stack[i]);
+    free_buffer(buffer);
+    for(size_t i = 0; i < state.undo_stack.buf_capacity; i++) {
+        if(state.undo_stack.buf_stack[i] != NULL) {
+            free_buffer(state.undo_stack.buf_stack[i]);
+        }
     }
-    for(size_t i = 0; i < state.redo_stack.buf_stack_s; i++) {
-        free_buffer(&state.redo_stack.buf_stack[i]);
+    for(size_t i = 0; i < state.redo_stack.buf_capacity; i++) {
+        if(state.redo_stack.buf_stack[i] != NULL) {
+            free_buffer(state.redo_stack.buf_stack[i]);
+        }
     }
     return 0;
 }
