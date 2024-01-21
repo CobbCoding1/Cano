@@ -13,6 +13,7 @@
 
 #include <curses.h>
 
+#include "colors.h"
 #include "config.h"
 #include "lex.c"
 // global config vars
@@ -201,9 +202,6 @@ void create_color(Color *color) {
     sprintf(msg2, "%i, %i, %i", color->red, color->green, color->blue);
     write_log(msg2);
     write_log(msg);
-
-    free(msg);
-    free(msg2);
 
     init_color((color->id), values[0], values[1], values[2]);
 }
@@ -1291,18 +1289,6 @@ int main(int argc, char **argv) {
 
     strftime(run_time, sizeof(run_time), "%Y-%m-%d %H:%M:%S", timeinfo);
 
-    // create a color
-    write_log("creating color");
-
-    Color current_color = {
-        .id = 8,
-        .color_name = "red",
-        .red = 255, 
-        .green = 49,
-        .blue = 0
-    };
-
-    create_color(&current_color);
 
     (void)argc;
     char *program = *argv++;
@@ -1329,13 +1315,38 @@ int main(int argc, char **argv) {
     if(has_colors() == FALSE) {
         CRASH("your terminal does not support colors");
     }
+
+    // create a color
+    write_log("creating color");
+    Color new_color = {
+        .id = 8,
+        .color_name = "red",
+        .red = 255, 
+        .green = 49,
+        .blue = 0
+    };
+
+    create_color(&new_color);
+
+    bool custom_color_enabled = true;
+    int custom_color = 1;
+    // int main_custom_r = 0;
+    // int main_custom_g = 0;
+    // int main_custom_b = 0;
+    
+    if (custom_color_enabled) {
+        custom_color = 2;
+        // main_custom_r = 996;
+        // main_custom_g = 191;
+        // main_custom_b = 0;
+    }
     
     init_color(9, 996, 191, 0);
 
     // colors
     start_color();
-    init_pair(YELLOW_COLOR, 9, COLOR_BLACK);
-    init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
+    init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(BLUE_COLOR, new_color.id, COLOR_BLACK);
     init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
     init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
     init_pair(MAGENTA_COLOR, COLOR_MAGENTA, COLOR_BLACK);
@@ -1496,7 +1507,7 @@ int main(int argc, char **argv) {
             if(i <= buffer->row_s) {
                 size_t print_index_y = i - line_render_start;
 
-                wattron(line_num_win, COLOR_PAIR(YELLOW_COLOR));
+                wattron(line_num_win, COLOR_PAIR(custom_color));
                 if(relative_nums) {
                     if(buffer->row_index == i) mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                     else mvwprintw(line_num_win, print_index_y, 0, "%4zu", 
@@ -1504,7 +1515,7 @@ int main(int argc, char **argv) {
                 } else {
                     mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                 }
-                wattroff(line_num_win, COLOR_PAIR(YELLOW_COLOR));
+                wattroff(line_num_win, COLOR_PAIR(custom_color));
 
                 size_t off_at = 0;
 
@@ -1516,11 +1527,23 @@ int main(int argc, char **argv) {
                                                      buffer->rows[i].size, token_arr, &token_capacity);
                 }
                 
-                Color_Pairs color = YELLOW_COLOR; 
+                Color_Pairs color = custom_color;
+
+                int colors[3];
+                rgb_to_ncurses(new_color.red, new_color.green, new_color.blue, colors);
+                Custom_Color custom = {
+                    .custom_slot = 8,
+                    .custom_id = custom_color,
+                    .custom_r = colors[0],
+                    .custom_g = colors[1],
+                    .custom_b = colors[2]
+                }; 
+
+
                 size_t j = 0;
                 for(j = col_render_start; j <= col_render_start+main_col; j++) {
                     size_t keyword_size = 0;
-                    if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, &color)) {
+                    if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, &color, &custom)) {
                         wattron(main_win, COLOR_PAIR(color));
                         off_at = j + keyword_size;
                     }
