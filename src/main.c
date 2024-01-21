@@ -173,17 +173,19 @@ Brace find_opposite_brace(char opening) {
     return (Brace){.brace = '0'};
 }
 
-void free_buffer(Buffer *buffer) {
+void free_buffer(Buffer **buffer) {
     write_log("before");
-    for(size_t i = 0; i < buffer->row_capacity; i++) {
+    for(size_t i = 0; i < (*buffer)->row_capacity; i++) {
         char msg[21] = {0};
         sprintf(msg, "%zu", i);
         write_log(msg);
-        free(buffer->rows[i].contents);
+        free((*buffer)->rows[i].contents);
     }
     write_log("after");
-    //free(buffer->rows);
-    *buffer = (Buffer){0};
+    free((*buffer)->rows);
+    free((*buffer)->filename);
+    free(*buffer);
+    *buffer = NULL;
 }
 
 Buffer *copy_buffer(Buffer *buffer) {
@@ -214,13 +216,13 @@ Buffer *copy_buffer(Buffer *buffer) {
 
 void shift_undo_left(Undo *undo, size_t amount) {
     for(size_t j = 0; j < amount; j++) {
-        free_buffer(undo->buf_stack[0]);
+        if(undo->buf_stack[0] != NULL) free_buffer(&undo->buf_stack[0]);
         write_log("free");
         for(size_t i = 1; i < undo->buf_stack_s; i++) {
             undo->buf_stack[i-1] = undo->buf_stack[i];
         }
         if(undo->buf_stack[undo->buf_stack_s] != NULL) {
-            free_buffer(undo->buf_stack[undo->buf_stack_s]);
+            free_buffer(&undo->buf_stack[undo->buf_stack_s]);
         }
         undo->buf_stack_s--;
     }
@@ -231,6 +233,7 @@ void push_undo(Undo *undo, Buffer *buf) {
         shift_undo_left(undo, 1); 
     }
     Buffer *result = copy_buffer(buf); 
+    //if(result != NULL && undo->buf_stack[undo->buf_stack_s] != NULL) free_buffer(&undo->buf_stack[undo->buf_stack_s]);
     write_log("push undo");
     undo->buf_stack[undo->buf_stack_s++] = result;
     write_log("push undo2");
@@ -242,7 +245,7 @@ Buffer *pop_undo(Undo *undo) {
     //shift_undo_left(undo, 1);
     if(result != NULL && undo->buf_stack[undo->buf_stack_s+1] != NULL) {
         write_log("freed");
-        free_buffer(undo->buf_stack[undo->buf_stack_s+1]);
+        free_buffer(&undo->buf_stack[undo->buf_stack_s+1]);
     }
     return result;
 }
@@ -427,8 +430,11 @@ typedef enum {
 int execute_command(Command *command, Buffer *buf, State *state) {
     if(command->command_s == 10 && strncmp(command->command, "set-output", 10) == 0) {
         if(command->args_s < 1) return INVALID_ARG; 
-        buf->filename = command->args[0].arg;
-        for(size_t i = 1; i < command->args_s; i++) free(command->args[i].arg);
+        char *filename = command->args[0].arg;
+        free(buf->filename);
+        buf->filename = malloc(sizeof(char)*command->args[0].size);
+        strncpy(buf->filename, filename, command->args[0].size);
+        for(size_t i = 0; i < command->args_s; i++) free(command->args[i].arg);
     } else if(command->command_s == 1 && strncmp(command->command, "e", 1) == 0) {
         QUIT = 1;
     } else if(command->command_s == 2 && strncmp(command->command, "we", 2) == 0) {
@@ -465,7 +471,7 @@ int execute_command(Command *command, Buffer *buf, State *state) {
             undo_size = value;
             state->undo_stack.buf_capacity = undo_size;
             for(size_t i = 0; i < state->undo_stack.buf_stack_s; i++) {
-                free_buffer(state->undo_stack.buf_stack[i]);
+                free_buffer(&state->undo_stack.buf_stack[i]);
             }
             state->undo_stack.buf_stack_s = 0;
             free(state->undo_stack.buf_stack);
@@ -608,7 +614,9 @@ void create_newline_indent(Buffer *buffer, size_t num_of_braces) {
 
 
 void read_file_to_buffer(Buffer *buffer, char *filename) {
-    buffer->filename = filename;
+    size_t filename_s = strlen(filename);
+    buffer->filename = malloc(sizeof(char)*filename_s);
+    strncpy(buffer->filename, filename, filename_s);
     FILE *file = fopen(filename, "a+");
     if(file == NULL) {
         CRASH("could not open file");
@@ -787,9 +795,10 @@ int handle_normal_to_insert_keys(Buffer *buffer, int ch) {
     return 1;
 }
 
-void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, 
+void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, 
                  char *command, size_t *command_s, int *repeating, size_t *repeating_count, size_t *normal_pos, 
                  int *is_print_msg, char *status_bar_msg) {
+    (void)modify_buffer;
     switch(mode) {
         case NORMAL:
             switch(ch) {
@@ -876,10 +885,12 @@ void handle_keys(Buffer *buffer, State *state, WINDOW *main_win, WINDOW *status_
                     buffer->row_index = new_pos.y;
                 } break;
                 case 'u': {
+                    write_log("BEFORE");
                     Buffer *new_buf = pop_undo(&state->undo_stack);
                     if(new_buf == NULL) break;
                     //push_undo(&state->redo_stack, buffer);
                     *buffer = *new_buf;
+                    write_log("AFTER");
                 } break;
                 case 'U': {
                     Buffer *new_buf = pop_undo(&state->redo_stack);
@@ -1312,7 +1323,11 @@ int main(int argc, char **argv) {
         }
     }
     if(filename != NULL) read_file_to_buffer(buffer, filename);
-    else buffer->filename = "out.txt";
+    else {
+        buffer->filename = malloc(sizeof(char)*sizeof("out.txt"));
+        strncpy(buffer->filename, "out.txt", sizeof("out.txt"));
+        buffer->filename = "out.txt";
+    }
 
     mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
     wmove(main_win, 0, 0);
@@ -1520,7 +1535,7 @@ int main(int argc, char **argv) {
 
         // TODO: move a lot of these extra variables into buffer struct
         for(size_t i = 0; i < repeating_count; i++) {
-            handle_keys(buffer, &state, main_win, status_bar, &y, ch, command, &command_s, 
+            handle_keys(buffer, &buffer, &state, main_win, status_bar, &y, ch, command, &command_s, 
                         &repeating, &repeating_count, &normal_pos, &is_print_msg, status_bar_msg);
         }
         if(mode != COMMAND && mode != SEARCH && buffer->cur_pos > buffer->rows[buffer->row_index].size) {
@@ -1534,15 +1549,15 @@ int main(int argc, char **argv) {
     refresh_all(windows, windows_s);
     endwin();
 
-    free_buffer(buffer);
+    free_buffer(&buffer);
     for(size_t i = 0; i < state.undo_stack.buf_capacity; i++) {
         if(state.undo_stack.buf_stack[i] != NULL) {
-            free_buffer(state.undo_stack.buf_stack[i]);
+            free_buffer(&state.undo_stack.buf_stack[i]);
         }
     }
     for(size_t i = 0; i < state.redo_stack.buf_capacity; i++) {
         if(state.redo_stack.buf_stack[i] != NULL) {
-            free_buffer(state.redo_stack.buf_stack[i]);
+            free_buffer(&state.redo_stack.buf_stack[i]);
         }
     }
     return 0;
