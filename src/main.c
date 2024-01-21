@@ -176,10 +176,14 @@ Brace find_opposite_brace(char opening) {
 void free_buffer(Buffer **buffer) {
     write_log("before");
     for(size_t i = 0; i < (*buffer)->row_capacity; i++) {
-        char msg[21] = {0};
-        sprintf(msg, "%zu", i);
+        char msg[42] = {0};
+        sprintf(msg, "%zu, %zu", i, (*buffer)->row_capacity);
         write_log(msg);
-        free((*buffer)->rows[i].contents);
+        if((*buffer)->rows[i].contents != NULL) {
+            free((*buffer)->rows[i].contents);
+            (*buffer)->rows[i].contents = NULL;
+        }
+        write_log(msg);
     }
     write_log("after");
     free((*buffer)->rows);
@@ -222,7 +226,7 @@ void shift_undo_left(Undo *undo, size_t amount) {
             undo->buf_stack[i-1] = undo->buf_stack[i];
         }
         if(undo->buf_stack[undo->buf_stack_s] != NULL) {
-            free_buffer(&undo->buf_stack[undo->buf_stack_s]);
+            //free_buffer(&undo->buf_stack[undo->buf_stack_s]);
         }
         undo->buf_stack_s--;
     }
@@ -233,7 +237,6 @@ void push_undo(Undo *undo, Buffer *buf) {
         shift_undo_left(undo, 1); 
     }
     Buffer *result = copy_buffer(buf); 
-    //if(result != NULL && undo->buf_stack[undo->buf_stack_s] != NULL) free_buffer(&undo->buf_stack[undo->buf_stack_s]);
     write_log("push undo");
     undo->buf_stack[undo->buf_stack_s++] = result;
     write_log("push undo2");
@@ -241,11 +244,9 @@ void push_undo(Undo *undo, Buffer *buf) {
 
 Buffer *pop_undo(Undo *undo) {
     if(undo->buf_stack_s == 0) return NULL;
-    Buffer *result = undo->buf_stack[--undo->buf_stack_s]; 
-    //shift_undo_left(undo, 1);
-    if(result != NULL && undo->buf_stack[undo->buf_stack_s+1] != NULL) {
-        write_log("freed");
-        free_buffer(&undo->buf_stack[undo->buf_stack_s+1]);
+    Buffer *result = copy_buffer(undo->buf_stack[--undo->buf_stack_s]); 
+    if(result != NULL) {
+        free_buffer(&undo->buf_stack[undo->buf_stack_s]);
     }
     return result;
 }
@@ -337,7 +338,6 @@ void replace(Buffer *buffer, Point position, char *new_str, size_t old_str_s, si
     for(size_t i = position.x; i < position.x+new_str_s; i++) {
         shift_row_right(cur, position.x);
     }
-    //memmove(cur->contents + position.x + new_str_s, cur->contents + position.x + old_str_s, cur->size - position.x - old_str_s);
 
     // Copy the new string into the buffer at the specified position
     memcpy(cur->contents + position.x, new_str, new_str_s);
@@ -490,8 +490,13 @@ int execute_command(Command *command, Buffer *buf, State *state) {
 // shift_rows_* functions shift the entire array of rows
 void shift_rows_left(Buffer *buf, size_t index) {
     for(size_t i = index; i < buf->row_s; i++) {
-        buf->rows[i] = buf->rows[i+1];
+        Row *cur = &buf->rows[i];
+        Row *next = &buf->rows[i+1];
+        memset(cur->contents, 0, cur->size);
+        strncpy(cur->contents, next->contents, next->size);
+        cur->size = next->size;
     }
+    memset(buf->rows[buf->row_s].contents, 0, buf->rows[buf->row_s].size);
     buf->rows[buf->row_s].size = 0;
     buf->row_s--;
 }
@@ -798,7 +803,7 @@ int handle_normal_to_insert_keys(Buffer *buffer, int ch) {
 void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *main_win, WINDOW *status_bar, size_t *y, int ch, 
                  char *command, size_t *command_s, int *repeating, size_t *repeating_count, size_t *normal_pos, 
                  int *is_print_msg, char *status_bar_msg) {
-    (void)modify_buffer;
+    //(void)modify_buffer;
     switch(mode) {
         case NORMAL:
             switch(ch) {
@@ -888,8 +893,8 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                     write_log("BEFORE");
                     Buffer *new_buf = pop_undo(&state->undo_stack);
                     if(new_buf == NULL) break;
-                    //push_undo(&state->redo_stack, buffer);
-                    *buffer = *new_buf;
+                    free_buffer(&buffer);
+                    *modify_buffer = new_buf;
                     write_log("AFTER");
                 } break;
                 case 'U': {
@@ -1326,7 +1331,6 @@ int main(int argc, char **argv) {
     else {
         buffer->filename = malloc(sizeof(char)*sizeof("out.txt"));
         strncpy(buffer->filename, "out.txt", sizeof("out.txt"));
-        buffer->filename = "out.txt";
     }
 
     mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
