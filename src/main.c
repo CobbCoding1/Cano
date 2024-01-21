@@ -13,6 +13,7 @@
 
 #include <curses.h>
 
+#include "colors.h"
 #include "config.h"
 #include "lex.c"
 // global config vars
@@ -59,6 +60,19 @@ typedef struct {
 
 #define MAX_ROWS 1024
 #define STARTING_ROW_SIZE 128
+
+
+typedef struct {
+    char color_name[20];
+    bool is_custom_line_row;
+    bool is_custom;
+    int slot;
+    int id;
+    int red;
+    int green;
+    int blue;
+} Color;
+
 
 typedef struct {
     size_t x;
@@ -171,6 +185,50 @@ Brace find_opposite_brace(char opening) {
             break;
     }
     return (Brace){.brace = '0'};
+}
+
+void rgb_to_ncurses(int r, int g, int b, int* rgb) {
+
+    /* 
+    
+    calculates the ncurse color id from rgb values ((RBG / 256) * 1000)
+    the math is not being done right for some reason. divides the rbg val
+    by 256 and then multiplies by 1000. this should give the correct value
+    ex: 255 / 256 = 0.99609375 * 1000 = 996.09375, cast to int gives
+    996, which is the correct value. but for some reason, 
+    logs are saying that the value is 1000. could be preventing the ability
+    to use more shades.
+    
+    please look into this.
+
+    */
+
+    rgb[0] = (int) ((r / 256.0) * 1000);
+    rgb[1] = (int) ((g / 256.0) * 1000);
+    rgb[2] = (int) ((b / 256.0) * 1000);
+    char msg[64] = {0};
+    sprintf(msg, "-----------\n%i, %i, %i", rgb[0], rgb[1], rgb[2]);
+    write_log(msg);
+
+}
+
+void create_color(Color *color) {
+
+    // creates a color and adds it to the color array
+
+    int values[3];
+    rgb_to_ncurses(color->red, color->green, color->blue, values);
+    char msg[64] = {0};
+    char msg2[64] = {0};
+    write_log("RGB BEFORE AND AFTER");
+    sprintf(msg, "%i, %i, %i", values[0], values[1], values[2]);
+    sprintf(msg2, "%i, %i, %i", color->red, color->green, color->blue);
+    write_log(msg2);
+    write_log(msg);
+
+    // applies the new colors.
+
+    init_color((color->id), values[0], values[1], values[2]);
 }
 
 void free_buffer(Buffer **buffer) {
@@ -851,6 +909,7 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                 case 'n': {
                     if(*command_s > 2 && strncmp(command, "s/", 2) == 0) {
                         // search and replace
+
                         char str[128]; // replace with the maximum length of your command
                         strncpy(str, command+2, *command_s-2);
                         str[*command_s-2] = '\0'; // ensure null termination
@@ -1112,6 +1171,11 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                         */
 
                         // search and replace
+
+                        write_log("changing color");
+                        init_color(8, 250, 134, 107);
+                        write_log("changed color");
+
                         char str[128]; // replace with the maximum length of your command
                         strncpy(str, command+2, *command_s-2);
                         str[*command_s-2] = '\0'; // ensure null termination
@@ -1284,6 +1348,30 @@ int main(int argc, char **argv) {
         CRASH("your terminal does not support colors");
     }
 
+    // create a color
+    write_log("creating color");
+    Color custom_color = {
+        .is_custom_line_row = true, // determines wether we change the color of the line counter
+        .is_custom = true, // custom colors enabled or not?
+        .slot = 2, // 1 - 7 is what is used to create a custom color. 1 is default color YELLOW
+        .id = 8, // id of the color (8 - 255) anything less is default colors
+        .color_name = "anything",
+        .red = 256, // RGB values
+        .green = 0, 
+        .blue = 0
+    };
+
+    // this creates a color. currently it applies it only to the row of lines
+    // create_color(&custom_color);
+
+    // make false to disable custom color
+    // default color is 1, which is Slot 1 of YELLOW
+    
+    if (custom_color.is_custom) {
+        // lets lex.c know that we are using a custom color
+        custom_color.slot = 2;
+    }
+
     // colors
     start_color();
     init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
@@ -1292,6 +1380,11 @@ int main(int argc, char **argv) {
     init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
     init_pair(MAGENTA_COLOR, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
+
+    if (custom_color.is_custom_line_row) {
+        // lets lex.c know that we are using a custom color
+        init_pair(custom_color.slot, custom_color.id, COLOR_BLACK);
+    }
 
     noecho();
     raw();
@@ -1446,7 +1539,8 @@ int main(int argc, char **argv) {
         for(size_t i = line_render_start; i <= line_render_start+main_row; i++) {
             if(i <= buffer->row_s) {
                 size_t print_index_y = i - line_render_start;
-                wattron(line_num_win, COLOR_PAIR(YELLOW_COLOR));
+
+                wattron(line_num_win, COLOR_PAIR(custom_color.slot));
                 if(relative_nums) {
                     if(buffer->row_index == i) mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                     else mvwprintw(line_num_win, print_index_y, 0, "%4zu", 
@@ -1454,7 +1548,7 @@ int main(int argc, char **argv) {
                 } else {
                     mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                 }
-                wattroff(line_num_win, COLOR_PAIR(YELLOW_COLOR));
+                wattroff(line_num_win, COLOR_PAIR(custom_color.slot));
 
                 size_t off_at = 0;
 
@@ -1466,11 +1560,24 @@ int main(int argc, char **argv) {
                                                      buffer->rows[i].size, token_arr, &token_capacity);
                 }
                 
-                Color_Pairs color = YELLOW_COLOR; 
+                Color_Pairs color = custom_color.slot;
+
+                // converts rbg values to ncurses values.
+                int colors[3];
+                rgb_to_ncurses(custom_color.red, custom_color.green, custom_color.blue, colors);
+                Custom_Color custom = {
+                    .custom_id = 8,
+                    .custom_slot = custom_color.slot,
+                    .custom_r = colors[0], // applies the new values.
+                    .custom_g = colors[1],
+                    .custom_b = colors[2]
+                }; 
+
+
                 size_t j = 0;
                 for(j = col_render_start; j <= col_render_start+main_col; j++) {
                     size_t keyword_size = 0;
-                    if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, &color)) {
+                    if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, &color, &custom)) {
                         wattron(main_win, COLOR_PAIR(color));
                         off_at = j + keyword_size;
                     }
