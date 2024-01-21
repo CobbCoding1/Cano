@@ -64,6 +64,9 @@ typedef struct {
 
 typedef struct {
     char color_name[20];
+    bool is_custom_line_row;
+    bool is_custom;
+    int slot;
     int id;
     int red;
     int green;
@@ -186,22 +189,44 @@ Brace find_opposite_brace(char opening) {
 
 void rgb_to_ncurses(int r, int g, int b, int* rgb) {
 
-    // (int) ((round(num * multiplier) / multiplier) * 1000);
+    /* 
+    
+    calculates the ncurse color id from rgb values ((RBG / 256) * 1000)
+    the math is not being done right for some reason. divides the rbg val
+    by 256 and then multiplies by 1000. this should give the correct value
+    ex: 255 / 256 = 0.99609375 * 1000 = 996.09375, cast to int gives
+    996, which is the correct value. but for some reason, 
+    logs are saying that the value is 1000. could be preventing the ability
+    to use more shades.
+    
+    please look into this.
+
+    */
+
     rgb[0] = (int) ((r / 256.0) * 1000);
     rgb[1] = (int) ((g / 256.0) * 1000);
     rgb[2] = (int) ((b / 256.0) * 1000);
+    char msg[64] = {0};
+    sprintf(msg, "-----------\n%i, %i, %i", rgb[0], rgb[1], rgb[2]);
+    write_log(msg);
+
 }
 
 void create_color(Color *color) {
+
+    // creates a color and adds it to the color array
+
     int values[3];
     rgb_to_ncurses(color->red, color->green, color->blue, values);
     char msg[64] = {0};
     char msg2[64] = {0};
-    write_log("--------------------------------");
+    write_log("RGB BEFORE AND AFTER");
     sprintf(msg, "%i, %i, %i", values[0], values[1], values[2]);
     sprintf(msg2, "%i, %i, %i", color->red, color->green, color->blue);
     write_log(msg2);
     write_log(msg);
+
+    // applies the new colors.
 
     init_color((color->id), values[0], values[1], values[2]);
 }
@@ -1318,39 +1343,41 @@ int main(int argc, char **argv) {
 
     // create a color
     write_log("creating color");
-    Color new_color = {
-        .id = 8,
-        .color_name = "red",
-        .red = 255, 
-        .green = 49,
+    Color custom_color = {
+        .is_custom_line_row = true, // determines wether we change the color of the line counter
+        .is_custom = true, // custom colors enabled or not?
+        .slot = 2, // 1 - 7 is what is used to create a custom color. 1 is default color YELLOW
+        .id = 8, // id of the color (8 - 255) anything less is default colors
+        .color_name = "anything",
+        .red = 256, // RGB values
+        .green = 0, 
         .blue = 0
     };
 
-    create_color(&new_color);
+    // this creates a color. currently it applies it only to the row of lines
+    // create_color(&custom_color);
 
-    bool custom_color_enabled = true;
-    int custom_color = 1;
-    // int main_custom_r = 0;
-    // int main_custom_g = 0;
-    // int main_custom_b = 0;
+    // make false to disable custom color
+    // default color is 1, which is Slot 1 of YELLOW
     
-    if (custom_color_enabled) {
-        custom_color = 2;
-        // main_custom_r = 996;
-        // main_custom_g = 191;
-        // main_custom_b = 0;
+    if (custom_color.is_custom) {
+        // lets lex.c know that we are using a custom color
+        custom_color.slot = 2;
     }
-    
-    init_color(9, 996, 191, 0);
 
     // colors
     start_color();
     init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(BLUE_COLOR, new_color.id, COLOR_BLACK);
+    init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
     init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
     init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
     init_pair(MAGENTA_COLOR, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
+
+    if (custom_color.is_custom_line_row) {
+        // lets lex.c know that we are using a custom color
+        init_pair(custom_color.slot, custom_color.id, COLOR_BLACK);
+    }
 
     noecho();
     raw();
@@ -1507,7 +1534,7 @@ int main(int argc, char **argv) {
             if(i <= buffer->row_s) {
                 size_t print_index_y = i - line_render_start;
 
-                wattron(line_num_win, COLOR_PAIR(custom_color));
+                wattron(line_num_win, COLOR_PAIR(custom_color.slot));
                 if(relative_nums) {
                     if(buffer->row_index == i) mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                     else mvwprintw(line_num_win, print_index_y, 0, "%4zu", 
@@ -1515,7 +1542,7 @@ int main(int argc, char **argv) {
                 } else {
                     mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                 }
-                wattroff(line_num_win, COLOR_PAIR(custom_color));
+                wattroff(line_num_win, COLOR_PAIR(custom_color.slot));
 
                 size_t off_at = 0;
 
@@ -1527,14 +1554,15 @@ int main(int argc, char **argv) {
                                                      buffer->rows[i].size, token_arr, &token_capacity);
                 }
                 
-                Color_Pairs color = custom_color;
+                Color_Pairs color = custom_color.slot;
 
+                // converts rbg values to ncurses values.
                 int colors[3];
-                rgb_to_ncurses(new_color.red, new_color.green, new_color.blue, colors);
+                rgb_to_ncurses(custom_color.red, custom_color.green, custom_color.blue, colors);
                 Custom_Color custom = {
-                    .custom_slot = 8,
-                    .custom_id = custom_color,
-                    .custom_r = colors[0],
+                    .custom_id = 8,
+                    .custom_slot = custom_color.slot,
+                    .custom_r = colors[0], // applies the new values.
                     .custom_g = colors[1],
                     .custom_b = colors[2]
                 }; 

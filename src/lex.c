@@ -97,10 +97,10 @@ int is_type(char *word, size_t word_s) {
 int is_in_tokens_index(Token *token_arr, size_t token_s, size_t index, size_t *size, Color_Pairs *color, Custom_Color *custom_color) {
     
 
-    if (custom_color->custom_id == 2) {
+    if (custom_color->custom_slot == 2) {
   
-        init_color(custom_color->custom_slot, custom_color->custom_r, custom_color->custom_g, custom_color->custom_b);
-        init_pair(custom_color->custom_id, custom_color->custom_slot, COLOR_BLACK);
+        init_color(custom_color->custom_id, custom_color->custom_r, custom_color->custom_g, custom_color->custom_b);
+        init_pair(custom_color->custom_slot, custom_color->custom_id, COLOR_BLACK);
         
     }
 
