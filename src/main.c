@@ -244,7 +244,7 @@ void push_undo(Undo *undo, Buffer *buf) {
 
 Buffer *pop_undo(Undo *undo) {
     if(undo->buf_stack_s == 0) return NULL;
-    Buffer *result = copy_buffer(undo->buf_stack[--undo->buf_stack_s]); 
+    Buffer *result = copy_buffer(undo->buf_stack[--undo->buf_stack_s]);
     if(result != NULL) {
         free_buffer(&undo->buf_stack[undo->buf_stack_s]);
     }
@@ -893,6 +893,7 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                     write_log("BEFORE");
                     Buffer *new_buf = pop_undo(&state->undo_stack);
                     if(new_buf == NULL) break;
+                    push_undo(&state->redo_stack, buffer);
                     free_buffer(&buffer);
                     *modify_buffer = new_buf;
                     write_log("AFTER");
@@ -901,7 +902,8 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                     Buffer *new_buf = pop_undo(&state->redo_stack);
                     if(new_buf == NULL) break; 
                     push_undo(&state->undo_stack, buffer);
-                    *buffer = *new_buf;
+                    free_buffer(&buffer);
+                    *modify_buffer = new_buf;
                 } break;
                 case ctrl('s'): {
                     handle_save(buffer);
