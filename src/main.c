@@ -60,6 +60,16 @@ typedef struct {
 #define MAX_ROWS 1024
 #define STARTING_ROW_SIZE 128
 
+
+typedef struct {
+    char color_name[20];
+    int id;
+    int red;
+    int green;
+    int blue;
+} Color;
+
+
 typedef struct {
     size_t x;
     size_t y;
@@ -171,6 +181,31 @@ Brace find_opposite_brace(char opening) {
             break;
     }
     return (Brace){.brace = '0'};
+}
+
+void rgb_to_ncurses(int r, int g, int b, int* rgb) {
+
+    // (int) ((round(num * multiplier) / multiplier) * 1000);
+    rgb[0] = (int) ((r / 256.0) * 1000);
+    rgb[1] = (int) ((g / 256.0) * 1000);
+    rgb[2] = (int) ((b / 256.0) * 1000);
+}
+
+void create_color(Color *color) {
+    int values[3];
+    rgb_to_ncurses(color->red, color->green, color->blue, values);
+    char msg[64] = {0};
+    char msg2[64] = {0};
+    write_log("--------------------------------");
+    sprintf(msg, "%i, %i, %i", values[0], values[1], values[2]);
+    sprintf(msg2, "%i, %i, %i", color->red, color->green, color->blue);
+    write_log(msg2);
+    write_log(msg);
+
+    free(msg);
+    free(msg2);
+
+    init_color((color->id), values[0], values[1], values[2]);
 }
 
 void free_buffer(Buffer **buffer) {
@@ -846,6 +881,7 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                 case 'n': {
                     if(*command_s > 2 && strncmp(command, "s/", 2) == 0) {
                         // search and replace
+
                         char str[128]; // replace with the maximum length of your command
                         strncpy(str, command+2, *command_s-2);
                         str[*command_s-2] = '\0'; // ensure null termination
@@ -1105,6 +1141,11 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                         */
 
                         // search and replace
+
+                        write_log("changing color");
+                        init_color(8, 250, 134, 107);
+                        write_log("changed color");
+
                         char str[128]; // replace with the maximum length of your command
                         strncpy(str, command+2, *command_s-2);
                         str[*command_s-2] = '\0'; // ensure null termination
@@ -1250,6 +1291,18 @@ int main(int argc, char **argv) {
 
     strftime(run_time, sizeof(run_time), "%Y-%m-%d %H:%M:%S", timeinfo);
 
+    // create a color
+    write_log("creating color");
+
+    Color current_color = {
+        .id = 8,
+        .color_name = "red",
+        .red = 255, 
+        .green = 49,
+        .blue = 0
+    };
+
+    create_color(&current_color);
 
     (void)argc;
     char *program = *argv++;
@@ -1276,10 +1329,12 @@ int main(int argc, char **argv) {
     if(has_colors() == FALSE) {
         CRASH("your terminal does not support colors");
     }
+    
+    init_color(9, 996, 191, 0);
 
     // colors
     start_color();
-    init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(YELLOW_COLOR, 9, COLOR_BLACK);
     init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
     init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
     init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
@@ -1440,6 +1495,7 @@ int main(int argc, char **argv) {
         for(size_t i = line_render_start; i <= line_render_start+main_row; i++) {
             if(i <= buffer->row_s) {
                 size_t print_index_y = i - line_render_start;
+
                 wattron(line_num_win, COLOR_PAIR(YELLOW_COLOR));
                 if(relative_nums) {
                     if(buffer->row_index == i) mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
