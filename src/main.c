@@ -187,7 +187,13 @@ Brace find_opposite_brace(char opening) {
     return (Brace){.brace = '0'};
 }
 
-void rgb_to_ncurses(int r, int g, int b, int* rgb) {
+typedef struct {
+    int r;
+    int g;
+    int b;
+} Ncurses_Color;
+
+Ncurses_Color rgb_to_ncurses(int r, int g, int b) {
 
     /* 
     
@@ -202,48 +208,49 @@ void rgb_to_ncurses(int r, int g, int b, int* rgb) {
     please look into this.
 
     */
+    Ncurses_Color color = {0};
 
-    rgb[0] = (int) ((r / 256.0) * 1000);
-    rgb[1] = (int) ((g / 256.0) * 1000);
-    rgb[2] = (int) ((b / 256.0) * 1000);
+    color.r = (int) ((r / 256.0) * 1000);
+    color.g = (int) ((g / 256.0) * 1000);
+    color.b = (int) ((b / 256.0) * 1000);
     char msg[64] = {0};
-    sprintf(msg, "-----------\n%i, %i, %i", rgb[0], rgb[1], rgb[2]);
+    sprintf(msg, "-----------\n%i, %i, %i", color.r, color.g, color.b);
     write_log(msg);
+    return color;
+}
 
+void init_ncurses_color(int id, int r, int g, int b) {
+        Ncurses_Color color = rgb_to_ncurses(r, g, b);
+        init_color(id, color.r, color.g, color.b);
 }
 
 void create_color(Color *color) {
 
     // creates a color and adds it to the color array
 
-    int values[3];
-    rgb_to_ncurses(color->red, color->green, color->blue, values);
+    Ncurses_Color values = rgb_to_ncurses(color->red, color->green, color->blue);
     char msg[64] = {0};
     char msg2[64] = {0};
     write_log("RGB BEFORE AND AFTER");
-    sprintf(msg, "%i, %i, %i", values[0], values[1], values[2]);
+    sprintf(msg, "%i, %i, %i", values.r, values.g, values.b);
     sprintf(msg2, "%i, %i, %i", color->red, color->green, color->blue);
     write_log(msg2);
     write_log(msg);
 
     // applies the new colors.
 
-    init_color((color->id), values[0], values[1], values[2]);
+    init_color((color->id), values.r, values.g, values.b);
 }
 
 void free_buffer(Buffer **buffer) {
-    write_log("before");
     for(size_t i = 0; i < (*buffer)->row_capacity; i++) {
         char msg[42] = {0};
         sprintf(msg, "%zu, %zu", i, (*buffer)->row_capacity);
-        write_log(msg);
         if((*buffer)->rows[i].contents != NULL) {
             free((*buffer)->rows[i].contents);
             (*buffer)->rows[i].contents = NULL;
         }
-        write_log(msg);
     }
-    write_log("after");
     free((*buffer)->rows);
     free((*buffer)->filename);
     free(*buffer);
@@ -251,7 +258,6 @@ void free_buffer(Buffer **buffer) {
 }
 
 Buffer *copy_buffer(Buffer *buffer) {
-    write_log("copy b4");
     Buffer *buf = malloc(sizeof(Buffer));
     *buf = *buffer;
     size_t filename_s = strlen(buffer->filename)+1;
@@ -268,9 +274,6 @@ Buffer *copy_buffer(Buffer *buffer) {
         sprintf(siz, "%zu, %zu, %zu, %zu", buffer->rows[i].size, cur->size, buffer->row_s, buffer->row_capacity);
         buf->rows[i].size = cur->size; 
         buf->rows[i].index = cur->index; 
-        write_log(siz);
-        write_log(cur->contents);
-        write_log("copy b5");
         strncpy(buf->rows[i].contents, cur->contents, buffer->rows[i].size);
     }
     return buf;
@@ -279,7 +282,6 @@ Buffer *copy_buffer(Buffer *buffer) {
 void shift_undo_left(Undo *undo, size_t amount) {
     for(size_t j = 0; j < amount; j++) {
         if(undo->buf_stack[0] != NULL) free_buffer(&undo->buf_stack[0]);
-        write_log("free");
         for(size_t i = 1; i < undo->buf_stack_s; i++) {
             undo->buf_stack[i-1] = undo->buf_stack[i];
         }
@@ -295,9 +297,7 @@ void push_undo(Undo *undo, Buffer *buf) {
         shift_undo_left(undo, 1); 
     }
     Buffer *result = copy_buffer(buf); 
-    write_log("push undo");
     undo->buf_stack[undo->buf_stack_s++] = result;
-    write_log("push undo2");
 }
 
 Buffer *pop_undo(Undo *undo) {
@@ -934,7 +934,6 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                             sprintf(message, "%s", token);
 
                             // log for args.
-                            write_log(message);
                             token = strtok(NULL, "/");
                         }
                         Point new_pos = search(buffer, args[0], strlen(args[0]));
@@ -949,13 +948,11 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                     buffer->row_index = new_pos.y;
                 } break;
                 case 'u': {
-                    write_log("BEFORE");
                     Buffer *new_buf = pop_undo(&state->undo_stack);
                     if(new_buf == NULL) break;
                     push_undo(&state->redo_stack, buffer);
                     free_buffer(&buffer);
                     *modify_buffer = new_buf;
-                    write_log("AFTER");
                 } break;
                 case 'U': {
                     Buffer *new_buf = pop_undo(&state->redo_stack);
@@ -976,9 +973,7 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                 default: {
                     int motion = handle_motion_keys(buffer, ch, repeating_count);
                     if(motion) break;
-                    write_log("default1");
                     push_undo(&state->undo_stack, buffer);
-                    write_log("default2");
                     int modified = handle_modifying_keys(buffer, ch, main_win, y);
                     (void)modified;
                     int switched = handle_normal_to_insert_keys(buffer, ch);
@@ -1350,27 +1345,32 @@ int main(int argc, char **argv) {
 
     // create a color
     write_log("creating color");
-    Color custom_color = {
+    Color custom_yellow = {
         .is_custom_line_row = true, // determines wether we change the color of the line counter
         .is_custom = true, // custom colors enabled or not?
-        .slot = 2, // 1 - 7 is what is used to create a custom color. 1 is default color YELLOW
+        .slot = 1, // 1 - 7 is what is used to create a custom color. 1 is default color YELLOW
         .id = 8, // id of the color (8 - 255) anything less is default colors
         .color_name = "anything",
-        .red = 256, // RGB values
-        .green = 0, 
-        .blue = 0
+        .red = 255, // RGB values
+        .green = 255, 
+        .blue = 0, 
     };
 
-    // this creates a color. currently it applies it only to the row of lines
-    // create_color(&custom_color);
+    Color custom_red = {
+        .slot = 4,
+        .id = 9,
+        .red = 255,
+        .green = 0,
+        .blue = 0,
+    };
 
-    // make false to disable custom color
-    // default color is 1, which is Slot 1 of YELLOW
-    
-    if (custom_color.is_custom) {
-        // lets lex.c know that we are using a custom color
-        custom_color.slot = 2;
-    }
+    Color custom_green = {
+        .slot = 3,
+        .id = 10,
+        .red = 0,
+        .green = 255,
+        .blue = 0,
+    };
 
     // colors
     start_color();
@@ -1381,10 +1381,14 @@ int main(int argc, char **argv) {
     init_pair(MAGENTA_COLOR, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
 
-    if (custom_color.is_custom_line_row) {
-        // lets lex.c know that we are using a custom color
-        init_pair(custom_color.slot, custom_color.id, COLOR_BLACK);
-    }
+    //init_pair(custom_yellow.slot, custom_yellow.id, COLOR_BLACK);
+    //init_pair(custom_red.slot, custom_red.id, COLOR_BLACK);
+    //init_pair(custom_green.slot, custom_green.id, COLOR_BLACK);
+
+    //init_ncurses_color(custom_yellow.id, custom_yellow.red, custom_yellow.green, custom_yellow.blue);
+    //init_ncurses_color(custom_red.id, custom_red.red, custom_red.green, custom_red.blue);
+    //init_ncurses_color(custom_green.id, custom_green.red, custom_green.green, custom_green.blue);
+
 
     noecho();
     raw();
@@ -1540,7 +1544,7 @@ int main(int argc, char **argv) {
             if(i <= buffer->row_s) {
                 size_t print_index_y = i - line_render_start;
 
-                wattron(line_num_win, COLOR_PAIR(custom_color.slot));
+                wattron(line_num_win, COLOR_PAIR(YELLOW_COLOR));
                 if(relative_nums) {
                     if(buffer->row_index == i) mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                     else mvwprintw(line_num_win, print_index_y, 0, "%4zu", 
@@ -1548,7 +1552,7 @@ int main(int argc, char **argv) {
                 } else {
                     mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                 }
-                wattroff(line_num_win, COLOR_PAIR(custom_color.slot));
+                wattroff(line_num_win, COLOR_PAIR(YELLOW_COLOR));
 
                 size_t off_at = 0;
 
@@ -1560,24 +1564,13 @@ int main(int argc, char **argv) {
                                                      buffer->rows[i].size, token_arr, &token_capacity);
                 }
                 
-                Color_Pairs color = custom_color.slot;
-
-                // converts rbg values to ncurses values.
-                int colors[3];
-                rgb_to_ncurses(custom_color.red, custom_color.green, custom_color.blue, colors);
-                Custom_Color custom = {
-                    .custom_id = 8,
-                    .custom_slot = custom_color.slot,
-                    .custom_r = colors[0], // applies the new values.
-                    .custom_g = colors[1],
-                    .custom_b = colors[2]
-                }; 
-
+                Color_Pairs color = 0;
 
                 size_t j = 0;
                 for(j = col_render_start; j <= col_render_start+main_col; j++) {
                     size_t keyword_size = 0;
-                    if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, &color, &custom)) {
+                    if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, 
+                                                    &color)) {
                         wattron(main_win, COLOR_PAIR(color));
                         off_at = j + keyword_size;
                     }

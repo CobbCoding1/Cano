@@ -7,16 +7,6 @@
 #include "view.h"
 #include "colors.h"
 
-
-typedef enum { 
-    YELLOW_COLOR = 1,
-    BLUE_COLOR,
-    GREEN_COLOR,
-    RED_COLOR,
-    CYAN_COLOR,
-    MAGENTA_COLOR,
-} Color_Pairs;
-
 typedef enum {
     Type_None = 0,
     Type_Keyword,
@@ -94,15 +84,14 @@ int is_type(char *word, size_t word_s) {
 }
 
 
-int is_in_tokens_index(Token *token_arr, size_t token_s, size_t index, size_t *size, Color_Pairs *color, Custom_Color *custom_color) {
+int is_in_tokens_index(Token *token_arr, size_t token_s, size_t index, size_t *size, Color_Pairs *color) {
     
 
-    if (custom_color->custom_slot == 2) {
-  
-        init_color(custom_color->custom_id, custom_color->custom_r, custom_color->custom_g, custom_color->custom_b);
-        init_pair(custom_color->custom_slot, custom_color->custom_id, COLOR_BLACK);
+    //if (custom_color != NULL) {
+        //init_color(custom_color->custom_id, custom_color->custom_r, custom_color->custom_g, custom_color->custom_b);
+        //init_pair(custom_color->custom_slot, custom_color->custom_id, COLOR_BLACK);
         
-    }
+    //}
 
     for(size_t i = 0; i < token_s; i++) {
         if(token_arr[i].index == index) {
