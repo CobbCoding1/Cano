@@ -1381,14 +1381,15 @@ int main(int argc, char **argv) {
     init_pair(MAGENTA_COLOR, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
 
-    //init_pair(custom_yellow.slot, custom_yellow.id, COLOR_BLACK);
-    //init_pair(custom_red.slot, custom_red.id, COLOR_BLACK);
-    //init_pair(custom_green.slot, custom_green.id, COLOR_BLACK);
+    parse_syntax_file("c.cyntax");
 
-    //init_ncurses_color(custom_yellow.id, custom_yellow.red, custom_yellow.green, custom_yellow.blue);
-    //init_ncurses_color(custom_red.id, custom_red.red, custom_red.green, custom_red.blue);
-    //init_ncurses_color(custom_green.id, custom_green.red, custom_green.green, custom_green.blue);
+    init_pair(custom_yellow.slot, custom_yellow.id, COLOR_BLACK);
+    init_pair(custom_red.slot, custom_red.id, COLOR_BLACK);
+    init_pair(custom_green.slot, custom_green.id, COLOR_BLACK);
 
+    init_ncurses_color(custom_yellow.id, custom_yellow.red, custom_yellow.green, custom_yellow.blue);
+    init_ncurses_color(custom_red.id, custom_red.red, custom_red.green, custom_red.blue);
+    init_ncurses_color(custom_green.id, custom_green.red, custom_green.green, custom_green.blue);
 
     noecho();
     raw();

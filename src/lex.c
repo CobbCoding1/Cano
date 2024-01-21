@@ -17,7 +17,7 @@ typedef enum {
     Type_Word,
 } Token_Type;
 
-char *types[] = {
+char *types_old[] = {
     "char",
     "double",
     "float",
@@ -28,7 +28,7 @@ char *types[] = {
     "size_t",
 };
 
-char *keywords[] = {
+char *keywords_old[] = {
     "auto",
     "break",
     "case",
@@ -56,6 +56,12 @@ char *keywords[] = {
     "while",
 };
 
+char **keywords;
+size_t keywords_s = 0;
+
+char **types;
+size_t types_s = 0;
+
 char *comments = "//";
 
 #define NUM_KEYWORDS sizeof(keywords)/sizeof(*keywords)
@@ -68,7 +74,7 @@ typedef struct {
 } Token;
 
 int is_keyword(char *word, size_t word_s) {
-    for(size_t i = 0; i < NUM_KEYWORDS; i++) {
+    for(size_t i = 0; i < keywords_s; i++) {
         if(word_s < strlen(keywords[i])) continue;
         if(strcmp(word, keywords[i]) == 0) return 1;
     }
@@ -76,23 +82,115 @@ int is_keyword(char *word, size_t word_s) {
 }
 
 int is_type(char *word, size_t word_s) {
-    for(size_t i = 0; i < NUM_TYPES; i++) {
+    for(size_t i = 0; i < types_s; i++) {
         if(word_s < strlen(types[i])) continue;
         if(strcmp(word, types[i]) == 0) return 1;
     }
     return 0;
 }
 
+size_t read_file_to_str(char *filename, char **contents) {
+    FILE *file = fopen(filename, "r");
+    if(file == NULL) {
+        endwin();
+        fprintf(stderr, "could not read from file: %s\n", filename);
+        exit(1);
+    }
+    fseek(file, 0, SEEK_END);
+    size_t length = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    *contents = malloc(sizeof(char)*length);
+    fread(*contents, 1, length, file);
+    fclose(file);
+    return length;
+}
+
+Custom_Color *parse_syntax_file(char *filename) {
+    char *contents = NULL;
+    size_t contents_s = read_file_to_str(filename, &contents);
+    String_View contents_view = view_create(contents, contents_s);
+
+    size_t num_of_dots = 0;
+    for(size_t i = 0; i < contents_view.len; i++) {
+        if(contents_view.data[i] == '.') {
+            num_of_dots++;
+        }
+    }
+
+    String_View *lines = malloc(sizeof(String_View)*num_of_dots);
+    size_t lines_s = 0;
+
+    size_t cur_size = 0;
+    char *cur = contents_view.data;
+    for(size_t i = 0; i < contents_view.len; i++) {
+        cur_size++;
+        if(contents_view.data[i] == '.') {
+            cur_size++;
+            lines[lines_s].data = cur;
+            cur += cur_size;
+            lines[lines_s++].len = cur_size;
+            cur_size = 0;
+        }
+    }
+
+
+    for(size_t i = 0; i < lines_s; i++) {
+        //printf("-"View_Print"-\n", View_Arg(lines[i]));
+        size_t num_of_commas = 0;
+        for(size_t j = 0; j < lines[i].len; j++) {
+            if(lines[i].data[j] == ',') {
+                num_of_commas++;
+            }
+        }
+        String_View words[num_of_commas];
+        size_t words_s = 0;
+        char *cur = lines[i].data;
+        size_t cur_size = 0;
+        for(size_t j = 0; j < lines[i].len; j++) {
+            cur_size++;
+            if(lines[i].data[j] == ',') {
+                words[words_s].data = cur;
+                cur += cur_size;
+                words[words_s++].len = cur_size-1;
+                cur_size = 0;
+            }
+        }
+        cur_size--;
+        words[words_s].data = cur;
+        cur += cur_size;
+        words[words_s++].len = cur_size-1;
+
+        Custom_Color color = {0};
+        color.custom_id = i+8;
+        char cur_type = words[0].data[0]; 
+        //printf("cur_type: %c\n", cur_type);
+        color.custom_r = view_to_int(words[1]);
+        color.custom_g = view_to_int(words[2]);
+        color.custom_b = view_to_int(words[3]);
+        if(cur_type == 'k') keywords = malloc(sizeof(char*)*words_s-3);
+        if(cur_type == 't') types = malloc(sizeof(char*)*words_s-3);
+
+        for(size_t j = 4; j < words_s; j++) {
+            switch(cur_type) {
+                case 'k':
+                    keywords[keywords_s++] = view_to_cstr(words[j]);
+                    break;
+                case 't':
+                    types[types_s++] = view_to_cstr(words[j]);
+                    //printf("%s\n", types[types_s-1]);
+                    break;
+                case 'w':
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    return (Custom_Color*){0}; 
+}
 
 int is_in_tokens_index(Token *token_arr, size_t token_s, size_t index, size_t *size, Color_Pairs *color) {
-    
-
-    //if (custom_color != NULL) {
-        //init_color(custom_color->custom_id, custom_color->custom_r, custom_color->custom_g, custom_color->custom_b);
-        //init_pair(custom_color->custom_slot, custom_color->custom_id, COLOR_BLACK);
-        
-    //}
-
     for(size_t i = 0; i < token_s; i++) {
         if(token_arr[i].index == index) {
             *size = token_arr[i].size;
