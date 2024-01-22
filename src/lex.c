@@ -102,6 +102,7 @@ size_t read_file_to_str(char *filename, char **contents) {
     *contents = malloc(sizeof(char)*length);
     fread(*contents, 1, length, file);
     fclose(file);
+    contents[length] = '\0';
     return length;
 }
 
@@ -122,10 +123,9 @@ Custom_Color *parse_syntax_file(char *filename) {
 
     size_t cur_size = 0;
     char *cur = contents_view.data;
-    for(size_t i = 0; i < contents_view.len; i++) {
+    for(size_t i = 0; i <= contents_view.len; i++) {
         cur_size++;
-        if(contents_view.data[i] == '.') {
-            cur_size++;
+        if(contents_view.data[i-1] == '.') {
             lines[lines_s].data = cur;
             cur += cur_size;
             lines[lines_s++].len = cur_size;
@@ -133,9 +133,9 @@ Custom_Color *parse_syntax_file(char *filename) {
         }
     }
 
+    endwin();
 
     for(size_t i = 0; i < lines_s; i++) {
-        //printf("-"View_Print"-\n", View_Arg(lines[i]));
         size_t num_of_commas = 0;
         for(size_t j = 0; j < lines[i].len; j++) {
             if(lines[i].data[j] == ',') {
@@ -163,12 +163,18 @@ Custom_Color *parse_syntax_file(char *filename) {
         Custom_Color color = {0};
         color.custom_id = i+8;
         char cur_type = words[0].data[0]; 
-        //printf("cur_type: %c\n", cur_type);
         color.custom_r = view_to_int(words[1]);
         color.custom_g = view_to_int(words[2]);
         color.custom_b = view_to_int(words[3]);
-        if(cur_type == 'k') keywords = malloc(sizeof(char*)*words_s-3);
-        if(cur_type == 't') types = malloc(sizeof(char*)*words_s-3);
+        if(cur_type == 'k') {
+            keywords = malloc(sizeof(char*)*words_s-3);
+            color.custom_slot = 4;
+        } else if(cur_type == 't') {
+            types = malloc(sizeof(char*)*words_s-3);
+            color.custom_slot = 1;
+        } else if(cur_type == 'w') {
+            color.custom_slot = 2;
+        }
 
         for(size_t j = 4; j < words_s; j++) {
             switch(cur_type) {
@@ -177,7 +183,6 @@ Custom_Color *parse_syntax_file(char *filename) {
                     break;
                 case 't':
                     types[types_s++] = view_to_cstr(words[j]);
-                    //printf("%s\n", types[types_s-1]);
                     break;
                 case 'w':
                     break;
@@ -187,6 +192,7 @@ Custom_Color *parse_syntax_file(char *filename) {
         }
     }
 
+    exit(1);
     return (Custom_Color*){0}; 
 }
 
