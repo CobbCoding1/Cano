@@ -133,8 +133,6 @@ Custom_Color *parse_syntax_file(char *filename) {
         }
     }
 
-    endwin();
-
     for(size_t i = 0; i < lines_s; i++) {
         size_t num_of_commas = 0;
         for(size_t j = 0; j < lines[i].len; j++) {
@@ -192,7 +190,6 @@ Custom_Color *parse_syntax_file(char *filename) {
         }
     }
 
-    exit(1);
     return (Custom_Color*){0}; 
 }
 
