@@ -9,13 +9,13 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
-#include <time.h>
 
 #include <curses.h>
 
 #include "colors.h"
 #include "config.h"
 #include "lex.c"
+
 // global config vars
 
 #define CRASH(str)                    \
@@ -36,6 +36,11 @@
 #define LEFT_ARROW  260 
 #define RIGHT_ARROW 261 
 
+#define MAX_STRING_SIZE 1025
+
+#define MAX_ROWS 1024
+#define STARTING_ROW_SIZE 128
+
 typedef enum {
     NORMAL,
     INSERT,
@@ -44,13 +49,6 @@ typedef enum {
     VISUAL,
 } Mode;
 
-int ESCDELAY = 10;
-time_t rawtime;
-struct tm *timeinfo;
-
-char run_time[80];
-
-#define MAX_STRING_SIZE 1025
 
 typedef struct {
     size_t index;
@@ -58,8 +56,6 @@ typedef struct {
     char *contents;
 } Row;
 
-#define MAX_ROWS 1024
-#define STARTING_ROW_SIZE 128
 
 
 typedef struct {
@@ -118,12 +114,40 @@ typedef struct {
     Undo redo_stack;
 } State;
 
+typedef struct {
+    char brace;
+    int closing;
+} Brace;
+
+
+typedef struct {
+    int r;
+    int g;
+    int b;
+} Ncurses_Color;
+
+typedef enum {
+    NO_ERROR,
+    UNKNOWN_COMMAND,
+    INVALID_ARG,
+    INVALID_VALUE,
+} Command_Errors;
+
+typedef struct {
+    size_t row;
+    size_t col;
+    size_t size;
+} Syntax_Highlighting;
+
+Mode mode = NORMAL;
+
+/* --------------------------- FUNCTIONS --------------------------- */
+
 void shift_rows_left(Buffer *buf, size_t index);
 void shift_row_left(Row *row, size_t index);
 void shift_row_right(Row *row, size_t index);
 void write_log(const char *message);
 
-Mode mode = NORMAL;
 int QUIT = 0;
 
 int is_between(Point a, Point b, Point c) {
@@ -136,6 +160,7 @@ int is_between(Point a, Point b, Point c) {
     }
     return 0; 
 }
+
 
 char *stringify_mode() {
     switch(mode) {
@@ -158,10 +183,6 @@ char *stringify_mode() {
     return "NORMAL";
 }
 
-typedef struct {
-    char brace;
-    int closing;
-} Brace;
 
 Brace find_opposite_brace(char opening) {
     switch(opening) {
@@ -187,27 +208,9 @@ Brace find_opposite_brace(char opening) {
     return (Brace){.brace = '0'};
 }
 
-typedef struct {
-    int r;
-    int g;
-    int b;
-} Ncurses_Color;
 
 Ncurses_Color rgb_to_ncurses(int r, int g, int b) {
 
-    /* 
-    
-    calculates the ncurse color id from rgb values ((RBG / 256) * 1000)
-    the math is not being done right for some reason. divides the rbg val
-    by 256 and then multiplies by 1000. this should give the correct value
-    ex: 255 / 256 = 0.99609375 * 1000 = 996.09375, cast to int gives
-    996, which is the correct value. but for some reason, 
-    logs are saying that the value is 1000. could be preventing the ability
-    to use more shades.
-    
-    please look into this.
-
-    */
     Ncurses_Color color = {0};
 
     color.r = (int) ((r / 256.0) * 1000);
@@ -217,12 +220,15 @@ Ncurses_Color rgb_to_ncurses(int r, int g, int b) {
     sprintf(msg, "-----------\n%i, %i, %i", color.r, color.g, color.b);
     write_log(msg);
     return color;
+
 }
+
 
 void init_ncurses_color(int id, int r, int g, int b) {
         Ncurses_Color color = rgb_to_ncurses(r, g, b);
         init_color(id, color.r, color.g, color.b);
 }
+
 
 void create_color(Color *color) {
 
@@ -242,6 +248,7 @@ void create_color(Color *color) {
     init_color((color->id), values.r, values.g, values.b);
 }
 
+
 void free_buffer(Buffer **buffer) {
     for(size_t i = 0; i < (*buffer)->row_capacity; i++) {
         char msg[42] = {0};
@@ -256,6 +263,7 @@ void free_buffer(Buffer **buffer) {
     free(*buffer);
     *buffer = NULL;
 }
+
 
 Buffer *copy_buffer(Buffer *buffer) {
     Buffer *buf = malloc(sizeof(Buffer));
@@ -279,6 +287,7 @@ Buffer *copy_buffer(Buffer *buffer) {
     return buf;
 }
 
+
 void shift_undo_left(Undo *undo, size_t amount) {
     for(size_t j = 0; j < amount; j++) {
         if(undo->buf_stack[0] != NULL) free_buffer(&undo->buf_stack[0]);
@@ -292,6 +301,7 @@ void shift_undo_left(Undo *undo, size_t amount) {
     }
 }
 
+
 void push_undo(Undo *undo, Buffer *buf) {
     if(undo->buf_stack_s >= undo->buf_capacity) {
         shift_undo_left(undo, 1); 
@@ -299,6 +309,7 @@ void push_undo(Undo *undo, Buffer *buf) {
     Buffer *result = copy_buffer(buf); 
     undo->buf_stack[undo->buf_stack_s++] = result;
 }
+
 
 Buffer *pop_undo(Undo *undo) {
     if(undo->buf_stack_s == 0) return NULL;
@@ -308,6 +319,7 @@ Buffer *pop_undo(Undo *undo) {
     }
     return result;
 }
+
 
 void resize_rows(Buffer *buffer, size_t capacity) {
     Row *rows = calloc(capacity*2, sizeof(Row));
@@ -337,11 +349,11 @@ void write_log(const char *message) {
     FILE *file = fopen("logs/cano.log", "a");
     if (file == NULL) {
         return;
-    }
-    
+    }   
     fprintf(file, "%s\n", message);
     fclose(file);
 }
+
 
 Point search(Buffer *buffer, char *command, size_t command_s) {
     Point point = {
@@ -366,6 +378,7 @@ Point search(Buffer *buffer, char *command, size_t command_s) {
     return point;
 
 }
+
 
 void replace(Buffer *buffer, Point position, char *new_str, size_t old_str_s, size_t new_str_s) { 
     if (buffer == NULL || new_str == NULL) {
@@ -414,6 +427,7 @@ void find_and_replace(Buffer *buffer, char *old_str, char *new_str) {
     }
 }
 
+
 size_t num_of_open_braces(Buffer *buffer) {
     int posy = buffer->row_index;
     int posx = buffer->cur_pos;
@@ -444,6 +458,7 @@ void reset_command(char *command, size_t *command_s) {
     *command_s = 0;
 }
 
+
 void handle_save(Buffer *buffer) {
     FILE *file = fopen(buffer->filename, "w"); 
     for(size_t i = 0; i <= buffer->row_s; i++) {
@@ -452,6 +467,7 @@ void handle_save(Buffer *buffer) {
     }
     fclose(file);
 }
+
 
 Command parse_command(char *command, size_t command_s) {
     Command cmd = {0};
@@ -478,12 +494,6 @@ Command parse_command(char *command, size_t command_s) {
     return cmd;
 }
 
-typedef enum {
-    NO_ERROR,
-    UNKNOWN_COMMAND,
-    INVALID_ARG,
-    INVALID_VALUE,
-} Command_Errors;
 
 int execute_command(Command *command, Buffer *buf, State *state) {
     if(command->command_s == 10 && strncmp(command->command, "set-output", 10) == 0) {
@@ -701,25 +711,25 @@ void read_file_to_buffer(Buffer *buffer, char *filename) {
 
 int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
     switch(ch) {
-        case 'g':
+        case 'g': // Move to the start of the file or to the line specified by repeating_count
             if(*repeating_count-1 > 1 && *repeating_count-1 <= buffer->row_s) {
                 buffer->row_index = *repeating_count-1;
                 *repeating_count = 1;
             } else buffer->row_index = 0;
             break;
-        case 'G':
+        case 'G': // Move to the end of the file or to the line specified by repeating_count
             if(*repeating_count-1 > 1 && *repeating_count-1 <= buffer->row_s) {
                 buffer->row_index = *repeating_count-1;
                 *repeating_count = 1;
             } else buffer->row_index = buffer->row_s;
             break;
-        case '0':
+        case '0': // Move to the start of the line
             buffer->cur_pos = 0;
             break;
-        case '$':
+        case '$': // Move to the end of the line
             buffer->cur_pos = buffer->rows[buffer->row_index].size;
             break;
-        case 'e': {
+        case 'e': { // Move to the end of the next word
             Row *cur = &buffer->rows[buffer->row_index];
             while(buffer->cur_pos+1 < cur->size && cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
             if(cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
@@ -727,14 +737,14 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
                 buffer->cur_pos++;
             }
         } break;
-        case 'b': {
+        case 'b': { // Move to the start of the previous word
             Row *cur = &buffer->rows[buffer->row_index];
             if(cur->contents[buffer->cur_pos-1] == ' ') buffer->cur_pos--;
             while(cur->contents[buffer->cur_pos-1] != ' ' && buffer->cur_pos > 0) {
                 buffer->cur_pos--;
             }
         } break;
-        case 'w': {
+        case 'w': { // Move to the start of the next word
             Row *cur = &buffer->rows[buffer->row_index];
             while(buffer->cur_pos+1 < cur->size && cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
             if(cur->contents[buffer->cur_pos-1] == ' ') buffer->cur_pos++;
@@ -743,22 +753,22 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
             }
         } break;
         case LEFT_ARROW:
-        case 'h':
+        case 'h': // Move left
             if(buffer->cur_pos != 0) buffer->cur_pos--;
             break;
         case DOWN_ARROW:
-        case 'j':
+        case 'j': // Move down
             if(buffer->row_index < buffer->row_s) buffer->row_index++;
             break;
         case UP_ARROW:
-        case 'k':
+        case 'k': // Move up
             if(buffer->row_index != 0) buffer->row_index--;
             break;
         case RIGHT_ARROW:
-        case 'l':
+        case 'l': // Move right
             buffer->cur_pos++;
             break;
-        case '%': {
+        case '%': { // Move to the matching brace
             Row *cur = &buffer->rows[buffer->row_index];
             char initial_brace = cur->contents[buffer->cur_pos];
             Brace initial_opposite = find_opposite_brace(initial_brace);
@@ -790,11 +800,11 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
             }
             break;
         }
-        default: {
+        default: { // If the key is not a motion key, return 0
             return 0;
         } 
     }
-    return 1;
+    return 1; // If the key is a motion key, return 1
 }
 
 int handle_modifying_keys(Buffer *buffer, int ch, WINDOW *main_win, size_t *y) {
@@ -984,32 +994,31 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                 }break;
             }
             break;
-        case INSERT: {
-            switch(ch) {
+        case INSERT: { // Start of the INSERT mode case
+            switch(ch) { // Switch based on the character input
                 case '\b':
                 case 127:
-                case KEY_BACKSPACE: {
-                    if(buffer->cur_pos == 0) {
-                        if(buffer->row_index != 0) {
-                            Row *cur = &buffer->rows[--buffer->row_index];
-                            buffer->cur_pos = cur->size;
-                            wmove(main_win, buffer->row_index, buffer->cur_pos);
-                            delete_and_append_row(buffer, buffer->row_index+1);
-                        }
+                case KEY_BACKSPACE: { // Handle backspace
+                    if(buffer->cur_pos == 0 && buffer->row_index != 0) {
+                        // Move to previous row and delete current row
+                        Row *cur = &buffer->rows[--buffer->row_index];
+                        buffer->cur_pos = cur->size;
+                        wmove(main_win, buffer->row_index, buffer->cur_pos);
+                        delete_and_append_row(buffer, buffer->row_index+1);
                     } else {
+                        // Shift row to the left
                         Row *cur = &buffer->rows[buffer->row_index];
                         shift_row_left(cur, --buffer->cur_pos);
                         wmove(main_win, *y, buffer->cur_pos);
                     }
                 } break;
-                case ESCAPE:
+                case ESCAPE: // Switch to NORMAL mode
                     mode = NORMAL;
                     break;
                 case KEY_ENTER:
-                case ENTER: {
+                case ENTER: { // Handle enter key
                     Row *cur = &buffer->rows[buffer->row_index]; 
-                    create_and_cut_row(buffer, buffer->row_index+1,
-                                &cur->size, buffer->cur_pos);
+                    create_and_cut_row(buffer, buffer->row_index+1, &cur->size, buffer->cur_pos);
                     buffer->row_index++; 
                     buffer->cur_pos = 0;
                     size_t num_of_braces = num_of_open_braces(buffer);
@@ -1017,23 +1026,15 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                         create_newline_indent(buffer, num_of_braces);
                     }
                 } break;
-                case LEFT_ARROW:
-                    if(buffer->cur_pos != 0) buffer->cur_pos--;
+                case LEFT_ARROW: // Move cursor left
+                case DOWN_ARROW: // Move cursor down
+                case UP_ARROW:   // Move cursor up
+                case RIGHT_ARROW: // Move cursor right
+                case KEY_RESIZE: // Refresh window on resize
                     break;
-                case DOWN_ARROW:
-                    if(buffer->row_index < buffer->row_s) buffer->row_index++;
-                    break;
-                case UP_ARROW:
-                    if(buffer->row_index != 0) buffer->row_index--;
-                    break;
-                case RIGHT_ARROW:
-                    if(buffer->cur_pos < buffer->rows[buffer->row_index].size) buffer->cur_pos++;
-                    break;
-                case KEY_RESIZE:
-                    wrefresh(main_win);
-                    break;
-                default: {
+                default: { // Handle other characters
                     Row *cur = &buffer->rows[buffer->row_index];
+                    // Handle special characters and indentation
                     Brace cur_brace = find_opposite_brace(cur->contents[buffer->cur_pos]);
                     if(
                         (cur_brace.brace != '0' && cur_brace.closing && 
@@ -1297,25 +1298,12 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
     }
 }
 
-typedef struct {
-    size_t row;
-    size_t col;
-    size_t size;
-} Syntax_Highlighting;
+/* ------------------------- FUNCTIONS END ------------------------- */
+
 
 int main(int argc, char **argv) {
 
     write_log("starting (int main)");
-
-    time_t rawtime;
-    struct tm *timeinfo;
-
-    // get current time
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);
-
-    strftime(run_time, sizeof(run_time), "%Y-%m-%d %H:%M:%S", timeinfo);
-
 
     (void)argc;
     char *program = *argv++;
@@ -1506,11 +1494,15 @@ int main(int argc, char **argv) {
     size_t y = 0;
     while(ch != ctrl('q') && QUIT != 1) {
         getmaxyx(main_win, main_row, main_col);
+
 #ifndef NO_CLEAR
+
         werase(main_win);
         werase(status_bar);
         werase(line_num_win);
+
 #endif
+
         int row_s_len = (int)log10(buffer->row_s)+2;
         if(row_s_len > line_num_col) {
             wresize(main_win, main_row, main_col-(row_s_len-line_num_width));
@@ -1526,46 +1518,61 @@ int main(int argc, char **argv) {
             mvwprintw(status_bar, 1, 0, "%s", status_bar_msg);
             wrefresh(status_bar);
             sleep(1);
+            // Clear the status bar
             wclear(status_bar);
             is_print_msg = 0;
-        }
-        if(mode == COMMAND || mode == SEARCH) {
-            mvwprintw(status_bar, 1, 0, ":%.*s", (int)command_s, command);
-        }
-        mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
-        mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer->row_index+1, buffer->cur_pos+1);
 
-        if(buffer->row_index <= line_render_start) line_render_start = buffer->row_index;
-        if(buffer->row_index >= line_render_start+main_row) line_render_start = buffer->row_index-main_row+1;
+            // If the mode is COMMAND or SEARCH, print the command to the status bar
+            if(mode == COMMAND || mode == SEARCH) {
+                mvwprintw(status_bar, 1, 0, ":%.*s", (int)command_s, command);
+            }
 
-        if(buffer->cur_pos <= col_render_start) col_render_start = buffer->cur_pos;
-        if(buffer->cur_pos >= col_render_start+main_col) col_render_start = buffer->cur_pos-main_col+1;
-        
-        for(size_t i = line_render_start; i <= line_render_start+main_row; i++) {
-            if(i <= buffer->row_s) {
-                size_t print_index_y = i - line_render_start;
+            // Print the current mode and cursor position to the status bar
+            mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
+            mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer->row_index+1, buffer->cur_pos+1);
 
-                wattron(line_num_win, COLOR_PAIR(YELLOW_COLOR));
-                if(relative_nums) {
-                    if(buffer->row_index == i) mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
-                    else mvwprintw(line_num_win, print_index_y, 0, "%4zu", 
-                                   (size_t)abs((int)i-(int)buffer->row_index));
-                } else {
-                    mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
-                }
-                wattroff(line_num_win, COLOR_PAIR(YELLOW_COLOR));
+            // Adjust the line rendering start based on the current row index
+            if(buffer->row_index <= line_render_start) line_render_start = buffer->row_index;
+            if(buffer->row_index >= line_render_start+main_row) line_render_start = buffer->row_index-main_row+1;
 
-                size_t off_at = 0;
+            // Adjust the column rendering start based on the current cursor position
+            if(buffer->cur_pos <= col_render_start) col_render_start = buffer->cur_pos;
+            if(buffer->cur_pos >= col_render_start+main_col) col_render_start = buffer->cur_pos-main_col+1;
 
-                size_t token_capacity = 32;
-                Token *token_arr = malloc(sizeof(Token)*token_capacity);
-                size_t token_s = 0;
-                if(syntax) {
-                    token_s = generate_tokens(buffer->rows[i].contents, 
-                                                     buffer->rows[i].size, token_arr, &token_capacity);
-                }
-                
-                Color_Pairs color = 0;
+            // Loop through the lines to be rendered
+            for(size_t i = line_render_start; i <= line_render_start+main_row; i++) {
+                if(i <= buffer->row_s) {
+                    size_t print_index_y = i - line_render_start;
+
+                    // Set the line number color to yellow
+                    wattron(line_num_win, COLOR_PAIR(YELLOW_COLOR));
+
+                    // Print the line number, either relative or absolute
+                    if(relative_nums) {
+                        if(buffer->row_index == i) mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
+                        else mvwprintw(line_num_win, print_index_y, 0, "%4zu", 
+                                    (size_t)abs((int)i-(int)buffer->row_index));
+                    } else {
+                        mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
+                    }
+
+                    // Turn off the yellow color
+                    wattroff(line_num_win, COLOR_PAIR(YELLOW_COLOR));
+
+                    size_t off_at = 0;
+
+                    // Initialize the token array for syntax highlighting
+                    size_t token_capacity = 32;
+                    Token *token_arr = malloc(sizeof(Token)*token_capacity);
+                    size_t token_s = 0;
+
+                    // If syntax highlighting is enabled, generate the tokens for the current line
+                    if(syntax) {
+                        token_s = generate_tokens(buffer->rows[i].contents, 
+                                                            buffer->rows[i].size, token_arr, &token_capacity);
+                    }
+                    
+                    Color_Pairs color = 0;
 
                 size_t j = 0;
                 for(j = col_render_start; j <= col_render_start+main_col; j++) {
