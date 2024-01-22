@@ -1308,6 +1308,7 @@ int main(int argc, char **argv) {
     char *program = *argv++;
     char *flag = *argv++;
     char *config_filename = NULL;
+    char *syntax_filename = NULL;
     char *filename = NULL;
     while(flag != NULL) {
         if(strcmp(flag, "--config") == 0) {
@@ -1332,32 +1333,6 @@ int main(int argc, char **argv) {
 
     // create a color
     write_log("creating color");
-    Color custom_yellow = {
-        .is_custom_line_row = true, // determines wether we change the color of the line counter
-        .is_custom = true, // custom colors enabled or not?
-        .slot = 1, // 1 - 7 is what is used to create a custom color. 1 is default color YELLOW
-        .id = 8, // id of the color (8 - 255) anything less is default colors
-        .color_name = "anything",
-        .red = 255, // RGB values
-        .green = 255, 
-        .blue = 0, 
-    };
-
-    Color custom_red = {
-        .slot = 4,
-        .id = 9,
-        .red = 255,
-        .green = 0,
-        .blue = 0,
-    };
-
-    Color custom_green = {
-        .slot = 3,
-        .id = 10,
-        .red = 0,
-        .green = 255,
-        .blue = 0,
-    };
 
     // colors
     start_color();
@@ -1367,16 +1342,6 @@ int main(int argc, char **argv) {
     init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
     init_pair(MAGENTA_COLOR, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
-
-    parse_syntax_file("c.cyntax");
-
-    init_pair(custom_yellow.slot, custom_yellow.id, COLOR_BLACK);
-    init_pair(custom_red.slot, custom_red.id, COLOR_BLACK);
-    init_pair(custom_green.slot, custom_green.id, COLOR_BLACK);
-
-    init_ncurses_color(custom_yellow.id, custom_yellow.red, custom_yellow.green, custom_yellow.blue);
-    init_ncurses_color(custom_red.id, custom_red.red, custom_red.green, custom_red.blue);
-    init_ncurses_color(custom_green.id, custom_green.red, custom_green.green, custom_green.blue);
 
     noecho();
     raw();
@@ -1458,6 +1423,14 @@ int main(int argc, char **argv) {
         }
         sprintf(default_config_filename, "%s/config.cano", config_dir);
         config_filename = default_config_filename;
+
+
+        char *language = strip_off_dot(buffer->filename, strlen(buffer->filename));
+        if(language != NULL) {
+            syntax_filename = malloc(sizeof(char)*strlen(config_dir)+strlen(language)+sizeof(".cyntax"));
+            sprintf(syntax_filename, "%s/%s.cyntax", config_dir, language);
+            free(language);
+        }
     }
     char **lines = malloc(sizeof(char)*2);
     size_t lines_s = 0;
@@ -1470,6 +1443,21 @@ int main(int argc, char **argv) {
         }
     }
     free(lines);
+
+    if(syntax_filename != NULL) {
+        Color_Arr color_arr = parse_syntax_file(syntax_filename);
+        if(color_arr.arr != NULL) {
+            for(size_t i = 0; i < color_arr.arr_s; i++) {
+                init_pair(color_arr.arr[i].custom_slot, color_arr.arr[i].custom_id, COLOR_BLACK);
+                init_ncurses_color(color_arr.arr[i].custom_id, color_arr.arr[i].custom_r, 
+                                   color_arr.arr[i].custom_g, color_arr.arr[i].custom_b);
+            }
+
+            free(color_arr.arr);
+        }
+    }
+
+
 
     write_log("finished loading config");
 

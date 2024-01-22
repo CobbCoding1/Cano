@@ -89,12 +89,21 @@ int is_type(char *word, size_t word_s) {
     return 0;
 }
 
+char *strip_off_dot(char *str, size_t str_s) {
+    char *result = NULL;
+    for(size_t i = 0; i < str_s; i++) {
+        if(str[i] == '.') {
+            result = malloc(sizeof(char)*str_s-i);
+            strncpy(result, str+i+1, str_s-i+1);
+        }
+    }
+    return result;
+}
+
 size_t read_file_to_str(char *filename, char **contents) {
     FILE *file = fopen(filename, "r");
     if(file == NULL) {
-        endwin();
-        fprintf(stderr, "could not read from file: %s\n", filename);
-        exit(1);
+       return 0; 
     }
     fseek(file, 0, SEEK_END);
     size_t length = ftell(file);
@@ -106,9 +115,12 @@ size_t read_file_to_str(char *filename, char **contents) {
     return length;
 }
 
-Custom_Color *parse_syntax_file(char *filename) {
+Color_Arr parse_syntax_file(char *filename) {
     char *contents = NULL;
     size_t contents_s = read_file_to_str(filename, &contents);
+    if(contents_s == 0) {
+        return (Color_Arr){0};
+    }
     String_View contents_view = view_create(contents, contents_s);
 
     size_t num_of_dots = 0;
@@ -117,6 +129,9 @@ Custom_Color *parse_syntax_file(char *filename) {
             num_of_dots++;
         }
     }
+
+    Custom_Color *color_arr = malloc(sizeof(*color_arr)*num_of_dots);
+    size_t arr_s = 0;
 
     String_View *lines = malloc(sizeof(String_View)*num_of_dots);
     size_t lines_s = 0;
@@ -177,10 +192,10 @@ Custom_Color *parse_syntax_file(char *filename) {
         for(size_t j = 4; j < words_s; j++) {
             switch(cur_type) {
                 case 'k':
-                    keywords[keywords_s++] = view_to_cstr(words[j]);
+                    keywords[keywords_s++] = view_to_cstr(view_trim_left(words[j]));
                     break;
                 case 't':
-                    types[types_s++] = view_to_cstr(words[j]);
+                    types[types_s++] = view_to_cstr(view_trim_left(words[j]));
                     break;
                 case 'w':
                     break;
@@ -188,9 +203,16 @@ Custom_Color *parse_syntax_file(char *filename) {
                     break;
             }
         }
+        color_arr[arr_s++] = color;
     }
+    Color_Arr arr = {
+        .arr = color_arr,
+        .arr_s = arr_s,
+    };
 
-    return (Custom_Color*){0}; 
+    free(lines);
+
+    return arr; 
 }
 
 int is_in_tokens_index(Token *token_arr, size_t token_s, size_t index, size_t *size, Color_Pairs *color) {

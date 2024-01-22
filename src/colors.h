@@ -21,4 +21,9 @@ typedef struct {
     int custom_b;
 } Custom_Color;
 
+typedef struct {
+    Custom_Color *arr;
+    size_t arr_s;
+} Color_Arr;
+
 #endif /* COLORS_H */
