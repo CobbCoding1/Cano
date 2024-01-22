@@ -994,11 +994,11 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                 }break;
             }
             break;
-        case INSERT: { // Start of the INSERT mode case
-            switch(ch) { // Switch based on the character input
+        case INSERT: { 
+            switch(ch) { 
                 case '\b':
                 case 127:
-                case KEY_BACKSPACE: { // Handle backspace
+                case KEY_BACKSPACE: { 
                     if(buffer->cur_pos == 0 && buffer->row_index != 0) {
                         // Move to previous row and delete current row
                         Row *cur = &buffer->rows[--buffer->row_index];
@@ -1006,7 +1006,6 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                         wmove(main_win, buffer->row_index, buffer->cur_pos);
                         delete_and_append_row(buffer, buffer->row_index+1);
                     } else {
-                        // Shift row to the left
                         Row *cur = &buffer->rows[buffer->row_index];
                         shift_row_left(cur, --buffer->cur_pos);
                         wmove(main_win, *y, buffer->cur_pos);
@@ -1016,7 +1015,7 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                     mode = NORMAL;
                     break;
                 case KEY_ENTER:
-                case ENTER: { // Handle enter key
+                case ENTER: { 
                     Row *cur = &buffer->rows[buffer->row_index]; 
                     create_and_cut_row(buffer, buffer->row_index+1, &cur->size, buffer->cur_pos);
                     buffer->row_index++; 
@@ -1030,7 +1029,7 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                 case DOWN_ARROW: // Move cursor down
                 case UP_ARROW:   // Move cursor up
                 case RIGHT_ARROW: // Move cursor right
-                case KEY_RESIZE: // Refresh window on resize
+                case KEY_RESIZE: 
                     break;
                 default: { // Handle other characters
                     Row *cur = &buffer->rows[buffer->row_index];
@@ -1518,146 +1517,146 @@ int main(int argc, char **argv) {
             mvwprintw(status_bar, 1, 0, "%s", status_bar_msg);
             wrefresh(status_bar);
             sleep(1);
-            // Clear the status bar
             wclear(status_bar);
             is_print_msg = 0;
+        } // end of is_print_msg
 
-            // If the mode is COMMAND or SEARCH, print the command to the status bar
-            if(mode == COMMAND || mode == SEARCH) {
-                mvwprintw(status_bar, 1, 0, ":%.*s", (int)command_s, command);
-            }
+        if(mode == COMMAND || mode == SEARCH) {
+            mvwprintw(status_bar, 1, 0, ":%.*s", (int)command_s, command);
+        }
 
-            // Print the current mode and cursor position to the status bar
-            mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
-            mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer->row_index+1, buffer->cur_pos+1);
+        mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
+        mvwprintw(status_bar, 0, gcol/2, "%.3zu:%.3zu", buffer->row_index+1, buffer->cur_pos+1);
 
-            // Adjust the line rendering start based on the current row index
-            if(buffer->row_index <= line_render_start) line_render_start = buffer->row_index;
-            if(buffer->row_index >= line_render_start+main_row) line_render_start = buffer->row_index-main_row+1;
+        // Adjust the line rendering start based on the current row index
+        if(buffer->row_index <= line_render_start) line_render_start = buffer->row_index;
+        if(buffer->row_index >= line_render_start+main_row) line_render_start = buffer->row_index-main_row+1;
 
-            // Adjust the column rendering start based on the current cursor position
-            if(buffer->cur_pos <= col_render_start) col_render_start = buffer->cur_pos;
-            if(buffer->cur_pos >= col_render_start+main_col) col_render_start = buffer->cur_pos-main_col+1;
+        // Adjust the column rendering start based on the current cursor position
+        if(buffer->cur_pos <= col_render_start) col_render_start = buffer->cur_pos;
+        if(buffer->cur_pos >= col_render_start+main_col) col_render_start = buffer->cur_pos-main_col+1;
 
-            // Loop through the lines to be rendered
-            for(size_t i = line_render_start; i <= line_render_start+main_row; i++) {
-                if(i <= buffer->row_s) {
-                    size_t print_index_y = i - line_render_start;
+        for(size_t i = line_render_start; i <= line_render_start+main_row; i++) {
+            if(i <= buffer->row_s) {
+                size_t print_index_y = i - line_render_start;
 
-                    // Set the line number color to yellow
-                    wattron(line_num_win, COLOR_PAIR(YELLOW_COLOR));
+                // Set the line number color to yellow
+                wattron(line_num_win, COLOR_PAIR(YELLOW_COLOR));
 
-                    // Print the line number, either relative or absolute
-                    if(relative_nums) {
-                        if(buffer->row_index == i) mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
-                        else mvwprintw(line_num_win, print_index_y, 0, "%4zu", 
-                                    (size_t)abs((int)i-(int)buffer->row_index));
-                    } else {
+                if(relative_nums) {
+                    if(buffer->row_index == i) {
                         mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                     }
-
-                    // Turn off the yellow color
-                    wattroff(line_num_win, COLOR_PAIR(YELLOW_COLOR));
-
-                    size_t off_at = 0;
-
-                    // Initialize the token array for syntax highlighting
-                    size_t token_capacity = 32;
-                    Token *token_arr = malloc(sizeof(Token)*token_capacity);
-                    size_t token_s = 0;
-
-                    // If syntax highlighting is enabled, generate the tokens for the current line
-                    if(syntax) {
-                        token_s = generate_tokens(buffer->rows[i].contents, 
-                                                            buffer->rows[i].size, token_arr, &token_capacity);
+                    else {
+                        mvwprintw(line_num_win, print_index_y, 0, "%4zu", 
+                                (size_t)abs((int)i-(int)buffer->row_index));
                     }
-                    
-                    Color_Pairs color = 0;
-
-                size_t j = 0;
-                for(j = col_render_start; j <= col_render_start+main_col; j++) {
-                    size_t keyword_size = 0;
-                    if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, 
-                                                    &color)) {
-                        wattron(main_win, COLOR_PAIR(color));
-                        off_at = j + keyword_size;
-                    }
-                    if(syntax && j == off_at) wattroff(main_win, COLOR_PAIR(color));
-                    if(mode == VISUAL) {
-                        if(buffer->visual.starting_pos.y == buffer->visual.ending_pos.y) {
-
-                        }
-                        Point point = {.x = j, .y = i};
-                        int between = 0;
-                        if(buffer->visual.starting_pos.y > buffer->visual.ending_pos.y || 
-                          (buffer->visual.starting_pos.y == buffer->visual.ending_pos.y &&
-                           buffer->visual.starting_pos.x > buffer->visual.ending_pos.x)) {
-                            between = is_between(buffer->visual.ending_pos, buffer->visual.starting_pos, point);
-                        } else {
-                            between = is_between(buffer->visual.starting_pos, buffer->visual.ending_pos, point);
-                        }
-                        if(between) {
-                            wattron(main_win, A_STANDOUT);
-                        }
-                    }
-                    size_t print_index_x = j - col_render_start;
-                    mvwprintw(main_win, print_index_y, print_index_x, "%c", buffer->rows[i].contents[j]);
-                    wattroff(main_win, A_STANDOUT);
+                } else {
+                    mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
                 }
-                free(token_arr);
 
+                // Turn off the yellow color
+                wattroff(line_num_win, COLOR_PAIR(YELLOW_COLOR));
+
+                size_t off_at = 0;
+
+                // Initialize the token array for syntax highlighting
+                size_t token_capacity = 32;
+                Token *token_arr = malloc(sizeof(Token)*token_capacity);
+                size_t token_s = 0;
+
+                // If syntax highlighting is enabled, generate the tokens for the current line
+                if(syntax) {
+                    token_s = generate_tokens(buffer->rows[i].contents, 
+                                                        buffer->rows[i].size, token_arr, &token_capacity);
+                }
+                
+                Color_Pairs color = 0;
+
+            size_t j = 0;
+            for(j = col_render_start; j <= col_render_start+main_col; j++) {
+                size_t keyword_size = 0;
+                if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, 
+                                                &color)) {
+                    wattron(main_win, COLOR_PAIR(color));
+                    off_at = j + keyword_size;
+                }
+                if(syntax && j == off_at) wattroff(main_win, COLOR_PAIR(color));
+                if(mode == VISUAL) {
+                    if(buffer->visual.starting_pos.y == buffer->visual.ending_pos.y) {
+
+                    }
+                    Point point = {.x = j, .y = i};
+                    int between = 0;
+                    if(buffer->visual.starting_pos.y > buffer->visual.ending_pos.y || 
+                      (buffer->visual.starting_pos.y == buffer->visual.ending_pos.y &&
+                       buffer->visual.starting_pos.x > buffer->visual.ending_pos.x)) {
+                        between = is_between(buffer->visual.ending_pos, buffer->visual.starting_pos, point);
+                    } else {
+                        between = is_between(buffer->visual.starting_pos, buffer->visual.ending_pos, point);
+                    }
+                    if(between) {
+                        wattron(main_win, A_STANDOUT);
+                    }
+                }
+                size_t print_index_x = j - col_render_start;
+                mvwprintw(main_win, print_index_y, print_index_x, "%c", buffer->rows[i].contents[j]);
+                wattroff(main_win, A_STANDOUT);
             }
+            free(token_arr);
+
         }
+    }
 
-        refresh_all(windows, windows_s);
+    refresh_all(windows, windows_s);
 
-        size_t repeating_count = 1;
+    size_t repeating_count = 1;
 
-        y = buffer->row_index-line_render_start;
-        x = buffer->cur_pos-col_render_start;
+    y = buffer->row_index-line_render_start;
+    x = buffer->cur_pos-col_render_start;
 
-        if(repeating) {
-            mvwprintw(status_bar, 1, gcol-10, "r");
-            wrefresh(status_bar);
-        }
+    if(repeating) {
+        mvwprintw(status_bar, 1, gcol-10, "r");
+        wrefresh(status_bar);
+    }
 
-        if(mode != COMMAND && mode != SEARCH) {
-            wmove(main_win, y, x);
-            ch = wgetch(main_win);
-        } else if(mode == COMMAND){
-            wmove(status_bar, 1, buffer->cur_pos+1);
-            ch = wgetch(status_bar);
-        } else {
-            wmove(status_bar, 1, buffer->cur_pos+1);
-            ch = wgetch(status_bar);
-        }
-
-        if(repeating) {
-            char num[32] = {0};
-            size_t num_s = 0;
-            while(isdigit(ch)) {
-                num[num_s++] = ch;
-                mvwprintw(status_bar, 1, (gcol-10)+num_s, "%c", num[num_s-1]);
-                wrefresh(status_bar);
-                ch = wgetch(main_win);
-            }
-            repeating_count = atoi(num);
-            repeating = 0;
-        }
-
+    if(mode != COMMAND && mode != SEARCH) {
         wmove(main_win, y, x);
+        ch = wgetch(main_win);
+    } else if(mode == COMMAND){
+        wmove(status_bar, 1, buffer->cur_pos+1);
+        ch = wgetch(status_bar);
+    } else {
+        wmove(status_bar, 1, buffer->cur_pos+1);
+        ch = wgetch(status_bar);
+    }
 
-        // TODO: move a lot of these extra variables into buffer struct
-        for(size_t i = 0; i < repeating_count; i++) {
-            handle_keys(buffer, &buffer, &state, main_win, status_bar, &y, ch, command, &command_s, 
-                        &repeating, &repeating_count, &normal_pos, &is_print_msg, status_bar_msg);
+    if(repeating) {
+        char num[32] = {0};
+        size_t num_s = 0;
+        while(isdigit(ch)) {
+            num[num_s++] = ch;
+            mvwprintw(status_bar, 1, (gcol-10)+num_s, "%c", num[num_s-1]);
+            wrefresh(status_bar);
+            ch = wgetch(main_win);
         }
-        if(mode != COMMAND && mode != SEARCH && buffer->cur_pos > buffer->rows[buffer->row_index].size) {
-            buffer->cur_pos = buffer->rows[buffer->row_index].size;
-        }
-        x = buffer->cur_pos;
-        y = buffer->row_index;
-        getyx(main_win, y, x);
+        repeating_count = atoi(num);
+        repeating = 0;
+    }
+
+    wmove(main_win, y, x);
+
+    // TODO: move a lot of these extra variables into buffer struct
+    for(size_t i = 0; i < repeating_count; i++) {
+        handle_keys(buffer, &buffer, &state, main_win, status_bar, &y, ch, command, &command_s, 
+                    &repeating, &repeating_count, &normal_pos, &is_print_msg, status_bar_msg);
+    }
+    if(mode != COMMAND && mode != SEARCH && buffer->cur_pos > buffer->rows[buffer->row_index].size) {
+        buffer->cur_pos = buffer->rows[buffer->row_index].size;
+    }
+    x = buffer->cur_pos;
+    y = buffer->row_index;
+    getyx(main_win, y, x);
     }
 
     refresh_all(windows, windows_s);
