@@ -172,6 +172,9 @@ Color_Arr parse_syntax_file(char *filename) {
         words[words_s].data = cur;
         cur += cur_size;
         words[words_s++].len = cur_size-1;
+        if(words_s < 4) {
+            return (Color_Arr){0};
+        }
 
         Custom_Color color = {0};
         color.custom_id = i+8;
@@ -180,10 +183,20 @@ Color_Arr parse_syntax_file(char *filename) {
         color.custom_g = view_to_int(words[2]);
         color.custom_b = view_to_int(words[3]);
         if(cur_type == 'k') {
-            keywords = malloc(sizeof(char*)*words_s-3);
+            if(words_s > 4) {
+                keywords = malloc(sizeof(char*)*words_s-3);
+            } else {
+                keywords = malloc(sizeof(char*)*NUM_KEYWORDS);
+                memcpy(keywords, keywords_old, sizeof(char*)*NUM_KEYWORDS);
+            }
             color.custom_slot = 4;
         } else if(cur_type == 't') {
-            types = malloc(sizeof(char*)*words_s-3);
+            if(words_s > 4) {
+                types = malloc(sizeof(char*)*words_s-3);
+            } else {
+                types = malloc(sizeof(char*)*NUM_TYPES);
+                memcpy(types, types_old, sizeof(char*)*NUM_TYPES);
+            }
             color.custom_slot = 1;
         } else if(cur_type == 'w') {
             color.custom_slot = 2;
@@ -203,6 +216,7 @@ Color_Arr parse_syntax_file(char *filename) {
                     break;
             }
         }
+
         color_arr[arr_s++] = color;
     }
     Color_Arr arr = {
