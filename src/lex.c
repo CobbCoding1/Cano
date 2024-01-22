@@ -64,8 +64,8 @@ size_t types_s = 0;
 
 char *comments = "//";
 
-#define NUM_KEYWORDS sizeof(keywords)/sizeof(*keywords)
-#define NUM_TYPES sizeof(types)/sizeof(*types)
+#define NUM_KEYWORDS sizeof(keywords_old)/sizeof(*keywords_old)
+#define NUM_TYPES sizeof(types_old)/sizeof(*types_old)
 
 typedef struct {
     Token_Type type;
@@ -108,7 +108,7 @@ size_t read_file_to_str(char *filename, char **contents) {
     fseek(file, 0, SEEK_END);
     size_t length = ftell(file);
     fseek(file, 0, SEEK_SET);
-    *contents = malloc(sizeof(char)*length);
+    *contents = malloc(sizeof(char)*length+1);
     fread(*contents, 1, length, file);
     fclose(file);
     contents[length] = '\0';
@@ -186,16 +186,16 @@ Color_Arr parse_syntax_file(char *filename) {
             if(words_s > 4) {
                 keywords = malloc(sizeof(char*)*words_s-3);
             } else {
-                keywords = malloc(sizeof(char*)*NUM_KEYWORDS);
-                memcpy(keywords, keywords_old, sizeof(char*)*NUM_KEYWORDS);
+                keywords = keywords_old;
+                keywords_s = NUM_KEYWORDS;
             }
             color.custom_slot = 4;
         } else if(cur_type == 't') {
             if(words_s > 4) {
                 types = malloc(sizeof(char*)*words_s-3);
             } else {
-                types = malloc(sizeof(char*)*NUM_TYPES);
-                memcpy(types, types_old, sizeof(char*)*NUM_TYPES);
+                types = types_old;
+                types_s = NUM_TYPES;
             }
             color.custom_slot = 1;
         } else if(cur_type == 'w') {
@@ -210,8 +210,6 @@ Color_Arr parse_syntax_file(char *filename) {
                 case 't':
                     types[types_s++] = view_to_cstr(view_trim_left(words[j]));
                     break;
-                case 'w':
-                    break;
                 default:
                     break;
             }
@@ -225,6 +223,7 @@ Color_Arr parse_syntax_file(char *filename) {
     };
 
     free(lines);
+    free(contents);
 
     return arr; 
 }

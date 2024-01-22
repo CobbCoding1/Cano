@@ -337,14 +337,6 @@ void resize_rows(Buffer *buffer, size_t capacity) {
     buffer->row_capacity = capacity * 2;
 }
 
-void push_window(WINDOW *windows[16], size_t *windows_s, WINDOW *win) {
-    windows[(*windows_s)++] = win;
-}
-
-void refresh_all(WINDOW *windows[16], size_t windows_s) {
-    for(size_t i = 0; i < windows_s; i++) wrefresh(windows[i]);
-}
-
 void write_log(const char *message) {
     FILE *file = fopen("logs/cano.log", "a");
     if (file == NULL) {
@@ -1359,13 +1351,6 @@ int main(int argc, char **argv) {
 
     WINDOW *status_bar = newwin(2, gcol, grow-2, 0);
 
-    WINDOW *windows[16] = {0};
-    size_t  windows_s = 0; 
-    push_window(windows, &windows_s, main_win);
-    push_window(windows, &windows_s, line_num_win);
-    push_window(windows, &windows_s, status_bar);
-
-    refresh_all(windows, windows_s);
     keypad(main_win, TRUE);
     keypad(status_bar, TRUE);
 
@@ -1457,25 +1442,7 @@ int main(int argc, char **argv) {
         }
     }
 
-
-
     write_log("finished loading config");
-
-
-    /*
-    Syntax_Highlighting token_indexes[128] = {0};
-    size_t token_indexes_s = 0;
-
-    for(size_t i = 0; i < buffer->row_s; i++) {
-        size_t token_capacity = 32;
-        Token *token_arr = malloc(sizeof(Token)*token_capacity);
-        size_t token_s = generate_tokens(buffer->rows[i].contents, buffer->rows[i].size, token_arr, &token_capacity);
-        for(size_t j = 0; j < token_s; j++) {
-            token_indexes[token_indexes_s++] = (Syntax_Highlighting){.row = i, .col=token_arr[j].index, .size=token_arr[j].size};
-        }
-        free(token_arr);
-    }
-    */
 
     size_t x = 0; 
     size_t y = 0;
@@ -1593,61 +1560,62 @@ int main(int argc, char **argv) {
             }
             free(token_arr);
 
+            }
         }
-    }
 
-    refresh_all(windows, windows_s);
-
-    size_t repeating_count = 1;
-
-    y = buffer->row_index-line_render_start;
-    x = buffer->cur_pos-col_render_start;
-
-    if(repeating) {
-        mvwprintw(status_bar, 1, gcol-10, "r");
+        wrefresh(main_win);
         wrefresh(status_bar);
-    }
+        wrefresh(line_num_win);
 
-    if(mode != COMMAND && mode != SEARCH) {
-        wmove(main_win, y, x);
-        ch = wgetch(main_win);
-    } else if(mode == COMMAND){
-        wmove(status_bar, 1, buffer->cur_pos+1);
-        ch = wgetch(status_bar);
-    } else {
-        wmove(status_bar, 1, buffer->cur_pos+1);
-        ch = wgetch(status_bar);
-    }
+        size_t repeating_count = 1;
 
-    if(repeating) {
-        char num[32] = {0};
-        size_t num_s = 0;
-        while(isdigit(ch)) {
-            num[num_s++] = ch;
-            mvwprintw(status_bar, 1, (gcol-10)+num_s, "%c", num[num_s-1]);
+        y = buffer->row_index-line_render_start;
+        x = buffer->cur_pos-col_render_start;
+
+        if(repeating) {
+            mvwprintw(status_bar, 1, gcol-10, "r");
             wrefresh(status_bar);
-            ch = wgetch(main_win);
         }
-        repeating_count = atoi(num);
-        repeating = 0;
+
+        if(mode != COMMAND && mode != SEARCH) {
+            wmove(main_win, y, x);
+            ch = wgetch(main_win);
+        } else if(mode == COMMAND){
+            wmove(status_bar, 1, buffer->cur_pos+1);
+            ch = wgetch(status_bar);
+        } else {
+            wmove(status_bar, 1, buffer->cur_pos+1);
+            ch = wgetch(status_bar);
+        }
+
+        if(repeating) {
+            char num[32] = {0};
+            size_t num_s = 0;
+            while(isdigit(ch)) {
+                num[num_s++] = ch;
+                mvwprintw(status_bar, 1, (gcol-10)+num_s, "%c", num[num_s-1]);
+                wrefresh(status_bar);
+                ch = wgetch(main_win);
+            }
+            repeating_count = atoi(num);
+            repeating = 0;
+        }
+
+        wmove(main_win, y, x);
+
+        // TODO: move a lot of these extra variables into buffer struct
+        for(size_t i = 0; i < repeating_count; i++) {
+            handle_keys(buffer, &buffer, &state, main_win, status_bar, &y, ch, command, &command_s, 
+                        &repeating, &repeating_count, &normal_pos, &is_print_msg, status_bar_msg);
+        }
+        if(mode != COMMAND && mode != SEARCH && buffer->cur_pos > buffer->rows[buffer->row_index].size) {
+            buffer->cur_pos = buffer->rows[buffer->row_index].size;
+        }
+        x = buffer->cur_pos;
+        y = buffer->row_index;
+        getyx(main_win, y, x);
     }
 
-    wmove(main_win, y, x);
-
-    // TODO: move a lot of these extra variables into buffer struct
-    for(size_t i = 0; i < repeating_count; i++) {
-        handle_keys(buffer, &buffer, &state, main_win, status_bar, &y, ch, command, &command_s, 
-                    &repeating, &repeating_count, &normal_pos, &is_print_msg, status_bar_msg);
-    }
-    if(mode != COMMAND && mode != SEARCH && buffer->cur_pos > buffer->rows[buffer->row_index].size) {
-        buffer->cur_pos = buffer->rows[buffer->row_index].size;
-    }
-    x = buffer->cur_pos;
-    y = buffer->row_index;
-    getyx(main_win, y, x);
-    }
-
-    refresh_all(windows, windows_s);
     endwin();
 
     free_buffer(&buffer);
