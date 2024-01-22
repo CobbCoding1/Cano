@@ -80,6 +80,28 @@ set-var syntax 1
 set-var indent 2 
 ```
 
+There is a secondary config file, which is for custom syntax highlighting. It is stored in the same folder as the regular config, but uses a different naming format.
+An example is ~/.config/cano/c.cyntax (spelled cyntax, with a c). The c can be replaced with whatever the file extension of your language is, such as go.cyntax for Golang.
+Here is an example of a cyntax file:
+```sh
+k,170,68,68,
+auto,struct,break,else,switch,case,
+enum,register,typedef,extern,return,
+union,continue,for,signed,void,do,
+if,static,while,default,goto,sizeof,
+volatile,const,unsigned.
+t,255,165,0,
+double,size_t,int,
+long,char,float,short.
+w,128,160,255.
+```
+There's a bit to unpack here, basically the single characters represent the type of the keywords:
+k - Keyword
+t - Type
+w - Word
+The type is then followed by the RGB values, all comma separated without spaces. After the RGB values, there is the actual keywords. End each type with a dot '.' as seen above, to indicate to Cano that the list is finished. The words are meant to be left blank, as it will highlight any words not found in the keywords above with the chosen RGB color.
+If you wish to only set the color, you can provide no keywords to any, and it will fill in the keywords with C keywords by default.
+
 ## Config Variables
 ```sh
 relative # toggle relative line numbers
