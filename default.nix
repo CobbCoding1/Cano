@@ -5,7 +5,7 @@ pkgs.stdenv.mkDerivation {
     phases = ["unpackPhase" "buildPhase" "installPhase"];
     buildInputs = with pkgs; [ ncurses ];
     buildPhase = ''
-      $CC -I${pkgs.ncurses}/include -L${pkgs.ncurses}/lib -lncurses src/main.c -o cano -Wall -Wextra -pedantic
+      ${pkgs.stdenv.cc}/bin/cc -I${pkgs.ncurses}/include -L${pkgs.ncurses}/lib -lncurses -lm src/main.c -o cano -Wall -Wextra -pedantic
     '';
     installPhase = ''
       mkdir -p $out/bin
