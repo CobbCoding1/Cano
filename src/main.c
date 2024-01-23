@@ -991,13 +991,15 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                 case '\b':
                 case 127:
                 case KEY_BACKSPACE: { 
-                    if(buffer->cur_pos == 0 && buffer->row_index != 0) {
-                        // Move to previous row and delete current row
-                        Row *cur = &buffer->rows[--buffer->row_index];
-                        buffer->cur_pos = cur->size;
-                        wmove(main_win, buffer->row_index, buffer->cur_pos);
-                        delete_and_append_row(buffer, buffer->row_index+1);
-                    } else if(buffer->cur_pos != 0) {
+                    if(buffer->cur_pos == 0) {
+                        if(buffer->row_index != 0) {
+                            // Move to previous row and delete current row
+                            Row *cur = &buffer->rows[--buffer->row_index];
+                            buffer->cur_pos = cur->size;
+                            wmove(main_win, buffer->row_index, buffer->cur_pos);
+                            delete_and_append_row(buffer, buffer->row_index+1);
+                        }
+                    } else {
                         Row *cur = &buffer->rows[buffer->row_index];
                         shift_row_left(cur, --buffer->cur_pos);
                         wmove(main_win, *y, buffer->cur_pos);
