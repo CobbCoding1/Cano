@@ -997,7 +997,7 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                         buffer->cur_pos = cur->size;
                         wmove(main_win, buffer->row_index, buffer->cur_pos);
                         delete_and_append_row(buffer, buffer->row_index+1);
-                    } else {
+                    } else if(buffer->cur_pos != 0) {
                         Row *cur = &buffer->rows[buffer->row_index];
                         shift_row_left(cur, --buffer->cur_pos);
                         wmove(main_win, *y, buffer->cur_pos);
