@@ -93,7 +93,7 @@ char *strip_off_dot(char *str, size_t str_s) {
     char *result = NULL;
     for(size_t i = 0; i < str_s; i++) {
         if(str[i] == '.') {
-            result = malloc(sizeof(char)*str_s-i);
+            result = malloc(sizeof(char)*str_s-i+1);
             strncpy(result, str+i+1, str_s-i+1);
         }
     }
