@@ -112,12 +112,28 @@ undo-size # size of undo history
 ```
 
 # Installing
-Currently, the only way to install is to build the package, or use the AUR.
 
-If using yay, do the following:
+## Arch
+
+A package is provided within this [AUR](https://aur.archlinux.org).
+You can install it using your preferred aur helper:
+
+For instance, if using yay, do the following:
 ```sh
 yay -S cano-git
 ```
+
+## Nix / NixOS
+
+If you are using NixOS or have installed the [nix package manager](https://nixos.org),
+you can run cano using the following command:
+
+```sh
+nix run github:CobbCoding1/Cano
+```
+
+A flake a provided within the repository, including the package and a devShell.
+
 
 ## Contributing
 Cano is open to contributors. That does not mean that your pull request will be merged. \
