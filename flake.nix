@@ -14,26 +14,16 @@
 
       packages = rec {
         default = cano;
-        cano = pkgs.stdenv.mkDerivation rec {
+        cano = pkgs.stdenv.mkDerivation {
           name = "cano";
           src = ./.;
 
-          buildInputs = with pkgs; [ ncurses ];
+          buildInputs = with pkgs; [ gnumake ncurses ];
           hardeningDisable = [ "format" "fortify" ];
-
-          buildPhase = ''
-            runHook preBuild
-
-            ${pkgs.stdenv.cc}/bin/cc -o cano src/main.c \
-              -Wall -Wextra -pedantic \
-              -lncurses -lm
-
-            runHook postBuild
-          '';
 
           installPhase = ''
             mkdir -p $out/bin
-            cp ${name} $out/bin
+            cp build/cano $out/bin
           '';
         };
       };
