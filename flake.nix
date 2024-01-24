@@ -5,37 +5,35 @@
   };
 
   outputs = { nixpkgs, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (system: let
-      pkgs = nixpkgs.legacyPackages.${system};
-    in rec {
-      devShell = pkgs.mkShell {
-        inputsFrom = [ packages.cano ];
-      };
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
 
-      packages = rec {
-        default = cano;
-        cano = pkgs.stdenv.mkDerivation rec {
-          name = "cano";
-          src = ./.;
+        hardeningDisable = [ "format" "fortify" ];
+      in
+      rec {
+        devShell = pkgs.mkShell {
+          inherit hardeningDisable;
 
-          buildInputs = with pkgs; [ ncurses ];
-          hardeningDisable = [ "format" "fortify" ];
-
-          buildPhase = ''
-            runHook preBuild
-
-            ${pkgs.stdenv.cc}/bin/cc -o cano src/main.c \
-              -Wall -Wextra -pedantic \
-              -lncurses -lm
-
-            runHook postBuild
-          '';
-
-          installPhase = ''
-            mkdir -p $out/bin
-            cp ${name} $out/bin
-          '';
+          inputsFrom = [ packages.cano ];
         };
-      };
-    });
+
+        formatter = pkgs.nixpkgs-fmt;
+
+        packages = rec {
+          default = cano;
+          cano = pkgs.stdenv.mkDerivation rec {
+            inherit hardeningDisable;
+
+            name = "cano";
+            src = ./.;
+
+            buildInputs = with pkgs; [ gnumake ncurses ];
+            installPhase = ''
+              mkdir -p $out/bin
+              cp build/${name} $out/bin
+            '';
+          };
+        };
+      });
 }
