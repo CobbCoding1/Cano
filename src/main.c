@@ -147,13 +147,6 @@ void resize_row(Row **row, size_t capacity) {
     memset(new_contents+(*row)->size, 0, capacity-(*row)->size);
     (*row)->contents = new_contents;
     return;
-    (*row)->capacity = capacity;
-    if(new_contents == NULL) {
-        CRASH("no more ram");
-    }
-    memcpy(new_contents, (*row)->contents, sizeof(char)*(*row)->size);
-    free((*row)->contents);
-    (*row)->contents = new_contents;
 }
 
 void insert_char(Row *row, size_t pos, char c) {
@@ -314,7 +307,6 @@ int execute_command(Command *command, Buffer *buf, State *state) {
         free(buf->filename);
         buf->filename = calloc(command->args[0].size, sizeof(char));
         strncpy(buf->filename, filename, command->args[0].size);
-        for(size_t i = 0; i < command->args_s; i++) free(command->args[i].arg);
     } else if(command->command_s == 1 && strncmp(command->command, "e", 1) == 0) {
         QUIT = 1;
     } else if(command->command_s == 2 && strncmp(command->command, "we", 2) == 0) {
@@ -368,6 +360,7 @@ int execute_command(Command *command, Buffer *buf, State *state) {
     } else {
         return UNKNOWN_COMMAND;
     }
+    for(size_t i = 0; i < command->args_s; i++) free(command->args[i].arg);
     free(command->command);
     return NO_ERROR;
 }
@@ -1180,10 +1173,6 @@ int main(int argc, char **argv) {
         CRASH("your terminal does not support colors");
     }
 
-    // create a color
-    write_log("creating color");
-
-    // colors
     start_color();
     init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
     init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
@@ -1259,9 +1248,6 @@ int main(int argc, char **argv) {
     state.status_bar = status_bar;
     push_undo(&state.undo_stack, buffer);
 
-    write_log("finished loading");
-    write_log("loading config");
-
     // load config
     if(config_filename == NULL) {
         char default_config_filename[128] = {0};
@@ -1307,8 +1293,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    write_log("finished loading config");
-
     size_t x = 0; 
     size_t y = 0;
     while(ch != ctrl('q') && QUIT != 1) {
@@ -1339,7 +1323,7 @@ int main(int argc, char **argv) {
             sleep(1);
             wclear(state.status_bar);
             is_print_msg = 0;
-        } // end of is_print_msg
+        }
 
         if(mode == COMMAND || mode == SEARCH) {
             mvwprintw(state.status_bar, 1, 0, ":%.*s", (int)command_s, command);

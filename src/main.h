@@ -27,7 +27,6 @@
 
 #define ctrl(x) ((x) & 0x1f)
 
-#define BACKSPACE   263 
 #define ESCAPE      27
 #define SPACE       32 
 #define ENTER       10
@@ -36,7 +35,6 @@
 #define LEFT_ARROW  260 
 #define RIGHT_ARROW 261 
 
-#define MAX_ROWS 1024
 #define STARTING_ROWS_SIZE 128
 #define STARTING_ROW_SIZE 64 
 
