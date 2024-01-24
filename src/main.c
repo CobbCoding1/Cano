@@ -36,10 +36,9 @@
 #define LEFT_ARROW  260 
 #define RIGHT_ARROW 261 
 
-#define MAX_STRING_SIZE 1025
-
 #define MAX_ROWS 1024
-#define STARTING_ROW_SIZE 128
+#define STARTING_ROWS_SIZE 128
+#define STARTING_ROW_SIZE 64 
 
 typedef enum {
     NORMAL,
@@ -53,6 +52,7 @@ typedef enum {
 typedef struct {
     size_t index;
     size_t size;
+    size_t capacity;
     char *contents;
 } Row;
 
@@ -270,20 +270,28 @@ Buffer *copy_buffer(Buffer *buffer) {
     *buf = *buffer;
     size_t filename_s = strlen(buffer->filename)+1;
     buf->filename = malloc(filename_s*sizeof(char));
+    write_log("first");
     strncpy(buf->filename, buffer->filename, filename_s);
+    write_log("second");
     buf->rows = malloc(buffer->row_capacity*sizeof(Row));
     for(size_t i = 0; i < buffer->row_capacity; i++) {
-        buf->rows[i].contents = malloc(MAX_STRING_SIZE*sizeof(char));
-        memset(buf->rows[i].contents, 0, MAX_STRING_SIZE);
+        char msg[21] = {0};
+        sprintf(msg, "%zu", i);
+        write_log(msg);
+        buf->rows[i].contents = calloc(buffer->rows[i].capacity, sizeof(char));
+        //memset(buf->rows[i].contents, 0, buffer->rows[i].capacity);
     }
-    for(size_t i = 0; i < buffer->row_s+1; i++) {
+    write_log("third");
+    for(size_t i = 0; i <= buffer->row_s; i++) {
         Row *cur = &buffer->rows[i];
         char siz[64] = {0};
-        sprintf(siz, "%zu, %zu, %zu, %zu", buffer->rows[i].size, cur->size, buffer->row_s, buffer->row_capacity);
         buf->rows[i].size = cur->size; 
+        buf->rows[i].capacity = cur->capacity; 
         buf->rows[i].index = cur->index; 
+        sprintf(siz, "%zu, %zu, %zu, %zu", buf->rows[i].size, cur->size, buffer->row_s, buf->rows[i].capacity);
         strncpy(buf->rows[i].contents, cur->contents, buffer->rows[i].size);
     }
+    write_log("fourth");
     return buf;
 }
 
@@ -328,13 +336,40 @@ void resize_rows(Buffer *buffer, size_t capacity) {
     }
     memcpy(rows, buffer->rows, sizeof(Row)*buffer->row_capacity);
     buffer->rows = rows;
-    for(size_t i = buffer->row_s; i < capacity*2; i++) {
-        buffer->rows[i].contents = calloc(MAX_STRING_SIZE, sizeof(char));
+    for(size_t i = buffer->row_s+1; i < capacity*2; i++) {
+        buffer->rows[i].capacity = STARTING_ROW_SIZE;
+        buffer->rows[i].contents = calloc(buffer->rows[i].capacity, sizeof(char));
         if(buffer->rows[i].contents == NULL) {
             CRASH("no more ram");
         }
     }
     buffer->row_capacity = capacity * 2;
+}
+
+void resize_row(Row **row, size_t capacity) {
+    (*row)->capacity = capacity;
+    char *new_contents = realloc((*row)->contents, (*row)->capacity);
+    if(new_contents == NULL) {
+        CRASH("no more ram");
+    }
+    memset(new_contents+(*row)->size, 0, capacity-(*row)->size);
+    (*row)->contents = new_contents;
+    return;
+    (*row)->capacity = capacity;
+    //char *new_contents = calloc((*row)->capacity, sizeof(char));
+    if(new_contents == NULL) {
+        CRASH("no more ram");
+    }
+    memcpy(new_contents, (*row)->contents, sizeof(char)*(*row)->size);
+    free((*row)->contents);
+    (*row)->contents = new_contents;
+}
+
+void insert_char(Row *row, size_t pos, char c) {
+    if(pos >= row->capacity) {
+        resize_row(&row, row->capacity*2);
+    }
+    row->contents[pos] = c;
 }
 
 void write_log(const char *message) {
@@ -552,18 +587,20 @@ void shift_rows_left(Buffer *buf, size_t index) {
     for(size_t i = index; i < buf->row_s; i++) {
         Row *cur = &buf->rows[i];
         Row *next = &buf->rows[i+1];
+        if(next->size >= cur->capacity) resize_row(&cur, next->capacity);
         memset(cur->contents, 0, cur->size);
         strncpy(cur->contents, next->contents, next->size);
         cur->size = next->size;
+        cur->capacity = next->capacity;
     }
-    memset(buf->rows[buf->row_s].contents, 0, buf->rows[buf->row_s].size);
+    memset(buf->rows[buf->row_s].contents, 0, buf->rows[buf->row_s].capacity);
     buf->rows[buf->row_s].size = 0;
     buf->row_s--;
 }
 
 void shift_rows_right(Buffer *buf, size_t index) {
     if(buf->row_s+1 >= buf->row_capacity) resize_rows(buf, buf->row_capacity);
-    char *new = calloc(MAX_STRING_SIZE, sizeof(char));
+    char *new = calloc(STARTING_ROW_SIZE, sizeof(char));
     if(new == NULL) {
         CRASH("no more ram");
     }
@@ -573,6 +610,7 @@ void shift_rows_right(Buffer *buf, size_t index) {
     buf->rows[index] = (Row){0};
     buf->rows[index].contents = new;
     buf->rows[index].index = index;
+    buf->rows[index].capacity = STARTING_ROW_SIZE;
     buf->row_s++;
 }
 
@@ -594,7 +632,7 @@ void shift_row_right(Row *row, size_t index) {
 void delete_char(Buffer *buffer, size_t row, size_t col, size_t *y, WINDOW *main_win) {
     Row *cur = &buffer->rows[row];
     if(cur->size > 0 && col < cur->size) {
-        cur->contents[cur->size] = '\0';
+        insert_char(cur, cur->size, '\0');
         shift_row_left(cur, col);
         wmove(main_win, *y, col);
     }
@@ -627,7 +665,10 @@ void shift_str_right(char *str, size_t *str_s, size_t index) {
 #define NO_CLEAR_
 
 void append_rows(Row *a, Row *b) {
-    assert(a->size + b->size < MAX_STRING_SIZE);
+    if(a->size + b->size >= a->capacity) {
+        resize_row(&a, a->capacity+b->capacity);
+    }
+
     for(size_t i = 0; i < b->size; i++) {
         a->contents[(i + a->size)] = b->contents[i];
     }
@@ -637,12 +678,12 @@ void append_rows(Row *a, Row *b) {
 void delete_and_append_row(Buffer *buf, size_t index) {
     append_rows(&buf->rows[index-1], &buf->rows[index]);
     delete_row(buf, index);
-    //shift_rows_left(buf, index); 
 }
 
 void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t index) {
-    assert(index < MAX_STRING_SIZE);
+    assert(index < buf->rows[index].capacity);
     assert(dest_index > 0);
+
     size_t final_s = *str_s - index;
     char *temp = calloc(final_s, sizeof(char));
     if(temp == NULL) {
@@ -673,7 +714,7 @@ void create_newline_indent(Buffer *buffer, size_t num_of_braces) {
     }
     for(size_t i = 0; i < indent*num_of_braces; i++) {
         shift_row_right(cur, buffer->cur_pos);
-        cur->contents[buffer->cur_pos++] = ' ';
+        insert_char(cur, buffer->cur_pos++, ' ');
     }
 }
 
@@ -691,13 +732,21 @@ void read_file_to_buffer(Buffer *buffer, char *filename) {
     fseek(file, 0, SEEK_SET);
     char *buf = malloc(sizeof(char)*length);
     fread(buf, sizeof(char)*length, 1, file);
-    if(length > buffer->row_capacity) resize_rows(buffer, length);
+    if(length > buffer->row_capacity) {
+        resize_rows(buffer, length);
+    }
+
+    Row *cur = &buffer->rows[buffer->row_s];
     for(size_t i = 0; i+1 < length; i++) {
         if(buf[i] == '\n') {
             buffer->row_s++;
+            cur = &buffer->rows[buffer->row_s];
             continue;
         }
-        buffer->rows[buffer->row_s].contents[buffer->rows[buffer->row_s].size++] = buf[i];
+        cur->contents[cur->size++] = buf[i];
+        if(cur->size >= cur->capacity) {
+            resize_row(&cur, cur->capacity*2);
+        }
     }
 }
 
@@ -951,10 +1000,15 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                 } break;
                 case 'u': {
                     Buffer *new_buf = pop_undo(&state->undo_stack);
+                    write_log("fourth");
                     if(new_buf == NULL) break;
+                    write_log("fifth");
                     push_undo(&state->redo_stack, buffer);
+                    write_log("sixth");
                     free_buffer(&buffer);
+                    write_log("seventh");
                     *modify_buffer = new_buf;
+                    write_log("eighth");
                 } break;
                 case 'U': {
                     Buffer *new_buf = pop_undo(&state->redo_stack);
@@ -1042,20 +1096,20 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                         // TODO: use tabs instead of just 4 spaces
                         for(size_t i = 0; i < indent; i++) {
                             shift_row_right(cur, buffer->cur_pos);
-                            cur->contents[buffer->cur_pos++] = ' ';
+                            insert_char(cur, buffer->cur_pos++, ' ');
                         }
                     } else {
                         shift_row_right(cur, buffer->cur_pos);
-                        cur->contents[buffer->cur_pos++] = ch;
+                        insert_char(cur, buffer->cur_pos++, ch);
                     }
                     Brace next_ch = find_opposite_brace(ch); 
                     if(next_ch.brace != '0' && !next_ch.closing) {
                         shift_row_right(cur, buffer->cur_pos);
-                        cur->contents[buffer->cur_pos] = next_ch.brace;
+                        insert_char(cur, buffer->cur_pos, next_ch.brace);
                     } 
                     if(ch == '"' || ch == '\'') {
                         shift_row_right(cur, buffer->cur_pos);
-                        cur->contents[buffer->cur_pos] = ch;
+                        insert_char(cur, buffer->cur_pos, ch);
                     }
                 } break;
             }
@@ -1357,11 +1411,12 @@ int main(int argc, char **argv) {
     keypad(status_bar, TRUE);
 
     Buffer *buffer = malloc(sizeof(Buffer));
-    buffer->row_capacity = STARTING_ROW_SIZE;
-    buffer->rows = malloc(buffer->row_capacity * sizeof(Row));
+    buffer->row_capacity = STARTING_ROWS_SIZE;
+    buffer->rows = calloc(buffer->row_capacity, sizeof(Row));
     memset(buffer->rows, 0, sizeof(Row)*buffer->row_capacity);
     for(size_t i = 0; i < buffer->row_capacity; i++) {
-        buffer->rows[i].contents = calloc(MAX_STRING_SIZE, sizeof(char));
+        buffer->rows[i].capacity = STARTING_ROW_SIZE;
+        buffer->rows[i].contents = calloc(buffer->rows[i].capacity, sizeof(char));
         if(buffer->rows[i].contents == NULL) {
             CRASH("no more ram");
         }
@@ -1531,6 +1586,10 @@ int main(int argc, char **argv) {
                 Color_Pairs color = 0;
 
             size_t j = 0;
+            char line_msg[32];
+            sprintf(line_msg, "%zu", i);
+            write_log(buffer->rows[i].contents);
+            write_log(line_msg);
             for(j = col_render_start; j <= col_render_start+main_col; j++) {
                 size_t keyword_size = 0;
                 if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, 
@@ -1557,7 +1616,9 @@ int main(int argc, char **argv) {
                     }
                 }
                 size_t print_index_x = j - col_render_start;
-                mvwprintw(main_win, print_index_y, print_index_x, "%c", buffer->rows[i].contents[j]);
+                if(j <= buffer->rows[i].size) {
+                    mvwprintw(main_win, print_index_y, print_index_x, "%c", buffer->rows[i].contents[j]);
+                }
                 wattroff(main_win, A_STANDOUT);
             }
             free(token_arr);
