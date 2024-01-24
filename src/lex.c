@@ -343,7 +343,7 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
     return token_arr_s;
 }
 
-int read_file_by_lines(char *filename, char **lines, size_t *lines_s) {
+int read_file_by_lines(char *filename, char ***lines, size_t *lines_s) {
     FILE *file = fopen(filename, "r");
     if(file == NULL) {
         return 1;
@@ -356,7 +356,7 @@ int read_file_by_lines(char *filename, char **lines, size_t *lines_s) {
         return 1;
     }
 
-    char *contents = malloc(sizeof(char)*length);
+    char *contents =malloc(sizeof(char)*length);
     fread(contents, 1, length, file);
     fclose(file);
 
@@ -364,7 +364,7 @@ int read_file_by_lines(char *filename, char **lines, size_t *lines_s) {
     for(size_t i = 0; i < length; i++) {
         if(contents[i] == '\n') line_count++;
     }
-    free(lines);
+    free(*lines);
 
     char **new_lines = malloc(sizeof(*lines)*line_count);
 
@@ -382,7 +382,7 @@ int read_file_by_lines(char *filename, char **lines, size_t *lines_s) {
         current_line[current_line_s++] = contents[i];
     }
 
-    lines = new_lines;
+    *lines = new_lines;
 
     free(contents);
     return 0;

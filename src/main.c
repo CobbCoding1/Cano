@@ -254,12 +254,12 @@ void free_buffer(Buffer **buffer) {
 
 
 Buffer *copy_buffer(Buffer *buffer) {
-    Buffer *buf = malloc(sizeof(Buffer));
+    Buffer *buf = calloc(1, sizeof(Buffer));
     *buf = *buffer;
     size_t filename_s = strlen(buffer->filename)+1;
-    buf->filename = malloc(filename_s*sizeof(char));
+    buf->filename = calloc(filename_s, sizeof(char));
     strncpy(buf->filename, buffer->filename, filename_s);
-    buf->rows = malloc(buffer->row_capacity*sizeof(Row));
+    buf->rows = calloc(buffer->row_capacity, sizeof(Row));
     for(size_t i = 0; i < buffer->row_capacity; i++) {
         buf->rows[i].contents = calloc(buffer->rows[i].capacity, sizeof(char));
     }
@@ -279,9 +279,6 @@ void shift_undo_left(Undo *undo, size_t amount) {
         if(undo->buf_stack[0] != NULL) free_buffer(&undo->buf_stack[0]);
         for(size_t i = 1; i < undo->buf_stack_s; i++) {
             undo->buf_stack[i-1] = undo->buf_stack[i];
-        }
-        if(undo->buf_stack[undo->buf_stack_s] != NULL) {
-            //free_buffer(&undo->buf_stack[undo->buf_stack_s]);
         }
         undo->buf_stack_s--;
     }
@@ -479,7 +476,7 @@ Command parse_command(char *command, size_t command_s) {
     for(size_t i = 0; i < command_s; i++) {
         if(i == command_s-1 || command[i] == ' ') {
             cmd.command_s = (i == command_s-1) ? i+1 : i;
-            cmd.command = malloc(sizeof(char)*cmd.command_s);
+            cmd.command = calloc(cmd.command_s+1, sizeof(char));
             strncpy(cmd.command, command, cmd.command_s);
             args_start = i+1;
             break;
@@ -488,7 +485,7 @@ Command parse_command(char *command, size_t command_s) {
     if(args_start <= command_s) {
         for(size_t i = args_start; i < command_s; i++) {
             if(i == command_s-1 || command[i] == ' ') {
-                cmd.args[cmd.args_s].arg = malloc(sizeof(char)*i-args_start);
+                cmd.args[cmd.args_s].arg = calloc(i-args_start+1, sizeof(char));
                 strncpy(cmd.args[cmd.args_s].arg, command+args_start, i-args_start+1);
                 cmd.args[cmd.args_s++].size = i-args_start+1;
                 args_start = i+1;
@@ -504,7 +501,7 @@ int execute_command(Command *command, Buffer *buf, State *state) {
         if(command->args_s < 1) return INVALID_ARG; 
         char *filename = command->args[0].arg;
         free(buf->filename);
-        buf->filename = malloc(sizeof(char)*command->args[0].size);
+        buf->filename = calloc(command->args[0].size, sizeof(char));
         strncpy(buf->filename, filename, command->args[0].size);
         for(size_t i = 0; i < command->args_s; i++) free(command->args[i].arg);
     } else if(command->command_s == 1 && strncmp(command->command, "e", 1) == 0) {
@@ -518,27 +515,32 @@ int execute_command(Command *command, Buffer *buf, State *state) {
         if(command->args_s != 2) return INVALID_ARG;
         if(command->args[0].size >= 8 && strncmp(command->args[0].arg, "relative", 8) == 0) {
             if(command->args[1].size < 1) return INVALID_VALUE;
-            int value = atoi(command->args[1].arg);
+            int value = 0;
+            if(command->args[1].arg != NULL) value = atoi(command->args[1].arg);
             if(value != 0 && value != 1) return INVALID_VALUE;
             relative_nums = value;
         } else if(command->args[0].size >= 11 && strncmp(command->args[0].arg, "auto-indent", 11) == 0) {
             if(command->args[1].size < 1) return INVALID_VALUE;
-            int value = atoi(command->args[1].arg);
+            int value = 0;
+            if(command->args[1].arg != NULL) value = atoi(command->args[1].arg);
             if(value != 0 && value != 1) return INVALID_VALUE;
             auto_indent = value;
         } else if(command->args[0].size >= 6 && strncmp(command->args[0].arg, "indent", 6) == 0) {
             if(command->args[1].size < 1) return INVALID_VALUE;
-            int value = atoi(command->args[1].arg);
+            int value = 0;
+            if(command->args[1].arg != NULL) value = atoi(command->args[1].arg);
             if(value < 0) return INVALID_VALUE;
             indent = value;
         } else if(command->args[0].size >= 6 && strncmp(command->args[0].arg, "syntax", 6) == 0) {
             if(command->args[1].size < 1) return INVALID_VALUE;
-            int value = atoi(command->args[1].arg);
+            int value = 0;
+            if(command->args[1].arg != NULL) value = atoi(command->args[1].arg);
             if(value < 0) return INVALID_VALUE;
             syntax = value;
         } else if(command->args[0].size >= 9 && strncmp(command->args[0].arg, "undo-size", 9) == 0) {
             if(command->args[1].size < 1) return INVALID_VALUE;
-            int value = atoi(command->args[1].arg);
+            int value = 0;
+            if(command->args[1].arg != NULL && isdigit(command->args[1].arg[0])) value = atoi(command->args[1].arg);
             if(value < 0) return INVALID_VALUE;
             undo_size = value;
             state->undo_stack.buf_capacity = undo_size;
@@ -697,8 +699,9 @@ void create_newline_indent(Buffer *buffer, size_t num_of_braces) {
 
 
 void read_file_to_buffer(Buffer *buffer, char *filename) {
-    size_t filename_s = strlen(filename);
-    buffer->filename = malloc(sizeof(char)*filename_s);
+    size_t filename_s = strlen(filename)+1;
+    free(buffer->filename);
+    buffer->filename = calloc(filename_s, sizeof(char));
     strncpy(buffer->filename, filename, filename_s);
     FILE *file = fopen(filename, "a+");
     if(file == NULL) {
@@ -707,7 +710,7 @@ void read_file_to_buffer(Buffer *buffer, char *filename) {
     fseek(file, 0, SEEK_END);
     size_t length = ftell(file);
     fseek(file, 0, SEEK_SET);
-    char *buf = malloc(sizeof(char)*length);
+    char *buf = calloc(length, sizeof(char));
     fread(buf, sizeof(char)*length, 1, file);
     if(length > buffer->row_capacity) {
         resize_rows(buffer, length);
@@ -1374,10 +1377,12 @@ int main(int argc, char **argv) {
     keypad(main_win, TRUE);
     keypad(status_bar, TRUE);
 
-    Buffer *buffer = malloc(sizeof(Buffer));
+
+    Buffer *buffer = calloc(1, sizeof(Buffer));
     buffer->row_capacity = STARTING_ROWS_SIZE;
     buffer->rows = calloc(buffer->row_capacity, sizeof(Row));
-    memset(buffer->rows, 0, sizeof(Row)*buffer->row_capacity);
+    buffer->filename = calloc(sizeof("out.txt"), sizeof(char));
+    strncpy(buffer->filename, "out.txt", sizeof("out.txt"));
     for(size_t i = 0; i < buffer->row_capacity; i++) {
         buffer->rows[i].capacity = STARTING_ROW_SIZE;
         buffer->rows[i].contents = calloc(buffer->rows[i].capacity, sizeof(char));
@@ -1386,10 +1391,6 @@ int main(int argc, char **argv) {
         }
     }
     if(filename != NULL) read_file_to_buffer(buffer, filename);
-    else {
-        buffer->filename = malloc(sizeof(char)*sizeof("out.txt"));
-        strncpy(buffer->filename, "out.txt", sizeof("out.txt"));
-    }
 
     mvwprintw(status_bar, 0, 0, "%.7s", stringify_mode());
     wmove(main_win, 0, 0);
@@ -1403,7 +1404,7 @@ int main(int argc, char **argv) {
 
     size_t line_render_start = 0;
     size_t col_render_start = 0;
-    char *command = malloc(sizeof(char)*64);
+    char *command = calloc(64, sizeof(char));
     size_t command_s = 0;
 
     size_t normal_pos = 0;
@@ -1433,14 +1434,14 @@ int main(int argc, char **argv) {
 
         char *language = strip_off_dot(buffer->filename, strlen(buffer->filename));
         if(language != NULL) {
-            syntax_filename = malloc(sizeof(char)*strlen(config_dir)+strlen(language)+sizeof(".cyntax")+1);
+            syntax_filename = calloc(strlen(config_dir)+strlen(language)+sizeof(".cyntax")+1, sizeof(char));
             sprintf(syntax_filename, "%s/%s.cyntax", config_dir, language);
             free(language);
         }
     }
-    char **lines = malloc(sizeof(char)*2);
+    char **lines = calloc(2, sizeof(char*));
     size_t lines_s = 0;
-    int err = read_file_by_lines(config_filename, lines, &lines_s);
+    int err = read_file_by_lines(config_filename, &lines, &lines_s);
     if(err == 0) {
         for(size_t i = 0; i < lines_s; i++) {
             Command command = parse_command(lines[i], strlen(lines[i]));
@@ -1538,7 +1539,7 @@ int main(int argc, char **argv) {
 
                 // Initialize the token array for syntax highlighting
                 size_t token_capacity = 32;
-                Token *token_arr = malloc(sizeof(Token)*token_capacity);
+                Token *token_arr = calloc(token_capacity, sizeof(Token));
                 size_t token_s = 0;
 
                 // If syntax highlighting is enabled, generate the tokens for the current line
