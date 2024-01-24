@@ -560,10 +560,18 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
                 buffer->cur_pos = 0;
             }
             Row *cur = &buffer->rows[buffer->row_index];
-            while(buffer->cur_pos+1 < cur->size && cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
-            if(cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
-            while(cur->contents[buffer->cur_pos+1] != ' ' && buffer->cur_pos+1 < cur->size) {
-                buffer->cur_pos++;
+            if(isalnum(cur->contents[buffer->cur_pos+1])) {
+                while(buffer->cur_pos+1 < cur->size && isalnum(cur->contents[buffer->cur_pos+1])) {
+                    buffer->cur_pos++;
+                }
+            } else {
+                while(buffer->cur_pos < cur->size && !isalnum(cur->contents[buffer->cur_pos+1])) {
+                    buffer->cur_pos++;
+                }
+
+                while(buffer->cur_pos+1 < cur->size && isalnum(cur->contents[buffer->cur_pos+1])) {
+                    buffer->cur_pos++;
+                }
             }
         } break;
         case 'b': { // Move to the start of the previous word
@@ -572,8 +580,8 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
                 buffer->cur_pos = buffer->rows[buffer->row_index].size;
             }
             Row *cur = &buffer->rows[buffer->row_index];
-            if(cur->contents[buffer->cur_pos-1] == ' ') buffer->cur_pos--;
-            while(cur->contents[buffer->cur_pos-1] != ' ' && buffer->cur_pos > 0) {
+            if(buffer->cur_pos > 0 && !isalnum(cur->contents[buffer->cur_pos-1])) buffer->cur_pos--;
+            while(buffer->cur_pos > 0 && isalnum(cur->contents[buffer->cur_pos-1])) {
                 buffer->cur_pos--;
             }
         } break;
@@ -583,12 +591,15 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
                 buffer->cur_pos = 0;
             }
             Row *cur = &buffer->rows[buffer->row_index];
-            while(buffer->cur_pos+1 < cur->size && cur->contents[buffer->cur_pos+1] == ' ') {
+            if(isalnum(cur->contents[buffer->cur_pos])) {
+                while(buffer->cur_pos+1 < cur->size && isalnum(cur->contents[buffer->cur_pos])) {
+                    buffer->cur_pos++;
+                }
                 buffer->cur_pos++;
-            }
-            if(cur->contents[buffer->cur_pos-1] == ' ') buffer->cur_pos++;
-            while(cur->contents[buffer->cur_pos-1] != ' ' && buffer->cur_pos < cur->size) {
-                buffer->cur_pos++;
+            } else {
+                while(buffer->cur_pos < cur->size && !isalnum(cur->contents[buffer->cur_pos])) {
+                    buffer->cur_pos++;
+                }
             }
         } break;
         case LEFT_ARROW:
