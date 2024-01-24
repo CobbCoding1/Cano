@@ -4,7 +4,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra
 CFLAGS += -pedantic -Wpedantic
 
-LDLIBS := -lncurses -lm
+LDLIBS = -lncurses -lm
 
 VPATH += src
 SRC += main.c
