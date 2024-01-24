@@ -216,9 +216,6 @@ Ncurses_Color rgb_to_ncurses(int r, int g, int b) {
     color.r = (int) ((r / 256.0) * 1000);
     color.g = (int) ((g / 256.0) * 1000);
     color.b = (int) ((b / 256.0) * 1000);
-    char msg[64] = {0};
-    sprintf(msg, "-----------\n%i, %i, %i", color.r, color.g, color.b);
-    write_log(msg);
     return color;
 
 }
@@ -235,13 +232,6 @@ void create_color(Color *color) {
     // creates a color and adds it to the color array
 
     Ncurses_Color values = rgb_to_ncurses(color->red, color->green, color->blue);
-    char msg[64] = {0};
-    char msg2[64] = {0};
-    write_log("RGB BEFORE AND AFTER");
-    sprintf(msg, "%i, %i, %i", values.r, values.g, values.b);
-    sprintf(msg2, "%i, %i, %i", color->red, color->green, color->blue);
-    write_log(msg2);
-    write_log(msg);
 
     // applies the new colors.
 
@@ -251,8 +241,6 @@ void create_color(Color *color) {
 
 void free_buffer(Buffer **buffer) {
     for(size_t i = 0; i < (*buffer)->row_capacity; i++) {
-        char msg[42] = {0};
-        sprintf(msg, "%zu, %zu", i, (*buffer)->row_capacity);
         if((*buffer)->rows[i].contents != NULL) {
             free((*buffer)->rows[i].contents);
             (*buffer)->rows[i].contents = NULL;
@@ -270,28 +258,18 @@ Buffer *copy_buffer(Buffer *buffer) {
     *buf = *buffer;
     size_t filename_s = strlen(buffer->filename)+1;
     buf->filename = malloc(filename_s*sizeof(char));
-    write_log("first");
     strncpy(buf->filename, buffer->filename, filename_s);
-    write_log("second");
     buf->rows = malloc(buffer->row_capacity*sizeof(Row));
     for(size_t i = 0; i < buffer->row_capacity; i++) {
-        char msg[21] = {0};
-        sprintf(msg, "%zu", i);
-        write_log(msg);
         buf->rows[i].contents = calloc(buffer->rows[i].capacity, sizeof(char));
-        //memset(buf->rows[i].contents, 0, buffer->rows[i].capacity);
     }
-    write_log("third");
     for(size_t i = 0; i <= buffer->row_s; i++) {
         Row *cur = &buffer->rows[i];
-        char siz[64] = {0};
         buf->rows[i].size = cur->size; 
         buf->rows[i].capacity = cur->capacity; 
         buf->rows[i].index = cur->index; 
-        sprintf(siz, "%zu, %zu, %zu, %zu", buf->rows[i].size, cur->size, buffer->row_s, buf->rows[i].capacity);
         strncpy(buf->rows[i].contents, cur->contents, buffer->rows[i].size);
     }
-    write_log("fourth");
     return buf;
 }
 
@@ -356,7 +334,6 @@ void resize_row(Row **row, size_t capacity) {
     (*row)->contents = new_contents;
     return;
     (*row)->capacity = capacity;
-    //char *new_contents = calloc((*row)->capacity, sizeof(char));
     if(new_contents == NULL) {
         CRASH("no more ram");
     }
@@ -979,11 +956,6 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                             }
                             ++count;
 
-                            // temp message buffer
-                            char message[100];
-                            // format string to be logged later on
-                            sprintf(message, "%s", token);
-
                             // log for args.
                             token = strtok(NULL, "/");
                         }
@@ -1215,9 +1187,7 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
 
                         // search and replace
 
-                        write_log("changing color");
                         init_color(8, 250, 134, 107);
-                        write_log("changed color");
 
                         char str[128]; // replace with the maximum length of your command
                         strncpy(str, command+2, *command_s-2);
@@ -1237,13 +1207,7 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, WINDOW *m
                             }
                             ++count;
 
-                            // temp message buffer
-                            char message[100];
-                            // format string to be logged later on
-                            sprintf(message, "%s", token);
-
                             // log for args.
-                            write_log(message);
                             token = strtok(NULL, "/");
                         }
                         Point new_pos = search(buffer, args[0], strlen(args[0]));
@@ -1469,7 +1433,7 @@ int main(int argc, char **argv) {
 
         char *language = strip_off_dot(buffer->filename, strlen(buffer->filename));
         if(language != NULL) {
-            syntax_filename = malloc(sizeof(char)*strlen(config_dir)+strlen(language)+sizeof(".cyntax"));
+            syntax_filename = malloc(sizeof(char)*strlen(config_dir)+strlen(language)+sizeof(".cyntax")+1);
             sprintf(syntax_filename, "%s/%s.cyntax", config_dir, language);
             free(language);
         }
@@ -1586,10 +1550,6 @@ int main(int argc, char **argv) {
                 Color_Pairs color = 0;
 
             size_t j = 0;
-            char line_msg[32];
-            sprintf(line_msg, "%zu", i);
-            write_log(buffer->rows[i].contents);
-            write_log(line_msg);
             for(j = col_render_start; j <= col_render_start+main_col; j++) {
                 size_t keyword_size = 0;
                 if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, 
