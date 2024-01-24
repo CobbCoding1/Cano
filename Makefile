@@ -1,13 +1,14 @@
-CC = gcc 
+CC = gcc
 CFLAGS = -Wall -Wextra -pedantic -Wpedantic
-LIBS = -lncurses -lm
+DBFLAGS = -ggdb2
+LDFLAGS = -lncurses -lm
 SRC = src/
 OUT = build/
 
-cano: $(SRC)main.c
+cano: $(SRC)main.c 
 	@mkdir -p $(OUT) 
-	$(CC) $^ $(LIBS) -o $(OUT)cano $(CFLAGS)
+	$(CC) -o $(OUT)$@ $(CFLAGS) $^ $(LDFLAGS)
 
 debug: $(SRC)main.c
 	@mkdir -p $(OUT) 
-	$(CC) $^ $(LIBS) -o $(OUT)debug $(CFLAGS) -ggdb2 
+	$(CC) -o $(OUT)$@ $(CFLAGS) $(DBFLAGS) $^ $(LDFLAGS)
