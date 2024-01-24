@@ -1112,6 +1112,13 @@ void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state,
                             }
                         }
                     }
+                    if(buffer->visual.starting_pos.y < buffer->visual.ending_pos.y) {
+                        buffer->row_index = buffer->visual.starting_pos.y;
+                        buffer->cur_pos = buffer->visual.starting_pos.x;
+                    } else {
+                        buffer->row_index = buffer->visual.ending_pos.y;
+                        buffer->cur_pos = buffer->visual.ending_pos.x;
+                    }
                     mode = NORMAL;
                     curs_set(1);
                     break;
