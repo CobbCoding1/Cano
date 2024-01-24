@@ -1,4 +1,4 @@
-CC = cc 
+CC = gcc 
 CFLAGS = -Wall -Wextra -pedantic -Wpedantic
 LIBS = -lncurses -lm
 SRC = src/
