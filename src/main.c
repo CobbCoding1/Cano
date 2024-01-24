@@ -555,6 +555,10 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
             buffer->cur_pos = buffer->rows[buffer->row_index].size;
             break;
         case 'e': { // Move to the end of the next word
+            if(buffer->row_index < buffer->row_s && buffer->cur_pos >= buffer->rows[buffer->row_index].size) {
+                buffer->row_index++;
+                buffer->cur_pos = 0;
+            }
             Row *cur = &buffer->rows[buffer->row_index];
             while(buffer->cur_pos+1 < cur->size && cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
             if(cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
@@ -563,6 +567,10 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
             }
         } break;
         case 'b': { // Move to the start of the previous word
+            if(buffer->row_index > 0 && buffer->cur_pos <= 0) {
+                buffer->row_index--;
+                buffer->cur_pos = buffer->rows[buffer->row_index].size;
+            }
             Row *cur = &buffer->rows[buffer->row_index];
             if(cur->contents[buffer->cur_pos-1] == ' ') buffer->cur_pos--;
             while(cur->contents[buffer->cur_pos-1] != ' ' && buffer->cur_pos > 0) {
@@ -570,8 +578,14 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
             }
         } break;
         case 'w': { // Move to the start of the next word
+            if(buffer->row_index < buffer->row_s && buffer->cur_pos >= buffer->rows[buffer->row_index].size) {
+                buffer->row_index++;
+                buffer->cur_pos = 0;
+            }
             Row *cur = &buffer->rows[buffer->row_index];
-            while(buffer->cur_pos+1 < cur->size && cur->contents[buffer->cur_pos+1] == ' ') buffer->cur_pos++;
+            while(buffer->cur_pos+1 < cur->size && cur->contents[buffer->cur_pos+1] == ' ') {
+                buffer->cur_pos++;
+            }
             if(cur->contents[buffer->cur_pos-1] == ' ') buffer->cur_pos++;
             while(cur->contents[buffer->cur_pos-1] != ' ' && buffer->cur_pos < cur->size) {
                 buffer->cur_pos++;
