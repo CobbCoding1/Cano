@@ -568,7 +568,6 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
                 while(buffer->cur_pos < cur->size && !isalnum(cur->contents[buffer->cur_pos+1])) {
                     buffer->cur_pos++;
                 }
-
                 while(buffer->cur_pos+1 < cur->size && isalnum(cur->contents[buffer->cur_pos+1])) {
                     buffer->cur_pos++;
                 }
