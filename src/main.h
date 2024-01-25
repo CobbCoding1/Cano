@@ -109,9 +109,29 @@ typedef struct {
 } Undo;
 
 typedef struct {
+    int repeating;
+    size_t repeating_count;
+} Repeating;
+
+typedef struct {
     Undo undo_stack;
     Undo redo_stack;
     size_t num_of_braces;
+    int ch;
+
+    char *command;
+    size_t command_s;
+
+    Repeating repeating; 
+
+    int is_print_msg;
+    char *status_bar_msg;
+
+    size_t x;
+    size_t y;
+    size_t normal_pos;
+
+    // window sizes
     int main_row;
     int main_col;
     int grow;
@@ -120,6 +140,8 @@ typedef struct {
     int line_num_col;
     int status_bar_row;
     int status_bar_col;
+
+    // windows
     WINDOW *line_num_win;
     WINDOW *main_win;
     WINDOW *status_bar;
@@ -194,10 +216,7 @@ void read_file_to_buffer(Buffer *buffer, char *filename);
 int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count);
 int handle_modifying_keys(Buffer *buffer, int ch, WINDOW *main_win, size_t *y);
 int handle_normal_to_insert_keys(Buffer *buffer, State *state, int ch);
-void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state, 
-                 size_t *y, int ch, 
-                 char *command, size_t *command_s, int *repeating, size_t *repeating_count, size_t *normal_pos, 
-                 int *is_print_msg, char *status_bar_msg);
+void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state);
 int main(int argc, char **argv);
 
 #endif
