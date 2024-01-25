@@ -718,428 +718,448 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state, int ch) {
     return 1;
 }
 
+void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
+    switch(state->ch) {
+        case ':':
+            mode = COMMAND;
+            buffer->cur_pos = 0;
+            state->repeating.repeating_count = 1;
+            break;
+        case '/':
+            mode = SEARCH;
+            state->normal_pos = buffer->cur_pos;
+            buffer->cur_pos = 0;
+            reset_command(state->command, &state->command_s);
+            state->repeating.repeating_count = 1;
+            break;
+        case 'v':
+            mode = VISUAL;
+            buffer->visual.is_line = 0;
+            buffer->visual.starting_pos.x = buffer->cur_pos;
+            buffer->visual.starting_pos.y = buffer->row_index;
+            buffer->visual.ending_pos.x = buffer->cur_pos;
+            buffer->visual.ending_pos.y = buffer->row_index;
+            break;
+        case 'V':
+            mode = VISUAL;
+            buffer->visual.is_line = 1;
+            buffer->visual.starting_pos.x = 0;
+            buffer->visual.starting_pos.y = buffer->row_index;
+            buffer->visual.ending_pos.x = buffer->rows[buffer->row_index].size;
+            buffer->visual.ending_pos.y = buffer->row_index;
+            break;
+        case ctrl('o'): {
+            shift_rows_right(buffer, ++buffer->row_index);
+            buffer->cur_pos = 0;
+            if(auto_indent) {
+                if(state->num_of_braces > 0) {
+                    create_newline_indent(buffer, state->num_of_braces);
+                }
+            }
+        } break;
+        case 'R':
+            state->repeating.repeating = 1;
+            break;
+        case 'n': {
+            if(state->command_s > 2 && strncmp(state->command, "s/", 2) == 0) {
+                // search and replace
+
+                char str[128]; // replace with the maximum length of your command
+                strncpy(str, state->command+2, state->command_s-2);
+                str[state->command_s-2] = '\0'; // ensure null termination
+
+                char *token = strtok(str, "/");
+                int count = 0;
+                char args[2][100];
+
+                while (token != NULL) {
+                    char temp_buffer[100];
+                    strcpy(temp_buffer, token);
+                    if(count == 0) {
+                        strcpy(args[0], temp_buffer);
+                    } else if(count == 1) {
+                        strcpy(args[1], temp_buffer);
+                    }
+                    ++count;
+
+                    // log for args.
+                    token = strtok(NULL, "/");
+                }
+                Point new_pos = search(buffer, args[0], strlen(args[0]));
+                find_and_replace(buffer, args[0], args[1]);
+                buffer->cur_pos = new_pos.x;
+                buffer->row_index = new_pos.y;
+                break;
+
+            } 
+            Point new_pos = search(buffer, state->command, state->command_s);
+            buffer->cur_pos = new_pos.x;
+            buffer->row_index = new_pos.y;
+        } break;
+        case 'u': {
+            Buffer *new_buf = pop_undo(&state->undo_stack);
+            write_log("fourth");
+            if(new_buf == NULL) break;
+            write_log("fifth");
+            push_undo(&state->redo_stack, buffer);
+            write_log("sixth");
+            free_buffer(&buffer);
+            write_log("seventh");
+            *modify_buffer = new_buf;
+            write_log("eighth");
+        } break;
+        case 'U': {
+            Buffer *new_buf = pop_undo(&state->redo_stack);
+            if(new_buf == NULL) break; 
+            push_undo(&state->undo_stack, buffer);
+            free_buffer(&buffer);
+            *modify_buffer = new_buf;
+        } break;
+        case ctrl('s'): {
+            handle_save(buffer);
+            QUIT = 1;
+            state->repeating.repeating_count = 1;
+        } break;
+        case ESCAPE:
+            reset_command(state->command, &state->command_s);
+            mode = NORMAL;
+            break;
+        case KEY_RESIZE: {
+            getmaxyx(stdscr, state->grow, state->gcol);
+            wresize(state->main_win, state->grow-2, state->gcol-state->line_num_col);
+            wresize(state->status_bar, 2, state->gcol);
+            getmaxyx(state->main_win, state->main_row, state->main_col);
+            mvwin(state->main_win, 0, state->line_num_col);
+            wrefresh(state->main_win);
+        } break;
+        default: {
+            int motion = handle_motion_keys(buffer, state->ch, &state->repeating.repeating_count);
+            if(motion) break;
+            push_undo(&state->undo_stack, buffer);
+            int modified = handle_modifying_keys(buffer, state->ch, state->main_win, &state->y);
+            (void)modified;
+            int switched = handle_normal_to_insert_keys(buffer, state, state->ch);
+            if(switched) {
+                mode = INSERT;
+                state->repeating.repeating_count = 1;
+            }
+        } break;
+    }
+}
+
+void handle_insert_keys(Buffer *buffer, State *state) {
+    switch(state->ch) { 
+        case '\b':
+        case 127:
+        case KEY_BACKSPACE: { 
+            if(buffer->cur_pos == 0) {
+                if(buffer->row_index != 0) {
+                    // Move to previous row and delete current row
+                    Row *cur = &buffer->rows[--buffer->row_index];
+                    buffer->cur_pos = cur->size;
+                    wmove(state->main_win, buffer->row_index, buffer->cur_pos);
+                    delete_and_append_row(buffer, buffer->row_index+1);
+                }
+            } else {
+                Row *cur = &buffer->rows[buffer->row_index];
+                shift_row_left(cur, --buffer->cur_pos);
+                wmove(state->main_win, state->y, buffer->cur_pos);
+            }
+        } break;
+        case ESCAPE: // Switch to NORMAL mode
+            mode = NORMAL;
+            break;
+        case KEY_ENTER:
+        case ENTER: { 
+            Row *cur = &buffer->rows[buffer->row_index]; 
+            create_and_cut_row(buffer, buffer->row_index+1, &cur->size, buffer->cur_pos);
+            buffer->row_index++; 
+            buffer->cur_pos = 0;
+            if(state->num_of_braces > 0) {
+                create_newline_indent(buffer, state->num_of_braces);
+            }
+        } break;
+        case LEFT_ARROW: // Move cursor left
+        case DOWN_ARROW: // Move cursor down
+        case UP_ARROW:   // Move cursor up
+        case RIGHT_ARROW: // Move cursor right
+        case KEY_RESIZE: {
+            getmaxyx(stdscr, state->grow, state->gcol);
+            wresize(state->main_win, state->grow-2, state->gcol-state->line_num_col);
+            wresize(state->status_bar, 2, state->gcol);
+            getmaxyx(state->main_win, state->main_row, state->main_col);
+            mvwin(state->main_win, 0, state->line_num_col);
+            wrefresh(state->main_win);
+            wrefresh(state->status_bar);
+        } break;
+        default: { // Handle other characters
+            Row *cur = &buffer->rows[buffer->row_index];
+            // Handle special characters and indentation
+            Brace cur_brace = find_opposite_brace(cur->contents[buffer->cur_pos]);
+            if(
+                (cur_brace.brace != '0' && cur_brace.closing && 
+                 state->ch == find_opposite_brace(cur_brace.brace).brace) || 
+                (cur->contents[buffer->cur_pos] == '"' && state->ch == '"') ||
+                (cur->contents[buffer->cur_pos] == '\'' && state->ch == '\'')
+            ) {
+                buffer->cur_pos++;
+                break;
+            };
+            if(state->ch == 9) {
+                // TODO: use tabs instead of just 4 spaces
+                for(size_t i = 0; i < indent; i++) {
+                    shift_row_right(cur, buffer->cur_pos);
+                    insert_char(cur, buffer->cur_pos++, ' ');
+                }
+            } else {
+                shift_row_right(cur, buffer->cur_pos);
+                insert_char(cur, buffer->cur_pos++, state->ch);
+            }
+            Brace next_ch = find_opposite_brace(state->ch); 
+            if(next_ch.brace != '0' && !next_ch.closing) {
+                shift_row_right(cur, buffer->cur_pos);
+                insert_char(cur, buffer->cur_pos, next_ch.brace);
+            } 
+            if(state->ch == '"' || state->ch == '\'') {
+                shift_row_right(cur, buffer->cur_pos);
+                insert_char(cur, buffer->cur_pos, state->ch);
+            }
+        } break;
+    }
+}
+
+void handle_command_keys(Buffer *buffer, State *state) {
+    switch(state->ch) {
+        case '\b':
+        case 127:
+        case KEY_BACKSPACE: {
+            if(buffer->cur_pos != 0) {
+                shift_str_left(state->command, &state->command_s, --buffer->cur_pos);
+                wmove(state->status_bar, 1, buffer->cur_pos);
+            }
+        } break;
+        case ESCAPE:
+            reset_command(state->command, &state->command_s);
+            mode = NORMAL;
+            break;
+        case KEY_ENTER:
+        case ENTER: {
+            if(state->command[0] == '!') {
+                shift_str_left(state->command, &state->command_s, 0);
+                FILE *file = popen(state->command, "r");
+                if(file == NULL) {
+                    CRASH("could not run command");
+                }
+                while(fgets(state->status_bar_msg, sizeof(state->status_bar_msg), file) != NULL) {
+                    state->is_print_msg = 1;
+                }
+                pclose(file);
+            } else {
+                Command cmd = parse_command(state->command, state->command_s);
+                int err = execute_command(&cmd, buffer, state);
+                switch(err) {
+                    case NO_ERROR:
+                        break;
+                    case UNKNOWN_COMMAND:
+                        sprintf(state->status_bar_msg, "Unnown command: %s", cmd.command);
+                        state->is_print_msg = 1;
+                        break;
+                    case INVALID_ARG:
+                        sprintf(state->status_bar_msg, "Invalid arg %s\n", cmd.args[0].arg);
+                        state->is_print_msg = 1;
+                        break;
+                    case INVALID_VALUE:
+                        sprintf(state->status_bar_msg, "Invalid value %s\n", cmd.args[1].arg);
+                        state->is_print_msg = 1;
+                        break;
+                    default:
+                        sprintf(state->status_bar_msg, "err");
+                        state->is_print_msg = 1;
+                        break;
+                }
+            }
+            reset_command(state->command, &state->command_s);
+            mode = NORMAL;
+        } break;
+        case LEFT_ARROW:
+            if(buffer->cur_pos != 0) buffer->cur_pos--;
+            break;
+        case DOWN_ARROW:
+            break;
+        case UP_ARROW:
+            break;
+        case RIGHT_ARROW:
+            if(buffer->cur_pos < state->command_s) buffer->cur_pos++;
+            break;
+        default: {
+            shift_str_right(state->command, &state->command_s, buffer->cur_pos);
+            state->command[buffer->cur_pos++] = state->ch;
+        } break;
+    }
+}
+
+void handle_search_keys(Buffer *buffer, State *state) {
+    switch(state->ch) {
+        case '\b':
+        case 127:
+        case KEY_BACKSPACE: {
+            if(buffer->cur_pos != 0) {
+                shift_str_left(state->command, &state->command_s, --buffer->cur_pos);
+                wmove(state->status_bar, 1, buffer->cur_pos);
+            }
+        } break;
+        case ESCAPE:
+            buffer->cur_pos = state->normal_pos;
+            reset_command(state->command, &state->command_s);
+            mode = NORMAL;
+            break;
+        case ENTER: {
+            if(state->command_s > 2 && strncmp(state->command, "s/", 2) == 0) {
+                init_color(8, 250, 134, 107);
+
+                char str[128]; // replace with the maximum length of your command
+                strncpy(str, state->command+2, state->command_s-2);
+                str[state->command_s-2] = '\0'; // ensure null termination
+
+                char *token = strtok(str, "/");
+                int count = 0;
+                char args[2][100];
+
+                while (token != NULL) {
+                    char temp_buffer[100];
+                    strcpy(temp_buffer, token);
+                    if(count == 0) {
+                        strcpy(args[0], temp_buffer);
+                    } else if(count == 1) {
+                        strcpy(args[1], temp_buffer);
+                    }
+                    ++count;
+
+                    // log for args.
+                    token = strtok(NULL, "/");
+                }
+                Point new_pos = search(buffer, args[0], strlen(args[0]));
+                find_and_replace(buffer, args[0], args[1]);
+                buffer->cur_pos = new_pos.x;
+                buffer->row_index = new_pos.y;
+                mode = NORMAL;
+                break;
+
+            } 
+            Point new_pos = search(buffer, state->command, state->command_s);
+            buffer->cur_pos = new_pos.x;
+            buffer->row_index = new_pos.y;
+            mode = NORMAL;
+        } break;
+        case LEFT_ARROW:
+            if(buffer->cur_pos != 0) buffer->cur_pos--;
+            break;
+        case DOWN_ARROW:
+            break;
+        case UP_ARROW:
+            break;
+        case RIGHT_ARROW:
+            if(buffer->cur_pos < state->command_s) buffer->cur_pos++;
+            break;
+        default: {
+            shift_str_right(state->command, &state->command_s, buffer->cur_pos);
+            state->command[buffer->cur_pos++] = state->ch;
+        } break;
+    }
+}
+
+void handle_visual_keys(Buffer *buffer, State *state) {
+    curs_set(0);
+    switch(state->ch) {
+        case '\b':
+        case 127:
+        case KEY_BACKSPACE: {
+        } break;
+        case ESCAPE:
+            curs_set(1);
+            mode = NORMAL;
+            break;
+        case ENTER: {
+        } break;
+        case 'd':
+        case 'x':
+            push_undo(&state->undo_stack, buffer);
+            if(buffer->visual.starting_pos.y > buffer->visual.ending_pos.y || 
+              (buffer->visual.starting_pos.y == buffer->visual.ending_pos.y &&
+               buffer->visual.starting_pos.x > buffer->visual.ending_pos.x)) {
+                for(int i = buffer->visual.starting_pos.y; i >= (int)buffer->visual.ending_pos.y; i--) {
+                    Row *cur = &buffer->rows[i];
+                    if(i > (int)buffer->visual.ending_pos.y && i < (int)buffer->visual.starting_pos.y) delete_row(buffer, i);
+                    else {
+                        for(int j = cur->size-1; j >= 0; j--) {
+                            Point point = {.x = j, .y = i};
+                            if(is_between(buffer->visual.ending_pos, buffer->visual.starting_pos, point)) {
+                                delete_char(buffer, i, j, &state->y, state->main_win);
+                            }
+                        }
+                    }
+                }
+            } else {
+                for(int i = buffer->visual.ending_pos.y; i >= (int)buffer->visual.starting_pos.y; i--) {
+                    Row *cur = &buffer->rows[i];
+                    if(i > (int)buffer->visual.starting_pos.y && i < (int)buffer->visual.ending_pos.y) delete_row(buffer, i);
+                    else {
+                        for(int j = cur->size-1; j >= 0; j--) {
+                            Point point = {.x = j, .y = i};
+                            if(is_between(buffer->visual.starting_pos, buffer->visual.ending_pos, point)) {
+                                delete_char(buffer, i, j, &state->y, state->main_win);
+                            }
+                        }
+                    }
+                }
+            }
+            if(buffer->visual.starting_pos.y < buffer->visual.ending_pos.y) {
+                buffer->row_index = buffer->visual.starting_pos.y;
+                buffer->cur_pos = buffer->visual.starting_pos.x;
+            } else {
+                buffer->row_index = buffer->visual.ending_pos.y;
+                buffer->cur_pos = buffer->visual.ending_pos.x;
+            }
+            mode = NORMAL;
+            curs_set(1);
+            break;
+        default: {
+            handle_motion_keys(buffer, state->ch, &state->repeating.repeating_count);
+            if(buffer->visual.is_line) {
+                size_t cur_size = buffer->rows[buffer->row_index].size;
+                if(buffer->row_index <= buffer->visual.starting_pos.y) {
+                    buffer->visual.ending_pos.x = 0;
+                    buffer->visual.starting_pos.x = cur_size;
+                    buffer->visual.ending_pos.y = buffer->row_index;
+                } else {
+                    buffer->visual.ending_pos.x = cur_size;
+                    buffer->visual.ending_pos.y = buffer->row_index;
+                }
+                break;
+            }
+            buffer->visual.ending_pos.x = buffer->cur_pos;
+            buffer->visual.ending_pos.y = buffer->row_index;
+        } break;
+    }
+}
+
 void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     switch(mode) {
         case NORMAL:
-            switch(state->ch) {
-                case ':':
-                    mode = COMMAND;
-                    buffer->cur_pos = 0;
-                    state->repeating.repeating_count = 1;
-                    break;
-                case '/':
-                    mode = SEARCH;
-                    state->normal_pos = buffer->cur_pos;
-                    buffer->cur_pos = 0;
-                    reset_command(state->command, &state->command_s);
-                    state->repeating.repeating_count = 1;
-                    break;
-                case 'v':
-                    mode = VISUAL;
-                    buffer->visual.is_line = 0;
-                    buffer->visual.starting_pos.x = buffer->cur_pos;
-                    buffer->visual.starting_pos.y = buffer->row_index;
-                    buffer->visual.ending_pos.x = buffer->cur_pos;
-                    buffer->visual.ending_pos.y = buffer->row_index;
-                    break;
-                case 'V':
-                    mode = VISUAL;
-                    buffer->visual.is_line = 1;
-                    buffer->visual.starting_pos.x = 0;
-                    buffer->visual.starting_pos.y = buffer->row_index;
-                    buffer->visual.ending_pos.x = buffer->rows[buffer->row_index].size;
-                    buffer->visual.ending_pos.y = buffer->row_index;
-                    break;
-                case ctrl('o'): {
-                    shift_rows_right(buffer, ++buffer->row_index);
-                    buffer->cur_pos = 0;
-                    if(auto_indent) {
-                        if(state->num_of_braces > 0) {
-                            create_newline_indent(buffer, state->num_of_braces);
-                        }
-                    }
-                } break;
-                case 'R':
-                    state->repeating.repeating = 1;
-                    break;
-                case 'n': {
-                    if(state->command_s > 2 && strncmp(state->command, "s/", 2) == 0) {
-                        // search and replace
-
-                        char str[128]; // replace with the maximum length of your command
-                        strncpy(str, state->command+2, state->command_s-2);
-                        str[state->command_s-2] = '\0'; // ensure null termination
-
-                        char *token = strtok(str, "/");
-                        int count = 0;
-                        char args[2][100];
-
-                        while (token != NULL) {
-                            char temp_buffer[100];
-                            strcpy(temp_buffer, token);
-                            if(count == 0) {
-                                strcpy(args[0], temp_buffer);
-                            } else if(count == 1) {
-                                strcpy(args[1], temp_buffer);
-                            }
-                            ++count;
-
-                            // log for args.
-                            token = strtok(NULL, "/");
-                        }
-                        Point new_pos = search(buffer, args[0], strlen(args[0]));
-                        find_and_replace(buffer, args[0], args[1]);
-                        buffer->cur_pos = new_pos.x;
-                        buffer->row_index = new_pos.y;
-                        break;
-
-                    } 
-                    Point new_pos = search(buffer, state->command, state->command_s);
-                    buffer->cur_pos = new_pos.x;
-                    buffer->row_index = new_pos.y;
-                } break;
-                case 'u': {
-                    Buffer *new_buf = pop_undo(&state->undo_stack);
-                    write_log("fourth");
-                    if(new_buf == NULL) break;
-                    write_log("fifth");
-                    push_undo(&state->redo_stack, buffer);
-                    write_log("sixth");
-                    free_buffer(&buffer);
-                    write_log("seventh");
-                    *modify_buffer = new_buf;
-                    write_log("eighth");
-                } break;
-                case 'U': {
-                    Buffer *new_buf = pop_undo(&state->redo_stack);
-                    if(new_buf == NULL) break; 
-                    push_undo(&state->undo_stack, buffer);
-                    free_buffer(&buffer);
-                    *modify_buffer = new_buf;
-                } break;
-                case ctrl('s'): {
-                    handle_save(buffer);
-                    QUIT = 1;
-                    state->repeating.repeating_count = 1;
-                } break;
-                case ESCAPE:
-                    reset_command(state->command, &state->command_s);
-                    mode = NORMAL;
-                    break;
-                case KEY_RESIZE: {
-                    getmaxyx(stdscr, state->grow, state->gcol);
-                    wresize(state->main_win, state->grow-2, state->gcol-state->line_num_col);
-                    wresize(state->status_bar, 2, state->gcol);
-                    getmaxyx(state->main_win, state->main_row, state->main_col);
-                    mvwin(state->main_win, 0, state->line_num_col);
-                    wrefresh(state->main_win);
-                } break;
-                default: {
-                    int motion = handle_motion_keys(buffer, state->ch, &state->repeating.repeating_count);
-                    if(motion) break;
-                    push_undo(&state->undo_stack, buffer);
-                    int modified = handle_modifying_keys(buffer, state->ch, state->main_win, &state->y);
-                    (void)modified;
-                    int switched = handle_normal_to_insert_keys(buffer, state, state->ch);
-                    if(switched) {
-                        mode = INSERT;
-                        state->repeating.repeating_count = 1;
-                    }
-                }break;
-            }
+            handle_normal_keys(buffer, modify_buffer, state);
             break;
-        case INSERT: { 
-            switch(state->ch) { 
-                case '\b':
-                case 127:
-                case KEY_BACKSPACE: { 
-                    if(buffer->cur_pos == 0) {
-                        if(buffer->row_index != 0) {
-                            // Move to previous row and delete current row
-                            Row *cur = &buffer->rows[--buffer->row_index];
-                            buffer->cur_pos = cur->size;
-                            wmove(state->main_win, buffer->row_index, buffer->cur_pos);
-                            delete_and_append_row(buffer, buffer->row_index+1);
-                        }
-                    } else {
-                        Row *cur = &buffer->rows[buffer->row_index];
-                        shift_row_left(cur, --buffer->cur_pos);
-                        wmove(state->main_win, state->y, buffer->cur_pos);
-                    }
-                } break;
-                case ESCAPE: // Switch to NORMAL mode
-                    mode = NORMAL;
-                    break;
-                case KEY_ENTER:
-                case ENTER: { 
-                    Row *cur = &buffer->rows[buffer->row_index]; 
-                    create_and_cut_row(buffer, buffer->row_index+1, &cur->size, buffer->cur_pos);
-                    buffer->row_index++; 
-                    buffer->cur_pos = 0;
-                    if(state->num_of_braces > 0) {
-                        create_newline_indent(buffer, state->num_of_braces);
-                    }
-                } break;
-                case LEFT_ARROW: // Move cursor left
-                case DOWN_ARROW: // Move cursor down
-                case UP_ARROW:   // Move cursor up
-                case RIGHT_ARROW: // Move cursor right
-                case KEY_RESIZE: {
-                    getmaxyx(stdscr, state->grow, state->gcol);
-                    wresize(state->main_win, state->grow-2, state->gcol-state->line_num_col);
-                    wresize(state->status_bar, 2, state->gcol);
-                    getmaxyx(state->main_win, state->main_row, state->main_col);
-                    mvwin(state->main_win, 0, state->line_num_col);
-                    wrefresh(state->main_win);
-                    wrefresh(state->status_bar);
-                } break;
-                default: { // Handle other characters
-                    Row *cur = &buffer->rows[buffer->row_index];
-                    // Handle special characters and indentation
-                    Brace cur_brace = find_opposite_brace(cur->contents[buffer->cur_pos]);
-                    if(
-                        (cur_brace.brace != '0' && cur_brace.closing && 
-                         state->ch == find_opposite_brace(cur_brace.brace).brace) || 
-                        (cur->contents[buffer->cur_pos] == '"' && state->ch == '"') ||
-                        (cur->contents[buffer->cur_pos] == '\'' && state->ch == '\'')
-                    ) {
-                        buffer->cur_pos++;
-                        break;
-                    };
-                    if(state->ch == 9) {
-                        // TODO: use tabs instead of just 4 spaces
-                        for(size_t i = 0; i < indent; i++) {
-                            shift_row_right(cur, buffer->cur_pos);
-                            insert_char(cur, buffer->cur_pos++, ' ');
-                        }
-                    } else {
-                        shift_row_right(cur, buffer->cur_pos);
-                        insert_char(cur, buffer->cur_pos++, state->ch);
-                    }
-                    Brace next_ch = find_opposite_brace(state->ch); 
-                    if(next_ch.brace != '0' && !next_ch.closing) {
-                        shift_row_right(cur, buffer->cur_pos);
-                        insert_char(cur, buffer->cur_pos, next_ch.brace);
-                    } 
-                    if(state->ch == '"' || state->ch == '\'') {
-                        shift_row_right(cur, buffer->cur_pos);
-                        insert_char(cur, buffer->cur_pos, state->ch);
-                    }
-                } break;
-            }
-         } break;
-        case COMMAND: {
-            switch(state->ch) {
-                case '\b':
-                case 127:
-                case KEY_BACKSPACE: {
-                    if(buffer->cur_pos != 0) {
-                        shift_str_left(state->command, &state->command_s, --buffer->cur_pos);
-                        wmove(state->status_bar, 1, buffer->cur_pos);
-                    }
-                } break;
-                case ESCAPE:
-                    reset_command(state->command, &state->command_s);
-                    mode = NORMAL;
-                    break;
-                case KEY_ENTER:
-                case ENTER: {
-                    if(state->command[0] == '!') {
-                        shift_str_left(state->command, &state->command_s, 0);
-                        FILE *file = popen(state->command, "r");
-                        if(file == NULL) {
-                            CRASH("could not run command");
-                        }
-                        while(fgets(state->status_bar_msg, sizeof(state->status_bar_msg), file) != NULL) {
-                            state->is_print_msg = 1;
-                        }
-                        pclose(file);
-                    } else {
-                        Command cmd = parse_command(state->command, state->command_s);
-                        int err = execute_command(&cmd, buffer, state);
-                        switch(err) {
-                            case NO_ERROR:
-                                break;
-                            case UNKNOWN_COMMAND:
-                                sprintf(state->status_bar_msg, "Unnown command: %s", cmd.command);
-                                state->is_print_msg = 1;
-                                break;
-                            case INVALID_ARG:
-                                sprintf(state->status_bar_msg, "Invalid arg %s\n", cmd.args[0].arg);
-                                state->is_print_msg = 1;
-                                break;
-                            case INVALID_VALUE:
-                                sprintf(state->status_bar_msg, "Invalid value %s\n", cmd.args[1].arg);
-                                state->is_print_msg = 1;
-                                break;
-                            default:
-                                sprintf(state->status_bar_msg, "err");
-                                state->is_print_msg = 1;
-                                break;
-                        }
-                    }
-                    reset_command(state->command, &state->command_s);
-                    mode = NORMAL;
-                } break;
-                case LEFT_ARROW:
-                    if(buffer->cur_pos != 0) buffer->cur_pos--;
-                    break;
-                case DOWN_ARROW:
-                    break;
-                case UP_ARROW:
-                    break;
-                case RIGHT_ARROW:
-                    if(buffer->cur_pos < state->command_s) buffer->cur_pos++;
-                    break;
-                default: {
-                    shift_str_right(state->command, &state->command_s, buffer->cur_pos);
-                    state->command[buffer->cur_pos++] = state->ch;
-                } break;
-            }
-        } break;
-        case SEARCH: {
-            switch(state->ch) {
-                case '\b':
-                case 127:
-                case KEY_BACKSPACE: {
-                    if(buffer->cur_pos != 0) {
-                        shift_str_left(state->command, &state->command_s, --buffer->cur_pos);
-                        wmove(state->status_bar, 1, buffer->cur_pos);
-                    }
-                } break;
-                case ESCAPE:
-                    buffer->cur_pos = state->normal_pos;
-                    reset_command(state->command, &state->command_s);
-                    mode = NORMAL;
-                    break;
-                case ENTER: {
-                    if(state->command_s > 2 && strncmp(state->command, "s/", 2) == 0) {
-                        init_color(8, 250, 134, 107);
-
-                        char str[128]; // replace with the maximum length of your command
-                        strncpy(str, state->command+2, state->command_s-2);
-                        str[state->command_s-2] = '\0'; // ensure null termination
-
-                        char *token = strtok(str, "/");
-                        int count = 0;
-                        char args[2][100];
-
-                        while (token != NULL) {
-                            char temp_buffer[100];
-                            strcpy(temp_buffer, token);
-                            if(count == 0) {
-                                strcpy(args[0], temp_buffer);
-                            } else if(count == 1) {
-                                strcpy(args[1], temp_buffer);
-                            }
-                            ++count;
-
-                            // log for args.
-                            token = strtok(NULL, "/");
-                        }
-                        Point new_pos = search(buffer, args[0], strlen(args[0]));
-                        find_and_replace(buffer, args[0], args[1]);
-                        buffer->cur_pos = new_pos.x;
-                        buffer->row_index = new_pos.y;
-                        mode = NORMAL;
-                        break;
-
-                    } 
-                    Point new_pos = search(buffer, state->command, state->command_s);
-                    buffer->cur_pos = new_pos.x;
-                    buffer->row_index = new_pos.y;
-                    mode = NORMAL;
-                } break;
-                case LEFT_ARROW:
-                    if(buffer->cur_pos != 0) buffer->cur_pos--;
-                    break;
-                case DOWN_ARROW:
-                    break;
-                case UP_ARROW:
-                    break;
-                case RIGHT_ARROW:
-                    if(buffer->cur_pos < state->command_s) buffer->cur_pos++;
-                    break;
-                default: {
-                    shift_str_right(state->command, &state->command_s, buffer->cur_pos);
-                    state->command[buffer->cur_pos++] = state->ch;
-                } break;
-            }
-        } break;
-        case VISUAL: {
-            curs_set(0);
-            switch(state->ch) {
-                case '\b':
-                case 127:
-                case KEY_BACKSPACE: {
-                } break;
-                case ESCAPE:
-                    curs_set(1);
-                    mode = NORMAL;
-                    break;
-                case ENTER: {
-                } break;
-                case 'd':
-                case 'x':
-                    push_undo(&state->undo_stack, buffer);
-                    if(buffer->visual.starting_pos.y > buffer->visual.ending_pos.y || 
-                      (buffer->visual.starting_pos.y == buffer->visual.ending_pos.y &&
-                       buffer->visual.starting_pos.x > buffer->visual.ending_pos.x)) {
-                        for(int i = buffer->visual.starting_pos.y; i >= (int)buffer->visual.ending_pos.y; i--) {
-                            Row *cur = &buffer->rows[i];
-                            if(i > (int)buffer->visual.ending_pos.y && i < (int)buffer->visual.starting_pos.y) delete_row(buffer, i);
-                            else {
-                                for(int j = cur->size-1; j >= 0; j--) {
-                                    Point point = {.x = j, .y = i};
-                                    if(is_between(buffer->visual.ending_pos, buffer->visual.starting_pos, point)) {
-                                        delete_char(buffer, i, j, &state->y, state->main_win);
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        for(int i = buffer->visual.ending_pos.y; i >= (int)buffer->visual.starting_pos.y; i--) {
-                            Row *cur = &buffer->rows[i];
-                            if(i > (int)buffer->visual.starting_pos.y && i < (int)buffer->visual.ending_pos.y) delete_row(buffer, i);
-                            else {
-                                for(int j = cur->size-1; j >= 0; j--) {
-                                    Point point = {.x = j, .y = i};
-                                    if(is_between(buffer->visual.starting_pos, buffer->visual.ending_pos, point)) {
-                                        delete_char(buffer, i, j, &state->y, state->main_win);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if(buffer->visual.starting_pos.y < buffer->visual.ending_pos.y) {
-                        buffer->row_index = buffer->visual.starting_pos.y;
-                        buffer->cur_pos = buffer->visual.starting_pos.x;
-                    } else {
-                        buffer->row_index = buffer->visual.ending_pos.y;
-                        buffer->cur_pos = buffer->visual.ending_pos.x;
-                    }
-                    mode = NORMAL;
-                    curs_set(1);
-                    break;
-                default: {
-                    handle_motion_keys(buffer, state->ch, &state->repeating.repeating_count);
-                    if(buffer->visual.is_line) {
-                        size_t cur_size = buffer->rows[buffer->row_index].size;
-                        if(buffer->row_index <= buffer->visual.starting_pos.y) {
-                            buffer->visual.ending_pos.x = 0;
-                            buffer->visual.starting_pos.x = cur_size;
-                            buffer->visual.ending_pos.y = buffer->row_index;
-                        } else {
-                            buffer->visual.ending_pos.x = cur_size;
-                            buffer->visual.ending_pos.y = buffer->row_index;
-                        }
-                        break;
-                    }
-                    buffer->visual.ending_pos.x = buffer->cur_pos;
-                    buffer->visual.ending_pos.y = buffer->row_index;
-                } break;
-            }
-        } break;
+        case INSERT: 
+            handle_insert_keys(buffer, state);
+            break;
+        case COMMAND:
+            handle_command_keys(buffer, state);
+            break;
+        case SEARCH: 
+            handle_search_keys(buffer, state);
+            break;
+        case VISUAL:
+            handle_visual_keys(buffer, state);
+            break;
         case MODE_COUNT:
             assert(0 && "UNREACHABLE");
     }
