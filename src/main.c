@@ -847,7 +847,8 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     }
 }
 
-void handle_insert_keys(Buffer *buffer, State *state) {
+void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
+    (void)modify_buffer;
     switch(state->ch) { 
         case '\b':
         case 127:
@@ -928,7 +929,8 @@ void handle_insert_keys(Buffer *buffer, State *state) {
     }
 }
 
-void handle_command_keys(Buffer *buffer, State *state) {
+void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
+    (void)modify_buffer;
     switch(state->ch) {
         case '\b':
         case 127:
@@ -998,7 +1000,8 @@ void handle_command_keys(Buffer *buffer, State *state) {
     }
 }
 
-void handle_search_keys(Buffer *buffer, State *state) {
+void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
+    (void)modify_buffer;
     switch(state->ch) {
         case '\b':
         case 127:
@@ -1068,7 +1071,8 @@ void handle_search_keys(Buffer *buffer, State *state) {
     }
 }
 
-void handle_visual_keys(Buffer *buffer, State *state) {
+void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
+    (void)modify_buffer;
     curs_set(0);
     switch(state->ch) {
         case '\b':
@@ -1143,28 +1147,6 @@ void handle_visual_keys(Buffer *buffer, State *state) {
     }
 }
 
-void handle_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
-    switch(mode) {
-        case NORMAL:
-            handle_normal_keys(buffer, modify_buffer, state);
-            break;
-        case INSERT: 
-            handle_insert_keys(buffer, state);
-            break;
-        case COMMAND:
-            handle_command_keys(buffer, state);
-            break;
-        case SEARCH: 
-            handle_search_keys(buffer, state);
-            break;
-        case VISUAL:
-            handle_visual_keys(buffer, state);
-            break;
-        case MODE_COUNT:
-            assert(0 && "UNREACHABLE");
-    }
-}
-
 /* ------------------------- FUNCTIONS END ------------------------- */
 
 
@@ -1209,6 +1191,11 @@ int main(int argc, char **argv) {
 
     noecho();
     raw();
+
+    void(*key_func[MODE_COUNT])(Buffer *buffer, Buffer **modify_buffer, State *state) = {
+        handle_normal_keys, handle_insert_keys, handle_search_keys, handle_command_keys, handle_visual_keys
+    };
+
 
     int grow, gcol;
     getmaxyx(stdscr, grow, gcol);
@@ -1475,9 +1462,8 @@ int main(int argc, char **argv) {
         wmove(state.main_win, state.y, state.x);
         state.num_of_braces = num_of_open_braces(buffer);
 
-        // TODO: move a lot of these extra variables into buffer struct
         for(size_t i = 0; i < state.repeating.repeating_count; i++) {
-            handle_keys(buffer, &buffer, &state);
+            key_func[mode](buffer, &buffer, &state);
         }
         if(mode != COMMAND && mode != SEARCH && buffer->cur_pos > buffer->rows[buffer->row_index].size) {
             buffer->cur_pos = buffer->rows[buffer->row_index].size;
