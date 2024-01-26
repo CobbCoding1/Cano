@@ -25,6 +25,16 @@
             exit(1);                  \
         } while(0) 
 
+#define WRITE_LOG(message, ...)                                                         \
+    do {                                                                                \
+        FILE *file = fopen("logs/cano.log", "a");                                       \
+        if (file != NULL) {                                                             \
+            fprintf(file, "%s:%d: " message "\n", __FILE__, __LINE__, ##__VA_ARGS__);   \
+            fclose(file);                                                               \
+        }                                                                               \
+    } while(0)
+
+
 #define ctrl(x) ((x) & 0x1f)
 
 #define ESCAPE      27
@@ -191,7 +201,6 @@ Buffer *pop_undo(Undo *undo);
 void resize_rows(Buffer *buffer, size_t capacity);
 void resize_row(Row **row, size_t capacity);
 void insert_char(Row *row, size_t pos, char c);
-void write_log(const char *message);
 Point search(Buffer *buffer, char *command, size_t command_s);
 void replace(Buffer *buffer, Point position, char *new_str, size_t old_str_s, size_t new_str_s);
 void find_and_replace(Buffer *buffer, char *old_str, char *new_str);

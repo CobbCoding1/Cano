@@ -156,16 +156,6 @@ void insert_char(Row *row, size_t pos, char c) {
     row->contents[pos] = c;
 }
 
-void write_log(const char *message) {
-    FILE *file = fopen("logs/cano.log", "a");
-    if (file == NULL) {
-        return;
-    }   
-    fprintf(file, "%s\n", message);
-    fclose(file);
-}
-
-
 Point search(Buffer *buffer, char *command, size_t command_s) {
     Point point = {
             .x = buffer -> cur_pos,
@@ -193,13 +183,13 @@ Point search(Buffer *buffer, char *command, size_t command_s) {
 
 void replace(Buffer *buffer, Point position, char *new_str, size_t old_str_s, size_t new_str_s) { 
     if (buffer == NULL || new_str == NULL) {
-        write_log("Error: null pointer");
+        WRITE_LOG("Error: null pointer");
         return;
     }
 
     Row *cur = &buffer->rows[position.y];
     if (cur == NULL || cur->contents == NULL) {
-        write_log("Error: null pointer");
+        WRITE_LOG("Error: null pointer");
         return;
     }
 
@@ -798,15 +788,15 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         } break;
         case 'u': {
             Buffer *new_buf = pop_undo(&state->undo_stack);
-            write_log("fourth");
+            WRITE_LOG("fourth");
             if(new_buf == NULL) break;
-            write_log("fifth");
+            WRITE_LOG("fifth");
             push_undo(&state->redo_stack, buffer);
-            write_log("sixth");
+            WRITE_LOG("sixth");
             free_buffer(&buffer);
-            write_log("seventh");
+            WRITE_LOG("seventh");
             *modify_buffer = new_buf;
-            write_log("eighth");
+            WRITE_LOG("eighth");
         } break;
         case 'U': {
             Buffer *new_buf = pop_undo(&state->redo_stack);
@@ -1152,7 +1142,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 
 int main(int argc, char **argv) {
 
-    write_log("starting (int main)");
+    WRITE_LOG("starting (int main)");
 
     (void)argc;
     char *program = *argv++;
@@ -1192,6 +1182,7 @@ int main(int argc, char **argv) {
     noecho();
     raw();
 
+    // define functions based on current mode
     void(*key_func[MODE_COUNT])(Buffer *buffer, Buffer **modify_buffer, State *state) = {
         handle_normal_keys, handle_insert_keys, handle_search_keys, handle_command_keys, handle_visual_keys
     };
