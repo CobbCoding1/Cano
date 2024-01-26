@@ -56,6 +56,12 @@ typedef enum {
     VISUAL,
     MODE_COUNT,
 } Mode;
+    
+typedef enum {
+    LEADER_NONE,
+    LEADER_R,
+    LEADER_D,
+} Leader;
 
 
 typedef struct {
@@ -64,7 +70,6 @@ typedef struct {
     size_t capacity;
     char *contents;
 } Row;
-
 
 
 typedef struct {
@@ -117,7 +122,7 @@ typedef struct {
     size_t buf_stack_s;
     size_t buf_capacity;
 } Undo;
-
+    
 typedef struct {
     int repeating;
     size_t repeating_count;
@@ -128,11 +133,12 @@ typedef struct {
     Undo redo_stack;
     size_t num_of_braces;
     int ch;
-
+    
     char *command;
     size_t command_s;
-
-    Repeating repeating; 
+    
+    Repeating repeating;
+    Leader leader;
 
     int is_print_msg;
     char *status_bar_msg;
@@ -221,9 +227,9 @@ void append_rows(Row *a, Row *b);
 void delete_and_append_row(Buffer *buf, size_t index);
 void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t index);
 void create_newline_indent(Buffer *buffer, size_t num_of_braces);
-void read_file_to_buffer(Buffer *buffer, char *filename);
+Buffer *read_file_to_buffer(char *filename);
 int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count);
-int handle_modifying_keys(Buffer *buffer, int ch, WINDOW *main_win, size_t *y);
+int handle_modifying_keys(Buffer *buffer, State *state, int ch, WINDOW *main_win, size_t *y);
 int handle_normal_to_insert_keys(Buffer *buffer, State *state, int ch);
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state);
 void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state);

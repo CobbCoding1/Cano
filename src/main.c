@@ -454,7 +454,7 @@ void delete_and_append_row(Buffer *buf, size_t index) {
 }
 
 void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t index) {
-    assert(index < buf->rows[index].capacity);
+    assert(index < buf->rows[buf->row_index].capacity);
     assert(dest_index > 0);
 
     size_t final_s = *str_s - index;
@@ -492,9 +492,18 @@ void create_newline_indent(Buffer *buffer, size_t num_of_braces) {
 }
 
 
-void read_file_to_buffer(Buffer *buffer, char *filename) {
+Buffer *read_file_to_buffer(char *filename) {
+    Buffer *buffer = calloc(1, sizeof(Buffer));
+    buffer->row_capacity = STARTING_ROWS_SIZE;
+    buffer->rows = calloc(buffer->row_capacity, sizeof(Row));
+    for(size_t i = 0; i < buffer->row_capacity; i++) {
+        buffer->rows[i].capacity = STARTING_ROW_SIZE;
+        buffer->rows[i].contents = calloc(buffer->rows[i].capacity, sizeof(char));
+        if(buffer->rows[i].contents == NULL) {
+            CRASH("OUT OF RAM");
+        }
+    }
     size_t filename_s = strlen(filename)+1;
-    free(buffer->filename);
     buffer->filename = calloc(filename_s, sizeof(char));
     strncpy(buffer->filename, filename, filename_s);
     FILE *file = fopen(filename, "a+");
@@ -522,6 +531,7 @@ void read_file_to_buffer(Buffer *buffer, char *filename) {
             resize_row(&cur, cur->capacity*2);
         }
     }
+    return buffer;
 }
 
 int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
@@ -648,15 +658,48 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
     }
     return 1; // If the key is a motion key, return 1
 }
+    
+int handle_leader_keys(State *state) {
+    switch(state->ch) {
+        case 'd':
+            state->leader = LEADER_D;
+            break;
+        default:
+            return 0;
+    }    
+    return 1;
+}
 
-int handle_modifying_keys(Buffer *buffer, int ch, WINDOW *main_win, size_t *y) {
+int handle_modifying_keys(Buffer *buffer, State *state, int ch, WINDOW *main_win, size_t *y) {
     switch(ch) {
         case 'x': {
             delete_char(buffer, buffer->row_index, buffer->cur_pos, y, main_win);
         } break;
+        case 'w': {
+            Row *cur = &buffer->rows[buffer->row_index];
+            switch(state->leader) {
+                case LEADER_D:
+                    WRITE_LOG("wsdhaskldaslkjkl");
+                    while(buffer->cur_pos < cur->size && !(!isalnum(cur->contents[buffer->cur_pos]) && isalnum(cur->contents[buffer->cur_pos+1]))) {
+                        delete_char(buffer, buffer->row_index, buffer->cur_pos, &state->y, state->main_win);
+                    }
+                    if(isspace(cur->contents[buffer->cur_pos])) {
+                        delete_char(buffer, buffer->row_index, buffer->cur_pos, &state->y, state->main_win);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        } break;
         case 'd': {
-            delete_row(buffer, buffer->row_index);
-            if(buffer->row_index != 0) buffer->row_index--;
+            switch(state->leader) {
+                case LEADER_D:
+                    delete_row(buffer, buffer->row_index);
+                    if(buffer->row_index != 0) buffer->row_index--;
+                    break;
+                default:
+                    break;
+            }
         } break;
         case 'r': {
             curs_set(0);
@@ -709,6 +752,9 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state, int ch) {
 }
 
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
+    if(state->leader == LEADER_NONE && handle_leader_keys(state)) {
+        return;   
+    } 
     switch(state->ch) {
         case ':':
             mode = COMMAND;
@@ -823,10 +869,10 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             wrefresh(state->main_win);
         } break;
         default: {
-            int motion = handle_motion_keys(buffer, state->ch, &state->repeating.repeating_count);
+            int motion = (state->leader == LEADER_NONE) ? handle_motion_keys(buffer, state->ch, &state->repeating.repeating_count) : 0;
             if(motion) break;
             push_undo(&state->undo_stack, buffer);
-            int modified = handle_modifying_keys(buffer, state->ch, state->main_win, &state->y);
+            int modified = handle_modifying_keys(buffer, state, state->ch, state->main_win, &state->y);
             (void)modified;
             int switched = handle_normal_to_insert_keys(buffer, state, state->ch);
             if(switched) {
@@ -835,6 +881,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             }
         } break;
     }
+    state->leader = LEADER_NONE;
 }
 
 void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
@@ -1136,6 +1183,78 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         } break;
     }
 }
+    
+State init_state() {
+    State state = {0};
+    state.undo_stack.buf_capacity = undo_size;
+    state.redo_stack.buf_capacity = undo_size;
+    state.undo_stack.buf_stack = calloc(state.undo_stack.buf_capacity, sizeof(Buffer));
+    state.redo_stack.buf_stack = calloc(state.undo_stack.buf_capacity, sizeof(Buffer));
+    return state;
+}
+
+void load_config_from_file(State *state, Buffer *buffer, char *config_filename, char *syntax_filename) {
+    if(config_filename == NULL) {
+        char default_config_filename[128] = {0};
+        char config_dir[64] = {0};
+        char *env = getenv("HOME");
+        if(env == NULL) CRASH("could not get HOME");
+        sprintf(config_dir, "%s/.config/cano", env);
+        struct stat st = {0};
+        if(stat(config_dir, &st) == -1) {
+            mkdir(config_dir, 0755);
+        }
+        sprintf(default_config_filename, "%s/config.cano", config_dir);
+        config_filename = default_config_filename;
+
+
+        char *language = strip_off_dot(buffer->filename, strlen(buffer->filename));
+        if(language != NULL) {
+            syntax_filename = calloc(strlen(config_dir)+strlen(language)+sizeof(".cyntax")+1, sizeof(char));
+            sprintf(syntax_filename, "%s/%s.cyntax", config_dir, language);
+            free(language);
+        }
+    }
+    char **lines = calloc(2, sizeof(char*));
+    size_t lines_s = 0;
+    int err = read_file_by_lines(config_filename, &lines, &lines_s);
+    if(err == 0) {
+        for(size_t i = 0; i < lines_s; i++) {
+            Command cmd = parse_command(lines[i], strlen(lines[i]));
+            execute_command(&cmd, buffer, state);
+            free(lines[i]);
+        }
+    }
+    free(lines);
+
+    if(syntax_filename != NULL) {
+        Color_Arr color_arr = parse_syntax_file(syntax_filename);
+        if(color_arr.arr != NULL) {
+            for(size_t i = 0; i < color_arr.arr_s; i++) {
+                init_pair(color_arr.arr[i].custom_slot, color_arr.arr[i].custom_id, COLOR_BLACK);
+                init_ncurses_color(color_arr.arr[i].custom_id, color_arr.arr[i].custom_r, 
+                                   color_arr.arr[i].custom_g, color_arr.arr[i].custom_b);
+            }
+
+            free(color_arr.arr);
+        }
+    }
+}
+
+void init_colors() {
+    if(has_colors() == FALSE) {
+        CRASH("your terminal does not support colors");
+    }
+
+    start_color();
+    init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
+    init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
+    init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
+    init_pair(MAGENTA_COLOR, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
+
+}
 
 /* ------------------------- FUNCTIONS END ------------------------- */
 
@@ -1166,132 +1285,53 @@ int main(int argc, char **argv) {
     }
 
     initscr();
-
-    if(has_colors() == FALSE) {
-        CRASH("your terminal does not support colors");
-    }
-
-    start_color();
-    init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
-    init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
-    init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
-    init_pair(MAGENTA_COLOR, COLOR_MAGENTA, COLOR_BLACK);
-    init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
-
     noecho();
     raw();
+
+    init_colors();
 
     // define functions based on current mode
     void(*key_func[MODE_COUNT])(Buffer *buffer, Buffer **modify_buffer, State *state) = {
         handle_normal_keys, handle_insert_keys, handle_search_keys, handle_command_keys, handle_visual_keys
     };
 
+    State state = init_state();
+    state.command = calloc(64, sizeof(char));
 
-    int grow, gcol;
-    getmaxyx(stdscr, grow, gcol);
+    getmaxyx(stdscr, state.grow, state.gcol);
     int line_num_width = 5;
-    WINDOW *main_win = newwin(grow-2, gcol-line_num_width, 0, line_num_width);
-    WINDOW *line_num_win = newwin(grow-2, line_num_width, 0, 0);
+    WINDOW *main_win = newwin(state.grow-2, state.gcol-line_num_width, 0, line_num_width);
+    WINDOW *line_num_win = newwin(state.grow-2, line_num_width, 0, 0);
+    
+    state.main_win = main_win;
+    state.line_num_win = line_num_win;
 
-    int main_row, main_col;
-    int line_num_row, line_num_col;
-    getmaxyx(main_win, main_row, main_col);
-    getmaxyx(line_num_win, line_num_row, line_num_col);
+    getmaxyx(main_win, state.main_row, state.main_col);
+    getmaxyx(line_num_win, state.line_num_row, state.line_num_col);
 
-    WINDOW *status_bar = newwin(2, gcol, grow-2, 0);
+    WINDOW *status_bar = newwin(2, state.gcol, state.grow-2, 0);
+    state.status_bar = status_bar;
 
     keypad(main_win, TRUE);
     keypad(status_bar, TRUE);
 
 
-    Buffer *buffer = calloc(1, sizeof(Buffer));
-    buffer->row_capacity = STARTING_ROWS_SIZE;
-    buffer->rows = calloc(buffer->row_capacity, sizeof(Row));
-    buffer->filename = calloc(sizeof("out.txt"), sizeof(char));
-    strncpy(buffer->filename, "out.txt", sizeof("out.txt"));
-    for(size_t i = 0; i < buffer->row_capacity; i++) {
-        buffer->rows[i].capacity = STARTING_ROW_SIZE;
-        buffer->rows[i].contents = calloc(buffer->rows[i].capacity, sizeof(char));
-        if(buffer->rows[i].contents == NULL) {
-            CRASH("no more ram");
-        }
-    }
-    if(filename != NULL) read_file_to_buffer(buffer, filename);
+    if(filename == NULL) filename = "out.txt";
+    Buffer *buffer = read_file_to_buffer(filename);
 
     mvwprintw(status_bar, 0, 0, "%.7s", string_modes[mode]);
     wmove(main_win, 0, 0);
 
     char status_bar_msg[128] = {0};
+    state.status_bar_msg = status_bar_msg;
 
     size_t line_render_start = 0;
     size_t col_render_start = 0;
-    char *command = calloc(64, sizeof(char));
 
-    State state = {0};
-    state.undo_stack.buf_capacity = undo_size;
-    state.redo_stack.buf_capacity = undo_size;
-    state.undo_stack.buf_stack = calloc(state.undo_stack.buf_capacity, sizeof(Buffer));
-    state.redo_stack.buf_stack = calloc(state.undo_stack.buf_capacity, sizeof(Buffer));
-    state.main_row = main_row;
-    state.main_col = main_col;
-    state.line_num_row = line_num_row;
-    state.line_num_col = line_num_col;
-    state.grow = grow;
-    state.gcol = gcol;
-    state.line_num_win = line_num_win;
-    state.main_win = main_win;
-    state.status_bar = status_bar;
-    state.repeating = (Repeating){0};
-    state.command = command;
-    state.command_s = 0;
-    state.status_bar_msg = status_bar_msg;
     push_undo(&state.undo_stack, buffer);
 
     // load config
-    if(config_filename == NULL) {
-        char default_config_filename[128] = {0};
-        char config_dir[64] = {0};
-        sprintf(config_dir, "%s/.config/cano", getenv("HOME"));
-        struct stat st = {0};
-        if(stat(config_dir, &st) == -1) {
-            mkdir(config_dir, 0755);
-        }
-        sprintf(default_config_filename, "%s/config.cano", config_dir);
-        config_filename = default_config_filename;
-
-
-        char *language = strip_off_dot(buffer->filename, strlen(buffer->filename));
-        if(language != NULL) {
-            syntax_filename = calloc(strlen(config_dir)+strlen(language)+sizeof(".cyntax")+1, sizeof(char));
-            sprintf(syntax_filename, "%s/%s.cyntax", config_dir, language);
-            free(language);
-        }
-    }
-    char **lines = calloc(2, sizeof(char*));
-    size_t lines_s = 0;
-    int err = read_file_by_lines(config_filename, &lines, &lines_s);
-    if(err == 0) {
-        for(size_t i = 0; i < lines_s; i++) {
-            Command cmd = parse_command(lines[i], strlen(lines[i]));
-            execute_command(&cmd, buffer, &state);
-            free(lines[i]);
-        }
-    }
-    free(lines);
-
-    if(syntax_filename != NULL) {
-        Color_Arr color_arr = parse_syntax_file(syntax_filename);
-        if(color_arr.arr != NULL) {
-            for(size_t i = 0; i < color_arr.arr_s; i++) {
-                init_pair(color_arr.arr[i].custom_slot, color_arr.arr[i].custom_id, COLOR_BLACK);
-                init_ncurses_color(color_arr.arr[i].custom_id, color_arr.arr[i].custom_r, 
-                                   color_arr.arr[i].custom_g, color_arr.arr[i].custom_b);
-            }
-
-            free(color_arr.arr);
-        }
-    }
+    load_config_from_file(&state, buffer, config_filename, syntax_filename);
 
     while(state.ch != ctrl('q') && QUIT != 1) {
         getmaxyx(state.main_win, state.main_row, state.main_col);
@@ -1305,7 +1345,7 @@ int main(int argc, char **argv) {
 #endif
 
         int row_s_len = (int)log10(buffer->row_s)+2;
-        if(row_s_len > line_num_col) {
+        if(row_s_len > state.line_num_col) {
             wresize(state.main_win, state.main_row, state.main_col-(row_s_len-line_num_width));
             wresize(line_num_win, state.line_num_row, row_s_len);
             mvwin(state.main_win, 0, row_s_len);
@@ -1422,7 +1462,7 @@ int main(int argc, char **argv) {
         state.x = buffer->cur_pos-col_render_start;
 
         if(state.repeating.repeating) {
-            mvwprintw(state.status_bar, 1, gcol-10, "r");
+            mvwprintw(state.status_bar, 1, state.gcol-10, "r");
             wrefresh(state.status_bar);
         }
 
@@ -1442,7 +1482,7 @@ int main(int argc, char **argv) {
             size_t num_s = 0;
             while(isdigit(state.ch)) {
                 num[num_s++] = state.ch;
-                mvwprintw(state.status_bar, 1, (gcol-10)+num_s, "%c", num[num_s-1]);
+                mvwprintw(state.status_bar, 1, (state.gcol-10)+num_s, "%c", num[num_s-1]);
                 wrefresh(state.status_bar);
                 state.ch = wgetch(state.main_win);
             }

@@ -29,7 +29,8 @@ Command - For executing commands
 |Normal| k        | Move up                                         |
 |Normal| l        | Move right                                      |
 |Normal| x        | Delete character                                |
-|Normal| d        | Delete entire line                              |
+|Normal| d + d    | Delete entire line                              |
+|Normal| d + w    | Deletes current word                            |
 |Normal| g        | Go to first line                                |
 |Normal| G        | Go to last line                                 |
 |Normal| 0        | Go to beginning of line                         |
