@@ -682,7 +682,8 @@ int handle_modifying_keys(Buffer *buffer, State *state, int ch, WINDOW *main_win
             Row *cur = &buffer->rows[buffer->row_index];
             switch(state->leader) {
                 case LEADER_D:
-                    while(buffer->cur_pos < cur->size && !(!isalnum(cur->contents[buffer->cur_pos]) && isalnum(cur->contents[buffer->cur_pos+1]))) {
+                    while(buffer->cur_pos < cur->size && 
+                           !(!isalnum(cur->contents[buffer->cur_pos]) && isalnum(cur->contents[buffer->cur_pos+1]))) {
                         delete_char(buffer, buffer->row_index, buffer->cur_pos, &state->y, state->main_win);
                     }
                     if(isspace(cur->contents[buffer->cur_pos])) {
@@ -760,6 +761,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     switch(state->ch) {
         case ':':
             mode = COMMAND;
+            reset_command(state->command, &state->command_s);
             buffer->cur_pos = 0;
             state->repeating.repeating_count = 1;
             break;
