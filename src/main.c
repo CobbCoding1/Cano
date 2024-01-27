@@ -398,6 +398,11 @@ void buffer_next_brace(Buffer *buffer) {
     }
 }
 
+int isword(char ch) {
+    if(isalnum(ch) || ch == '_') return 1;
+    return 0;
+}
+
 int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
     (void)repeating_count;
     switch(ch) {
@@ -416,21 +421,21 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
             buffer->cursor = buffer->rows.data[row].end;
         } break;
         case 'e': { // Move to the end of the next word
-            if(buffer->cursor+1 < buffer->data.count && !isalnum(buffer->data.data[buffer->cursor+1])) buffer->cursor++;
-            while(buffer->cursor+1 < buffer->data.count && isalnum(buffer->data.data[buffer->cursor+1])) {
+            if(buffer->cursor+1 < buffer->data.count && !isword(buffer->data.data[buffer->cursor+1])) buffer->cursor++;
+            while(buffer->cursor+1 < buffer->data.count && isword(buffer->data.data[buffer->cursor+1])) {
                 buffer->cursor++;
             }
         } break;
         case 'b': { // Move to the start of the previous word
             if(buffer->cursor == 0) break;
-            if(buffer->cursor-1 > 0 && !isalnum(buffer->data.data[buffer->cursor-1])) buffer->cursor--;
-            while(buffer->cursor-1 > 0 && isalnum(buffer->data.data[buffer->cursor-1])) {
+            if(buffer->cursor-1 > 0 && !isword(buffer->data.data[buffer->cursor-1])) buffer->cursor--;
+            while(buffer->cursor-1 > 0 && isword(buffer->data.data[buffer->cursor-1])) {
                 buffer->cursor--;
             }
             if(buffer->cursor-1 == 0) buffer->cursor--;
         } break;
         case 'w': { // Move to the start of the next word
-            while(buffer->cursor < buffer->data.count && isalnum(buffer->data.data[buffer->cursor])) {
+            while(buffer->cursor < buffer->data.count && isword(buffer->data.data[buffer->cursor])) {
                 buffer->cursor++;
             }
             if(buffer->cursor < buffer->data.count) buffer->cursor++;
@@ -479,6 +484,16 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
             buffer_delete_char(buffer);
         } break;
         case 'w': {
+            switch(state->leader) {
+                case LEADER_D:
+                    while(buffer->cursor < buffer->data.count && isword(buffer->data.data[buffer->cursor])) {
+                        buffer_delete_char(buffer);
+                    }
+                    if(buffer->cursor < buffer->data.count && isspace(buffer->data.data[buffer->cursor])) buffer_delete_char(buffer); 
+                    break;
+                default:
+                    break;
+            }
         } break;
         case 'd': {
             switch(state->leader) {
@@ -587,9 +602,9 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             resize_window(state);
         } break;
         default: {
-            handle_motion_keys(buffer, state->ch, &state->repeating.repeating_count);
-            handle_normal_to_insert_keys(buffer, state);
-            handle_modifying_keys(buffer, state);
+            if(handle_modifying_keys(buffer, state)) break;
+            if(handle_motion_keys(buffer, state->ch, &state->repeating.repeating_count)) break;
+            if(handle_normal_to_insert_keys(buffer, state)) break;
         } break;
     }
     state->leader = LEADER_NONE;
@@ -904,10 +919,7 @@ int main(int argc, char **argv) {
                 if(j < buffer->rows.data[i].start+col_render_start || j > buffer->rows.data[i].end+col+state.main_col) continue;
                 size_t col = j-buffer->rows.data[i].start;
                 size_t print_index_x = col-col_render_start;
-                if(col > buffer->rows.data[i].end) {
-                    WRITE_LOG("col: %zu, j: %zu, c_r_s: %zu, start: %zu, end: %zu", col, j, col_render_start, buffer->rows.data[i].start, buffer->rows.data[i].end);
-                    break;
-                }
+                if(col > buffer->rows.data[i].end) break;
                 int between = (buffer->visual.start > buffer->visual.end) 
                     ? is_between(buffer->visual.end, buffer->visual.start, buffer->rows.data[i].start+col) 
                     : is_between(buffer->visual.start, buffer->visual.end, buffer->rows.data[i].start+col);
