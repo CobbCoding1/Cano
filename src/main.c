@@ -249,6 +249,7 @@ size_t num_of_open_braces(Buffer *buffer) {
 
 
 void reset_command(char *command, size_t *command_s) {
+    assert(*command_s <= 64);
     memset(command, 0, *command_s);
     *command_s = 0;
 }
@@ -457,21 +458,28 @@ void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t in
     assert(index < buf->rows[buf->row_index].capacity);
     assert(dest_index > 0);
 
+    WRITE_LOG("test1");
+
     size_t final_s = *str_s - index;
     char *temp = calloc(final_s, sizeof(char));
     if(temp == NULL) {
         CRASH("no more ram");
     }
+    WRITE_LOG("test2");
     size_t temp_len = 0;
     for(size_t i = index; i < *str_s; i++) {
         temp[temp_len++] = buf->rows[dest_index-1].contents[i];
         buf->rows[dest_index-1].contents[i] = '\0';
     }
     shift_rows_right(buf, dest_index);
-    strncpy(buf->rows[dest_index].contents, temp, sizeof(char)*final_s);
+    WRITE_LOG("test3");
+    Row *cur = &buf->rows[dest_index];
+    if(cur->capacity < final_s) resize_row(&cur, final_s*2);
+    strncpy(cur->contents, temp, sizeof(char)*final_s);
     buf->rows[dest_index].size = final_s;
     *str_s = index;
     free(temp);
+    WRITE_LOG("test4");
 }
 
 void create_newline_indent(Buffer *buffer, size_t num_of_braces) {
@@ -679,7 +687,6 @@ int handle_modifying_keys(Buffer *buffer, State *state, int ch, WINDOW *main_win
             Row *cur = &buffer->rows[buffer->row_index];
             switch(state->leader) {
                 case LEADER_D:
-                    WRITE_LOG("wsdhaskldaslkjkl");
                     while(buffer->cur_pos < cur->size && !(!isalnum(cur->contents[buffer->cur_pos]) && isalnum(cur->contents[buffer->cur_pos+1]))) {
                         delete_char(buffer, buffer->row_index, buffer->cur_pos, &state->y, state->main_win);
                     }
@@ -909,8 +916,11 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             break;
         case KEY_ENTER:
         case ENTER: { 
+            WRITE_LOG("1");
             Row *cur = &buffer->rows[buffer->row_index]; 
+            WRITE_LOG("2");
             create_and_cut_row(buffer, buffer->row_index+1, &cur->size, buffer->cur_pos);
+            WRITE_LOG("3");
             buffer->row_index++; 
             buffer->cur_pos = 0;
             if(state->num_of_braces > 0) {
