@@ -501,7 +501,6 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
 }
 
 int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
-    (void)buffer;
     switch(state->ch) {
         case 'i':
             mode = INSERT;
@@ -546,9 +545,7 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
 
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
-    if(state->leader == LEADER_NONE && handle_leader_keys(state)) {
-        return;   
-    } 
+    if(state->leader == LEADER_NONE && handle_leader_keys(state)) return;   
     switch(state->ch) {
         case ':':
             mode = COMMAND;
@@ -869,7 +866,8 @@ int main(int argc, char **argv) {
     state.status_bar_msg = status_bar_msg;
     buffer_calculate_rows(buffer);
 
-    size_t line_render_start = 0;
+    size_t row_render_start = 0;
+    size_t col_render_start = 0;
 
     while(state.ch != ctrl('q') && QUIT != 1) {
         werase(main_win);
@@ -877,16 +875,19 @@ int main(int argc, char **argv) {
         werase(line_num_win);
         size_t cur_row = buffer_get_row(buffer);
         Row cur = buffer->rows.data[cur_row]; 
-        if(cur_row <= line_render_start) line_render_start = cur_row;
-        if(cur_row >= line_render_start+state.main_row) line_render_start = cur_row-state.main_row+1;
-
         size_t col = buffer->cursor - cur.start;
+        if(cur_row <= row_render_start) row_render_start = cur_row;
+        if(cur_row >= row_render_start+state.main_row) row_render_start = cur_row-state.main_row+1;
+
+        if(col <= col_render_start) col_render_start = col;
+        if(col >= col_render_start+state.main_col) col_render_start = col-state.main_col+1;
+
 
         mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
 
-        for(size_t i = line_render_start; i <= line_render_start+state.main_row; i++) {
+        for(size_t i = row_render_start; i <= row_render_start+state.main_row; i++) {
             if(i >= buffer->rows.count) break;
-            size_t print_index_y = i - line_render_start;
+            size_t print_index_y = i - row_render_start;
 
             if(relative_nums) {
                 if(cur_row == i) {
@@ -900,19 +901,25 @@ int main(int argc, char **argv) {
 
 
             for(size_t j = buffer->rows.data[i].start; j < buffer->rows.data[i].end; j++) {
-                size_t col = j - buffer->rows.data[i].start;
+                if(j < buffer->rows.data[i].start+col_render_start || j > buffer->rows.data[i].end+col+state.main_col) continue;
+                size_t col = j-buffer->rows.data[i].start;
+                size_t print_index_x = col-col_render_start;
+                if(col > buffer->rows.data[i].end) {
+                    WRITE_LOG("col: %zu, j: %zu, c_r_s: %zu, start: %zu, end: %zu", col, j, col_render_start, buffer->rows.data[i].start, buffer->rows.data[i].end);
+                    break;
+                }
                 int between = (buffer->visual.start > buffer->visual.end) 
                     ? is_between(buffer->visual.end, buffer->visual.start, buffer->rows.data[i].start+col) 
                     : is_between(buffer->visual.start, buffer->visual.end, buffer->rows.data[i].start+col);
                 if(mode == VISUAL && between) wattron(state.main_win, A_STANDOUT);
                 else wattroff(state.main_win, A_STANDOUT);
-                mvwprintw(state.main_win, print_index_y, col, "%c", buffer->data.data[buffer->rows.data[i].start+col]);
+                mvwprintw(state.main_win, print_index_y, print_index_x, "%c", buffer->data.data[buffer->rows.data[i].start+col]);
             }
         }
 
         mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[mode]);
 
-        wmove(state.main_win, cur_row-line_render_start, col);
+        wmove(state.main_win, cur_row-row_render_start, col-col_render_start);
 
         wrefresh(state.status_bar);
         wrefresh(state.line_num_win);
