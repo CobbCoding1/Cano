@@ -154,6 +154,23 @@ void handle_save(Buffer *buffer) {
     fclose(file);
 }
 
+Buffer *load_buffer_from_file(char *filename) {
+    Buffer *buffer = calloc(1, sizeof(Buffer));
+    buffer->filename = filename;
+    FILE *file = fopen(filename, "a+");
+    if(file == NULL) CRASH("Could not open file");
+    fseek(file, 0, SEEK_END);
+    size_t length = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    buffer->data.count = length;
+    buffer->data.capacity = length*2;
+    buffer->data.data = calloc(buffer->data.capacity, sizeof(char));
+    fread(buffer->data.data, length, 1, file);
+    fclose(file);
+    buffer_calculate_rows(buffer);
+    return buffer;
+}
+
 
 Command parse_command(char *command, size_t command_s) {
     Command cmd = {0};
@@ -876,8 +893,7 @@ int main(int argc, char **argv) {
     keypad(main_win, TRUE);
 
     if(filename == NULL) filename = "out.txt";
-    Buffer *buffer = calloc(1, sizeof(Buffer));
-    buffer->filename = "out.txt";
+    Buffer *buffer = load_buffer_from_file(filename);
 
     char status_bar_msg[128] = {0};
     state.status_bar_msg = status_bar_msg;
