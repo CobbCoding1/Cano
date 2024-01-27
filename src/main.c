@@ -57,74 +57,6 @@ void init_ncurses_color(int id, int r, int g, int b) {
 }
 
 #ifdef REFACTOR
-void free_buffer(Buffer **buffer) {
-    for(size_t i = 0; i < (*buffer)->row_capacity; i++) {
-        if((*buffer)->rows[i].contents != NULL) {
-            free((*buffer)->rows[i].contents);
-            (*buffer)->rows[i].contents = NULL;
-        }
-    }
-    free((*buffer)->rows);
-    free((*buffer)->filename);
-    free(*buffer);
-    *buffer = NULL;
-}
-
-
-Buffer *copy_buffer(Buffer *buffer) {
-    Buffer *buf = calloc(1, sizeof(Buffer));
-    *buf = *buffer;
-    size_t filename_s = strlen(buffer->filename)+1;
-    buf->filename = calloc(filename_s, sizeof(char));
-    strncpy(buf->filename, buffer->filename, filename_s);
-    buf->rows = calloc(buffer->row_capacity, sizeof(Row));
-    for(size_t i = 0; i < buffer->row_capacity; i++) {
-        buf->rows[i].contents = calloc(buffer->rows[i].capacity, sizeof(char));
-    }
-    for(size_t i = 0; i <= buffer->row_s; i++) {
-        Row *cur = &buffer->rows[i];
-        buf->rows[i].size = cur->size; 
-        buf->rows[i].capacity = cur->capacity; 
-        buf->rows[i].index = cur->index; 
-        strncpy(buf->rows[i].contents, cur->contents, buffer->rows[i].size);
-    }
-    return buf;
-}
-
-void resize_rows(Buffer *buffer, size_t capacity) {
-    Row *rows = calloc(capacity*2, sizeof(Row));
-    if(rows == NULL) {
-        CRASH("no more ram");
-    }
-    memcpy(rows, buffer->rows, sizeof(Row)*buffer->row_capacity);
-    buffer->rows = rows;
-    for(size_t i = buffer->row_s+1; i < capacity*2; i++) {
-        buffer->rows[i].capacity = STARTING_ROW_SIZE;
-        buffer->rows[i].contents = calloc(buffer->rows[i].capacity, sizeof(char));
-        if(buffer->rows[i].contents == NULL) {
-            CRASH("no more ram");
-        }
-    }
-    buffer->row_capacity = capacity * 2;
-}
-
-void resize_row(Row **row, size_t capacity) {
-    (*row)->capacity = capacity;
-    char *new_contents = realloc((*row)->contents, (*row)->capacity);
-    if(new_contents == NULL) {
-        CRASH("no more ram");
-    }
-    memset(new_contents+(*row)->size, 0, capacity-(*row)->size);
-    (*row)->contents = new_contents;
-    return;
-}
-
-void insert_char(Row *row, size_t pos, char c) {
-    if(pos >= row->capacity) {
-        resize_row(&row, row->capacity*2);
-    }
-    row->contents[pos] = c;
-}
 
 Point search(Buffer *buffer, char *command, size_t command_s) {
     Point point = {
@@ -192,22 +124,14 @@ void find_and_replace(Buffer *buffer, char *old_str, char *new_str) {
     }
 }
 
+#endif
 
 size_t num_of_open_braces(Buffer *buffer) {
-    int posy = buffer->row_index;
-    int posx = buffer->cur_pos;
+    size_t index = buffer->cursor;
     int count = 0;
-    Row *cur = &buffer->rows[posy];
-    while(posy >= 0) {
-        posx--;
-        if(posx < 0) {
-            posy--;
-            if(posy < 0) break;
-            cur = &buffer->rows[posy];
-            posx = cur->size;
-        }
-
-        Brace brace = find_opposite_brace(cur->contents[posx]);
+    while(index > 0) {
+        index--;
+        Brace brace = find_opposite_brace(buffer->data.data[index]);
         if(brace.brace != '0') {
             if(!brace.closing) count++; 
             if(brace.closing) count--; 
@@ -216,7 +140,6 @@ size_t num_of_open_braces(Buffer *buffer) {
     if(count < 0) return 0;
     return count;
 }
-#endif
 
 void reset_command(char *command, size_t *command_s) {
     assert(*command_s <= 64);
@@ -452,6 +375,26 @@ size_t buffer_get_row(const Buffer *buffer) {
     return 0;
 }
 
+size_t index_get_row(Buffer *buffer, size_t index) {
+    ASSERT(index <= buffer->data.count, "index: %zu", index);
+    ASSERT(buffer->rows.count >= 1, "there must be at least one line");
+    for(size_t i = 0; i < buffer->rows.count; i++) {
+        if(buffer->rows.data[i].start <= index && index <= buffer->rows.data[i].end) {
+            return i;
+        }
+    }
+    return 0;
+}
+
+void buffer_delete_row(Buffer *buffer) {
+    size_t row = buffer_get_row(buffer);
+    Row cur = buffer->rows.data[row];
+    buffer->cursor = (row == 0) ? cur.start : cur.start-1;
+    memmove(&buffer->data.data[buffer->cursor], &buffer->data.data[buffer->cursor+cur.end-buffer->cursor], buffer->data.count - buffer->cursor - 1);
+    buffer->data.count -= cur.end-cur.start;
+    buffer_calculate_rows(buffer);
+}
+
 void buffer_move_up(Buffer *buffer) {
     size_t row = buffer_get_row(buffer);
     size_t col = buffer->cursor - buffer->rows.data[row].start;
@@ -584,7 +527,6 @@ Buffer *read_file_to_buffer(char *filename) {
 #endif
 
 int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
-    (void)buffer;
     (void)repeating_count;
     switch(ch) {
         case 'g': // Move to the start of the file or to the line specified by repeating_count
@@ -638,24 +580,25 @@ int handle_leader_keys(State *state) {
     return 1;
 }
 
-int handle_modifying_keys(Buffer *buffer, State *state, int ch, WINDOW *main_win, size_t *y) {
-    (void)buffer;
-    (void)main_win;
-    (void)y;
-    switch(ch) {
+int handle_modifying_keys(Buffer *buffer, State *state) {
+    switch(state->ch) {
         case 'x': {
+            buffer_delete_char(buffer);
         } break;
         case 'w': {
         } break;
         case 'd': {
             switch(state->leader) {
                 case LEADER_D:
+                    buffer_delete_row(buffer);
                     break;
                 default:
                     break;
             }
         } break;
         case 'r': {
+            state->ch = wgetch(state->main_win); 
+            buffer->data.data[buffer->cursor] = state->ch;
         } break;
         default: {
             return 0;
@@ -748,6 +691,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         default: {
             handle_motion_keys(buffer, state->ch, &state->repeating.repeating_count);
             handle_normal_to_insert_keys(buffer, state);
+            handle_modifying_keys(buffer, state);
         } break;
     }
     state->leader = LEADER_NONE;
@@ -853,6 +797,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case KEY_BACKSPACE: {
         } break;
         case ESCAPE:
+            curs_set(1);
             mode = NORMAL;
             break;
         case ENTER: {
@@ -989,21 +934,14 @@ int main(int argc, char **argv) {
     int line_num_width = 5;
     WINDOW *main_win = newwin(state.grow-2, state.gcol-line_num_width, 0, line_num_width);
     WINDOW *status_bar = newwin(2, state.gcol, state.grow-2, 0);
+    WINDOW *line_num_win = newwin(state.grow-2, line_num_width, 0, 0);
     state.main_win = main_win;
     state.status_bar = status_bar;
-    getmaxyx(main_win, state.main_row, state.main_col);
-
-    #ifdef REFACTOR
-    WINDOW *line_num_win = newwin(state.grow-2, line_num_width, 0, 0);
-    
     state.line_num_win = line_num_win;
-
+    getmaxyx(main_win, state.main_row, state.main_col);
     getmaxyx(line_num_win, state.line_num_row, state.line_num_col);
 
-
     keypad(status_bar, TRUE);
-    #endif
-
     keypad(main_win, TRUE);
 
     if(filename == NULL) filename = "out.txt";
@@ -1016,22 +954,38 @@ int main(int argc, char **argv) {
     while(state.ch != ctrl('q') && QUIT != 1) {
         werase(main_win);
         werase(status_bar);
-        mvwprintw(main_win, 0, 0, "%.*s", (int)buffer->data.count, buffer->data.data);
+        werase(line_num_win);
+        size_t cur_row = buffer_get_row(buffer);
+
+        size_t col = buffer->cursor - buffer->rows.data[cur_row].start;
+
+        mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
+
+        for(size_t i = 0; i < buffer->data.count; i++) {
+            size_t row = index_get_row(buffer, i);
+            size_t col = i - buffer->rows.data[row].start;
+            mvwprintw(state.main_win, row, col, "%c", buffer->data.data[i]);
+            if(relative_nums) {
+                if(cur_row == row) {
+                    mvwprintw(state.line_num_win, row, 0, "%zu", row+1);
+                } else {
+                    mvwprintw(state.line_num_win, row, 0, "%zu", (size_t)abs((int)row-(int)cur_row));
+                }
+            } else {
+                mvwprintw(state.line_num_win, row, 0, "%zu", row+1);
+            }
+        }
+
         mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[mode]);
 
-        size_t row = buffer_get_row(buffer);
-        Row cur = buffer->rows.data[row];
-        size_t col = buffer->cursor - cur.start;
+        wmove(state.main_win, cur_row, col);
 
-        mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", row, col);
-
-        wmove(main_win, row, col);
+        wrefresh(state.status_bar);
+        wrefresh(state.line_num_win);
+        wrefresh(state.main_win);
 
         state.ch = wgetch(main_win);
         key_func[mode](buffer, &buffer, &state);
-
-        wrefresh(main_win);
-        wrefresh(status_bar);
     }
     endwin();
     return 0;

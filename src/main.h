@@ -251,7 +251,7 @@ void shift_str_left(char *str, size_t *str_s, size_t index);
 void shift_str_right(char *str, size_t *str_s, size_t index);
 Buffer *read_file_to_buffer(char *filename);
 int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count);
-int handle_modifying_keys(Buffer *buffer, State *state, int ch, WINDOW *main_win, size_t *y);
+int handle_modifying_keys(Buffer *buffer, State *state);
 int handle_normal_to_insert_keys(Buffer *buffer, State *state);
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state);
 void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state);
