@@ -148,16 +148,11 @@ void reset_command(char *command, size_t *command_s) {
 }
 
 
-#ifdef REFACTOR
 void handle_save(Buffer *buffer) {
     FILE *file = fopen(buffer->filename, "w"); 
-    for(size_t i = 0; i <= buffer->row_s; i++) {
-        fwrite(buffer->rows[i].contents, buffer->rows[i].size, 1, file);
-        fwrite("\n", sizeof("\n")-1, 1, file);
-    }
+    fwrite(buffer->data.data, buffer->data.count, 1, file);
     fclose(file);
 }
-#endif
 
 
 Command parse_command(char *command, size_t command_s) {
@@ -252,71 +247,6 @@ int execute_command(Command *command, Buffer *buf, State *state) {
     return NO_ERROR;
 }
 
-// shift_rows_* functions shift the entire array of rows
-void shift_rows_left(Buffer *buf, size_t index) {
-    for(size_t i = index; i < buf->row_s; i++) {
-        Row *cur = &buf->rows[i];
-        Row *next = &buf->rows[i+1];
-        if(next->size >= cur->capacity) resize_row(&cur, next->capacity);
-        memset(cur->contents, 0, cur->size);
-        strncpy(cur->contents, next->contents, next->size);
-        cur->size = next->size;
-        cur->capacity = next->capacity;
-    }
-    memset(buf->rows[buf->row_s].contents, 0, buf->rows[buf->row_s].capacity);
-    buf->rows[buf->row_s].size = 0;
-    buf->row_s--;
-}
-
-void shift_rows_right(Buffer *buf, size_t index) {
-    if(buf->row_s+1 >= buf->row_capacity) resize_rows(buf, buf->row_capacity);
-    char *new = calloc(STARTING_ROW_SIZE, sizeof(char));
-    if(new == NULL) {
-        CRASH("no more ram");
-    }
-    for(size_t i = buf->row_s+1; i > index; i--) {
-        buf->rows[i] = buf->rows[i-1];
-    }
-    buf->rows[index] = (Row){0};
-    buf->rows[index].contents = new;
-    buf->rows[index].index = index;
-    buf->rows[index].capacity = STARTING_ROW_SIZE;
-    buf->row_s++;
-}
-
-// shift_row_* functions shift single row
-void shift_row_left(Row *row, size_t index) {
-    for(size_t i = index; i < row->size; i++) {
-        row->contents[i] = row->contents[i+1];
-    }
-    row->size--;  
-}
-
-void shift_row_right(Row *row, size_t index) {
-    for(size_t i = row->size++; i > index; i--) {
-        row->contents[i] = row->contents[i-1];
-    }
-    row->contents[index] = ' ';
-}
-
-void delete_char(Buffer *buffer, size_t row, size_t col, size_t *y, WINDOW *main_win) {
-    Row *cur = &buffer->rows[row];
-    if(cur->size > 0 && col < cur->size) {
-        insert_char(cur, cur->size, '\0');
-        shift_row_left(cur, col);
-        wmove(main_win, *y, col);
-    }
-}
-
-void delete_row(Buffer *buffer, size_t row) {
-    Row *cur = &buffer->rows[row];
-    memset(cur->contents, 0, cur->size);
-    cur->size = 0;
-    if(buffer->row_s != 0) {
-        shift_rows_left(buffer, row);
-        if(row > buffer->row_s) row--;
-    }
-}
 #endif
 
 void shift_str_left(char *str, size_t *str_s, size_t index) {
@@ -680,6 +610,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case 'U': {
         } break;
         case ctrl('s'): {
+            handle_save(buffer);
             QUIT = 1;
         } break;
         case ESCAPE:
@@ -946,39 +877,50 @@ int main(int argc, char **argv) {
 
     if(filename == NULL) filename = "out.txt";
     Buffer *buffer = calloc(1, sizeof(Buffer));
+    buffer->filename = "out.txt";
 
     char status_bar_msg[128] = {0};
     state.status_bar_msg = status_bar_msg;
     buffer_calculate_rows(buffer);
+
+    size_t line_render_start = 0;
 
     while(state.ch != ctrl('q') && QUIT != 1) {
         werase(main_win);
         werase(status_bar);
         werase(line_num_win);
         size_t cur_row = buffer_get_row(buffer);
+        Row cur = buffer->rows.data[cur_row]; 
+        if(cur_row <= line_render_start) line_render_start = cur_row;
+        if(cur_row >= line_render_start+state.main_row) line_render_start = cur_row-state.main_row+1;
 
-        size_t col = buffer->cursor - buffer->rows.data[cur_row].start;
+        size_t col = buffer->cursor - cur.start;
 
         mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
 
-        for(size_t i = 0; i < buffer->data.count; i++) {
-            size_t row = index_get_row(buffer, i);
-            size_t col = i - buffer->rows.data[row].start;
-            mvwprintw(state.main_win, row, col, "%c", buffer->data.data[i]);
+        for(size_t i = line_render_start; i <= line_render_start+state.main_row; i++) {
+            if(i >= buffer->rows.count) break;
+            size_t print_index_y = i - line_render_start;
+
             if(relative_nums) {
-                if(cur_row == row) {
-                    mvwprintw(state.line_num_win, row, 0, "%zu", row+1);
+                if(cur_row == i) {
+                    mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
                 } else {
-                    mvwprintw(state.line_num_win, row, 0, "%zu", (size_t)abs((int)row-(int)cur_row));
+                    mvwprintw(state.line_num_win, print_index_y, 0, "%zu", (size_t)abs((int)i-(int)cur_row));
                 }
             } else {
-                mvwprintw(state.line_num_win, row, 0, "%zu", row+1);
+                mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
+            }
+
+            for(size_t j = buffer->rows.data[i].start; j < buffer->rows.data[i].end; j++) {
+                size_t col = j - buffer->rows.data[i].start;
+                mvwprintw(state.main_win, print_index_y, col, "%c", buffer->data.data[buffer->rows.data[i].start+col]);
             }
         }
 
         mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[mode]);
 
-        wmove(state.main_win, cur_row, col);
+        wmove(state.main_win, cur_row-line_render_start, col);
 
         wrefresh(state.status_bar);
         wrefresh(state.line_num_win);
