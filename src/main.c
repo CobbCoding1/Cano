@@ -1,14 +1,10 @@
 #include "main.h"
 
-int is_between(Point a, Point b, Point c) {
-    if(a.y == b.y) {
-        if(c.y == a.y && c.x <= b.x && c.x >= a.x) return 1;
-    } else if ((a.y <= c.y && c.y <= b.y) || (b.y <= c.y && c.y <= a.y)) {
-        if(c.y == b.y && c.x > b.x) return 0;
-        if(c.y == a.y && c.x < a.x) return 0;
-        return 1;  
+int is_between(size_t a, size_t b, size_t c) {
+    if(a <= c && c <= b) {
+        return 1;
     }
-    return 0; 
+    return 0;
 }
 
 char *string_modes[MODE_COUNT] = {"NORMAL", "INSERT", "SEARCH", "COMMAND", "VISUAL"};
@@ -36,6 +32,15 @@ Brace find_opposite_brace(char opening) {
             break;
     }
     return (Brace){.brace = '0'};
+}
+
+void resize_window(State *state) {
+    getmaxyx(stdscr, state->grow, state->gcol);
+    wresize(state->main_win, state->grow-2, state->gcol-state->line_num_col);
+    wresize(state->status_bar, 2, state->gcol);
+    getmaxyx(state->main_win, state->main_row, state->main_col);
+    mvwin(state->main_win, 0, state->line_num_col);
+    wrefresh(state->main_win);
 }
 
 
@@ -552,9 +557,15 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             mode = SEARCH;
             break;
         case 'v':
+            buffer->visual.start = buffer->cursor;
+            buffer->visual.end = buffer->cursor;
+            buffer->visual.is_line = 0;
             mode = VISUAL;
             break;
         case 'V':
+            buffer->visual.start = buffer->rows.data[buffer_get_row(buffer)].start;
+            buffer->visual.end = buffer->rows.data[buffer_get_row(buffer)].end;
+            buffer->visual.is_line = 1;
             mode = VISUAL;
             break;
         case ctrl('o'): {
@@ -576,6 +587,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             mode = NORMAL;
             break;
         case KEY_RESIZE: {
+            resize_window(state);
         } break;
         default: {
             handle_motion_keys(buffer, state->ch, &state->repeating.repeating_count);
@@ -614,6 +626,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             buffer_move_right(buffer);
             break;
         case KEY_RESIZE: {
+            resize_window(state);
         } break;
         default: { // Handle other characters
             buffer_insert_char(buffer, state->ch);
@@ -678,7 +691,6 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 
 void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
-    (void)buffer;
     curs_set(0);
     switch(state->ch) {
         case '\b':
@@ -692,11 +704,28 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case ENTER: {
         } break;
         case 'd':
-        case 'x':
+        case 'x': {
+            int cond = (buffer->visual.start > buffer->visual.end);
+            size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
+            size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
+            for(int i = end; i >= (int)start; i--) {
+                buffer->cursor = i;
+                buffer_delete_char(buffer);
+            }
             mode = NORMAL;
             curs_set(1);
-            break;
+        } break;
         default: {
+            handle_motion_keys(buffer, state->ch, &state->repeating.repeating_count);
+            if(buffer->visual.is_line) {
+                buffer->visual.end = buffer->rows.data[buffer_get_row(buffer)].end;
+                if(buffer->visual.start >= buffer->visual.end) {
+                    buffer->visual.end = buffer->rows.data[buffer_get_row(buffer)].start;
+                    buffer->visual.start = buffer->rows.data[index_get_row(buffer, buffer->visual.start)].end;
+                }
+            } else {
+                buffer->visual.end = buffer->cursor;
+            }
         } break;
     }
 }
@@ -869,8 +898,14 @@ int main(int argc, char **argv) {
                 mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
             }
 
+
             for(size_t j = buffer->rows.data[i].start; j < buffer->rows.data[i].end; j++) {
                 size_t col = j - buffer->rows.data[i].start;
+                int between = (buffer->visual.start > buffer->visual.end) 
+                    ? is_between(buffer->visual.end, buffer->visual.start, buffer->rows.data[i].start+col) 
+                    : is_between(buffer->visual.start, buffer->visual.end, buffer->rows.data[i].start+col);
+                if(mode == VISUAL && between) wattron(state.main_win, A_STANDOUT);
+                else wattroff(state.main_win, A_STANDOUT);
                 mvwprintw(state.main_win, print_index_y, col, "%c", buffer->data.data[buffer->rows.data[i].start+col]);
             }
         }
@@ -994,9 +1029,9 @@ int main(int argc, char **argv) {
                     if(buffer->visual.starting_pos.y > buffer->visual.ending_pos.y || 
                       (buffer->visual.starting_pos.y == buffer->visual.ending_pos.y &&
                        buffer->visual.starting_pos.x > buffer->visual.ending_pos.x)) {
-                        between = is_between(buffer->visual.ending_pos, buffer->visual.starting_pos, point);
+                        //between = is_between(buffer->visual.ending_pos, buffer->visual.starting_pos, point);
                     } else {
-                        between = is_between(buffer->visual.starting_pos, buffer->visual.ending_pos, point);
+                        //between = is_between(buffer->visual.starting_pos, buffer->visual.ending_pos, point);
                     }
                     if(between) {
                         wattron(state.main_win, A_STANDOUT);

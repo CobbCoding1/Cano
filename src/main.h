@@ -105,8 +105,8 @@ typedef struct {
 } Point;
 
 typedef struct {
-    Point starting_pos;
-    Point ending_pos;
+    size_t start;
+    size_t end;
     int is_line;
 } Visual;
 
@@ -236,7 +236,7 @@ int QUIT = 0;
 
 /* --------------------------- FUNCTIONS --------------------------- */
 
-int is_between(Point a, Point b, Point c);
+int is_between(size_t a, size_t b, size_t c);
 char *stringify_mode();
 Brace find_opposite_brace(char opening);
 Ncurses_Color rgb_to_ncurses(int r, int g, int b);
