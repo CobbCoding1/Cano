@@ -372,123 +372,63 @@ void buffer_move_left(Buffer *buffer) {
     if(buffer->cursor > 0) buffer->cursor--;
 }
 
-#ifdef REFACTOR
-void append_rows(Row *a, Row *b) {
-    if(a->size + b->size >= a->capacity) {
-        resize_row(&a, a->capacity+b->capacity);
-    }
-
-    for(size_t i = 0; i < b->size; i++) {
-        a->contents[(i + a->size)] = b->contents[i];
-    }
-    a->size = a->size + b->size;
-}
-
-void delete_and_append_row(Buffer *buf, size_t index) {
-    append_rows(&buf->rows[index-1], &buf->rows[index]);
-    delete_row(buf, index);
-}
-
-void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t index) {
-    assert(index < buf->rows[buf->row_index].capacity);
-    assert(dest_index > 0);
-
-    size_t final_s = *str_s - index;
-    char *temp = calloc(final_s, sizeof(char));
-    if(temp == NULL) {
-        CRASH("no more ram");
-    }
-    size_t temp_len = 0;
-    for(size_t i = index; i < *str_s; i++) {
-        temp[temp_len++] = buf->rows[dest_index-1].contents[i];
-        buf->rows[dest_index-1].contents[i] = '\0';
-    }
-    shift_rows_right(buf, dest_index);
-    Row *cur = &buf->rows[dest_index];
-    if(cur->capacity < final_s) resize_row(&cur, final_s*2);
-    strncpy(cur->contents, temp, sizeof(char)*final_s);
-    buf->rows[dest_index].size = final_s;
-    *str_s = index;
-    free(temp);
-}
-
-void create_newline_indent(Buffer *buffer, size_t num_of_braces) {
-    if(!auto_indent) return;
-    Row *cur = &buffer->rows[buffer->row_index];
-    Brace brace = find_opposite_brace(cur->contents[buffer->cur_pos]);
-    if(brace.brace != '0' && brace.closing) {
-        create_and_cut_row(buffer, buffer->row_index+1,
-                    &cur->size, buffer->cur_pos);
-        for(size_t i = 0; i < indent*(num_of_braces-1); i++) {
-            shift_row_right(&buffer->rows[buffer->row_index+1], i);
+void buffer_next_brace(Buffer *buffer) {
+    int cur_pos = buffer->cursor;
+    Brace initial_brace = find_opposite_brace(buffer->data.data[cur_pos]);
+    size_t brace_stack = 0;
+    if(initial_brace.brace == '0') return;
+    int direction = (initial_brace.closing) ? -1 : 1;
+    while(cur_pos >= 0 && cur_pos <= (int)buffer->data.count) {
+        cur_pos += direction;
+        Brace cur_brace = find_opposite_brace(buffer->data.data[cur_pos]);
+        if(cur_brace.brace == '0') continue;
+        if((cur_brace.closing && direction == -1) || (!cur_brace.closing && direction == 1)) {
+            brace_stack++;
+        } else {
+            if(brace_stack-- == 0 && cur_brace.brace == find_opposite_brace(initial_brace.brace).brace) {
+                buffer->cursor = cur_pos;
+                break;
+            }
         }
     }
-    for(size_t i = 0; i < indent*num_of_braces; i++) {
-        shift_row_right(cur, buffer->cur_pos);
-        insert_char(cur, buffer->cur_pos++, ' ');
-    }
 }
-
-
-Buffer *read_file_to_buffer(char *filename) {
-    Buffer *buffer = calloc(1, sizeof(Buffer));
-    buffer->row_capacity = STARTING_ROWS_SIZE;
-    buffer->rows = calloc(buffer->row_capacity, sizeof(Row));
-    for(size_t i = 0; i < buffer->row_capacity; i++) {
-        buffer->rows[i].capacity = STARTING_ROW_SIZE;
-        buffer->rows[i].contents = calloc(buffer->rows[i].capacity, sizeof(char));
-        if(buffer->rows[i].contents == NULL) {
-            CRASH("OUT OF RAM");
-        }
-    }
-    size_t filename_s = strlen(filename)+1;
-    buffer->filename = calloc(filename_s, sizeof(char));
-    strncpy(buffer->filename, filename, filename_s);
-    FILE *file = fopen(filename, "a+");
-    if(file == NULL) {
-        CRASH("could not open file");
-    }
-    fseek(file, 0, SEEK_END);
-    size_t length = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    char *buf = calloc(length, sizeof(char));
-    fread(buf, sizeof(char)*length, 1, file);
-    if(length > buffer->row_capacity) {
-        resize_rows(buffer, length);
-    }
-
-    Row *cur = &buffer->rows[buffer->row_s];
-    for(size_t i = 0; i+1 < length; i++) {
-        if(buf[i] == '\n') {
-            buffer->row_s++;
-            cur = &buffer->rows[buffer->row_s];
-            continue;
-        }
-        cur->contents[cur->size++] = buf[i];
-        if(cur->size >= cur->capacity) {
-            resize_row(&cur, cur->capacity*2);
-        }
-    }
-    return buffer;
-}
-#endif
 
 int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
     (void)repeating_count;
     switch(ch) {
         case 'g': // Move to the start of the file or to the line specified by repeating_count
+            buffer->cursor = 0;
             break;
         case 'G': // Move to the end of the file or to the line specified by repeating_count
+            buffer->cursor = buffer->data.count;
             break;
-        case '0': // Move to the start of the line
-            break;
-        case '$': // Move to the end of the line
-            break;
+        case '0': { // Move to the start of the line
+            size_t row = buffer_get_row(buffer);
+            buffer->cursor = buffer->rows.data[row].start;
+        } break;
+        case '$': { // Move to the end of the line
+            size_t row = buffer_get_row(buffer);
+            buffer->cursor = buffer->rows.data[row].end;
+        } break;
         case 'e': { // Move to the end of the next word
+            if(buffer->cursor+1 < buffer->data.count && !isalnum(buffer->data.data[buffer->cursor+1])) buffer->cursor++;
+            while(buffer->cursor+1 < buffer->data.count && isalnum(buffer->data.data[buffer->cursor+1])) {
+                buffer->cursor++;
+            }
         } break;
         case 'b': { // Move to the start of the previous word
+            if(buffer->cursor == 0) break;
+            if(buffer->cursor-1 > 0 && !isalnum(buffer->data.data[buffer->cursor-1])) buffer->cursor--;
+            while(buffer->cursor-1 > 0 && isalnum(buffer->data.data[buffer->cursor-1])) {
+                buffer->cursor--;
+            }
+            if(buffer->cursor-1 == 0) buffer->cursor--;
         } break;
         case 'w': { // Move to the start of the next word
+            while(buffer->cursor < buffer->data.count && isalnum(buffer->data.data[buffer->cursor])) {
+                buffer->cursor++;
+            }
+            if(buffer->cursor < buffer->data.count) buffer->cursor++;
         } break;
         case LEFT_ARROW:
         case 'h': // Move left
@@ -507,6 +447,7 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
             buffer_move_right(buffer);
             break;
         case '%': { // Move to the matching brace
+            buffer_next_brace(buffer);
             break;
         }
         default: { // If the key is not a motion key, return 0
