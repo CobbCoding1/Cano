@@ -297,7 +297,6 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
 
     String_View view = view_create(line, line_s);
     while(view.len > 0) {
-        view = view_trim_left(view);
         if(isalpha(view.data[0])) {
             Token token = generate_word(&view, line);
             if(token_arr_s >= *token_arr_capacity) {
@@ -310,7 +309,7 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
         } else if(view.data[0] == '#') {
             Token token = {
                 .type = Type_Preprocessor,
-                .index = 0,
+                .index = view.data-line,
                 .size = view.len,
             };
 

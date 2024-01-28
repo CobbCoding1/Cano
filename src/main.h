@@ -16,7 +16,6 @@
 
 #include "colors.h"
 #include "config.h"
-#include "lex.c"
 
 #define DATA_START_CAPACITY 1024
 
@@ -47,6 +46,7 @@
         }                                                                               \
     } while(0)
 
+
 #define DA_APPEND(da, item) do {                                                       \
     if ((da)->count >= (da)->capacity) {                                               \
         (da)->capacity = (da)->capacity == 0 ? DATA_START_CAPACITY : (da)->capacity*2; \
@@ -56,6 +56,7 @@
     (da)->data[(da)->count++] = (item);                                               \
 } while (0)
 
+#include "lex.c"
 
 #define ctrl(x) ((x) & 0x1f)
 

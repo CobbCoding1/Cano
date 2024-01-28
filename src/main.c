@@ -719,9 +719,11 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             }
         } break;
         case ESCAPE:
+            reset_command(state->command, &state->command_s);
             mode = NORMAL;
             break;
         case ENTER: {
+            // TODO: reimplement search and replace
             size_t index = search(buffer, state->command, state->command_s);
             buffer->cursor = index;
             mode = NORMAL;
@@ -801,7 +803,6 @@ State init_state() {
     return state;
 }
 
-#ifdef REFACTOR
 void load_config_from_file(State *state, Buffer *buffer, char *config_filename, char *syntax_filename) {
     if(config_filename == NULL) {
         char default_config_filename[128] = {0};
@@ -849,7 +850,6 @@ void load_config_from_file(State *state, Buffer *buffer, char *config_filename, 
         }
     }
 }
-#endif
 
 void init_colors() {
     if(has_colors() == FALSE) {
@@ -927,6 +927,8 @@ int main(int argc, char **argv) {
     if(filename == NULL) filename = "out.txt";
     Buffer *buffer = load_buffer_from_file(filename);
 
+    load_config_from_file(&state, buffer, config_filename, syntax_filename);
+
     char status_bar_msg[128] = {0};
     state.status_bar_msg = status_bar_msg;
     buffer_calculate_rows(buffer);
@@ -957,6 +959,7 @@ int main(int argc, char **argv) {
             if(i >= buffer->rows.count) break;
             size_t print_index_y = i - row_render_start;
 
+            wattron(state.line_num_win, COLOR_PAIR(YELLOW_COLOR));
             if(relative_nums) {
                 if(cur_row == i) {
                     mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
@@ -966,16 +969,41 @@ int main(int argc, char **argv) {
             } else {
                 mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
             }
+            wattroff(state.line_num_win, COLOR_PAIR(YELLOW_COLOR));
+
+            size_t off_at = 0;
+            size_t token_capacity = 32;
+            Token *token_arr = calloc(token_capacity, sizeof(Token));
+            size_t token_s = 0;
+
+            if(syntax) {
+                token_s = generate_tokens(buffer->data.data+buffer->rows.data[i].start, 
+                                          buffer->rows.data[i].end-buffer->rows.data[i].start, 
+                                          token_arr, &token_capacity);
+            }
+
+            Color_Pairs color = 0;
+
+
             for(size_t j = buffer->rows.data[i].start; j < buffer->rows.data[i].end; j++) {
                 if(j < buffer->rows.data[i].start+col_render_start || j > buffer->rows.data[i].end+col+state.main_col) continue;
                 size_t col = j-buffer->rows.data[i].start;
                 size_t print_index_x = col-col_render_start;
+
+                size_t keyword_size = 0;
+                if(syntax && is_in_tokens_index(token_arr, token_s, col, &keyword_size, &color)) {
+                    wattron(state.main_win, COLOR_PAIR(color));
+                    off_at = col+keyword_size;
+                }
+                if(syntax && col == off_at) wattroff(state.main_win, COLOR_PAIR(color));
+
                 if(col > buffer->rows.data[i].end) break;
                 int between = (buffer->visual.start > buffer->visual.end) 
                     ? is_between(buffer->visual.end, buffer->visual.start, buffer->rows.data[i].start+col) 
                     : is_between(buffer->visual.start, buffer->visual.end, buffer->rows.data[i].start+col);
                 if(mode == VISUAL && between) wattron(state.main_win, A_STANDOUT);
                 else wattroff(state.main_win, A_STANDOUT);
+
                 mvwprintw(state.main_win, print_index_y, print_index_x, "%c", buffer->data.data[buffer->rows.data[i].start+col]);
             }
         }
