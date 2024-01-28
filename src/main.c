@@ -151,6 +151,7 @@ void reset_command(char *command, size_t *command_s) {
 
 void handle_save(Buffer *buffer) {
     FILE *file = fopen(buffer->filename, "w"); 
+    WRITE_LOG("%s, %zu", buffer->data.data, buffer->data.count);
     fwrite(buffer->data.data, buffer->data.count, 1, file);
     fclose(file);
 }
@@ -324,9 +325,13 @@ size_t index_get_row(Buffer *buffer, size_t index) {
 void buffer_delete_row(Buffer *buffer) {
     size_t row = buffer_get_row(buffer);
     Row cur = buffer->rows.data[row];
-    buffer->cursor = (row == 0) ? cur.start : cur.start-1;
-    memmove(&buffer->data.data[buffer->cursor], &buffer->data.data[buffer->cursor+cur.end-buffer->cursor], buffer->data.count - buffer->cursor - 1);
-    buffer->data.count -= cur.end-cur.start;
+    size_t start = (row == 0) ? cur.start+1 : cur.start;
+    buffer->cursor = cur.end;
+    while(buffer->cursor >= start) {
+        buffer->cursor--;
+        buffer_delete_char(buffer);
+    } 
+    if(row == 0) buffer_delete_char(buffer);
     buffer_calculate_rows(buffer);
 }
 
