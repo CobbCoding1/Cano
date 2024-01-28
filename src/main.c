@@ -915,6 +915,7 @@ int main(int argc, char **argv) {
 
 
         mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
+        mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[mode]);
 
         for(size_t i = row_render_start; i <= row_render_start+state.main_row; i++) {
             if(i >= buffer->rows.count) break;
@@ -945,13 +946,11 @@ int main(int argc, char **argv) {
             }
         }
 
-        mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[mode]);
-
-        wmove(state.main_win, cur_row-row_render_start, col-col_render_start);
-
+        wrefresh(state.main_win);
         wrefresh(state.status_bar);
         wrefresh(state.line_num_win);
-        wrefresh(state.main_win);
+
+        wmove(state.main_win, cur_row-row_render_start, col-col_render_start);
 
         state.ch = wgetch(main_win);
         key_func[mode](buffer, &buffer, &state);
