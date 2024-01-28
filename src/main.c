@@ -622,6 +622,10 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 buffer_delete_char(buffer);
             }
         } break;
+        case ctrl('s'): {
+            handle_save(buffer);
+            QUIT = 1;
+        } break;
         case ESCAPE: // Switch to NORMAL mode
             mode = NORMAL;
             break;
@@ -657,6 +661,10 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case ESCAPE:
             mode = NORMAL;
             break;
+        case ctrl('s'): {
+            handle_save(buffer);
+            QUIT = 1;
+        } break;
         case KEY_ENTER:
         case ENTER: {
             mode = NORMAL;
@@ -688,6 +696,10 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case ENTER: {
             mode = NORMAL;
         } break;
+        case ctrl('s'): {
+            handle_save(buffer);
+            QUIT = 1;
+        } break;
         case LEFT_ARROW:
             break;
         case DOWN_ARROW:
@@ -714,6 +726,10 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             mode = NORMAL;
             break;
         case ENTER: {
+        } break;
+        case ctrl('s'): {
+            handle_save(buffer);
+            QUIT = 1;
         } break;
         case 'd':
         case 'x': {
