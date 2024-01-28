@@ -61,31 +61,19 @@ void init_ncurses_color(int id, int r, int g, int b) {
         init_color(id, color.r, color.g, color.b);
 }
 
-#ifdef REFACTOR
 
-Point search(Buffer *buffer, char *command, size_t command_s) {
-    Point point = {
-            .x = buffer -> cur_pos,
-            .y = buffer -> row_index,
-    };
-    for(size_t i = buffer->row_index; i <= buffer->row_s+buffer->row_index; i++) {
-
-        size_t index = (i + buffer->row_s+1) % (buffer->row_s+1);
-        Row *cur = &buffer->rows[index];
-        size_t j = (i == buffer->row_index) ? buffer->cur_pos+1 : 0;
-        for(; j < cur->size; j++) {
-            if(strncmp(cur->contents+j, command, command_s) == 0) {
-                // result found and will return the location of the word.
-                point.x = j;
-                point.y = index;
-                return point;
-            }
+size_t search(Buffer *buffer, char *command, size_t command_s) {
+    for(size_t i = buffer->cursor+1; i < buffer->data.count+buffer->cursor; i++) {
+        size_t pos = i % buffer->data.count;
+        if(strncmp(buffer->data.data+pos, command, command_s) == 0) {
+            // result found and will return the location of the word.
+            return pos;
         }
     }
-
-    return point;
-
+    return buffer->cursor;
 }
+
+#ifdef REFACTOR
 
 
 void replace(Buffer *buffer, Point position, char *new_str, size_t old_str_s, size_t new_str_s) { 
@@ -161,7 +149,9 @@ void handle_save(Buffer *buffer) {
 
 Buffer *load_buffer_from_file(char *filename) {
     Buffer *buffer = calloc(1, sizeof(Buffer));
-    buffer->filename = filename;
+    size_t filename_s = strlen(filename)+1; 
+    buffer->filename = calloc(filename_s, sizeof(char));
+    strncpy(buffer->filename, filename, filename_s);
     FILE *file = fopen(filename, "a+");
     if(file == NULL) CRASH("Could not open file");
     fseek(file, 0, SEEK_END);
@@ -203,8 +193,8 @@ Command parse_command(char *command, size_t command_s) {
 }
 
 
-#ifdef REFACTOR
 int execute_command(Command *command, Buffer *buf, State *state) {
+    (void)state;
     if(command->command_s == 10 && strncmp(command->command, "set-output", 10) == 0) {
         if(command->args_s < 1) return INVALID_ARG; 
         char *filename = command->args[0].arg;
@@ -245,19 +235,6 @@ int execute_command(Command *command, Buffer *buf, State *state) {
             if(value < 0) return INVALID_VALUE;
             syntax = value;
         } else if(command->args[0].size >= 9 && strncmp(command->args[0].arg, "undo-size", 9) == 0) {
-            if(command->args[1].size < 1) return INVALID_VALUE;
-            int value = 0;
-            if(command->args[1].arg != NULL && isdigit(command->args[1].arg[0])) value = atoi(command->args[1].arg);
-            if(value < 0) return INVALID_VALUE;
-            undo_size = value;
-            state->undo_stack.buf_capacity = undo_size;
-            for(size_t i = 0; i < state->undo_stack.buf_stack_s; i++) {
-                free_buffer(&state->undo_stack.buf_stack[i]);
-            }
-            state->undo_stack.buf_stack_s = 0;
-            free(state->undo_stack.buf_stack);
-            state->undo_stack.buf_stack = calloc(state->undo_stack.buf_capacity, sizeof(Buffer));
-            push_undo(&state->undo_stack, buf);
         } else {
             return UNKNOWN_COMMAND;
         }
@@ -268,8 +245,6 @@ int execute_command(Command *command, Buffer *buf, State *state) {
     free(command->command);
     return NO_ERROR;
 }
-
-#endif
 
 void shift_str_left(char *str, size_t *str_s, size_t index) {
     for(size_t i = index; i < *str_s; i++) {
@@ -563,9 +538,13 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     if(state->leader == LEADER_NONE && handle_leader_keys(state)) return;   
     switch(state->ch) {
         case ':':
+            state->x = 1;
+            wmove(state->status_bar, state->x, 1);
             mode = COMMAND;
             break;
         case '/':
+            state->x = state->command_s+1;
+            wmove(state->status_bar, state->x, 1);
             mode = SEARCH;
             break;
         case 'v':
@@ -585,6 +564,8 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case 'R':
             break;
         case 'n': {
+            size_t index = search(buffer, state->command, state->command_s);
+            buffer->cursor = index;
         } break;
         case 'u': {
         } break;
@@ -657,8 +638,13 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case '\b':
         case 127:
         case KEY_BACKSPACE: {
+            if(state->x != 0) {
+                shift_str_left(state->command, &state->command_s, --state->x);
+                wmove(state->status_bar, 1, state->x);
+            }
         } break;
         case ESCAPE:
+            reset_command(state->command, &state->command_s);
             mode = NORMAL;
             break;
         case ctrl('s'): {
@@ -667,17 +653,55 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         } break;
         case KEY_ENTER:
         case ENTER: {
+            if(state->command[0] == '!') {
+                shift_str_left(state->command, &state->command_s, 0);
+                FILE *file = popen(state->command, "r");
+                if(file == NULL) {
+                    CRASH("could not run command");
+                }
+                while(fgets(state->status_bar_msg, sizeof(state->status_bar_msg), file) != NULL) {
+                    state->is_print_msg = 1;
+                }
+                pclose(file);
+            } else {
+                Command cmd = parse_command(state->command, state->command_s);
+                int err = execute_command(&cmd, buffer, state);
+                switch(err) {
+                    case NO_ERROR:
+                        break;
+                    case UNKNOWN_COMMAND:
+                        sprintf(state->status_bar_msg, "Unnown command: %s", cmd.command);
+                        state->is_print_msg = 1;
+                        break;
+                    case INVALID_ARG:
+                        sprintf(state->status_bar_msg, "Invalid arg %s\n", cmd.args[0].arg);
+                        state->is_print_msg = 1;
+                        break;
+                    case INVALID_VALUE:
+                        sprintf(state->status_bar_msg, "Invalid value %s\n", cmd.args[1].arg);
+                        state->is_print_msg = 1;
+                        break;
+                    default:
+                        sprintf(state->status_bar_msg, "err");
+                        state->is_print_msg = 1;
+                        break;
+                }
+            }
             mode = NORMAL;
         } break;
         case LEFT_ARROW:
+            if(state->x > 1) state->x--;
             break;
         case DOWN_ARROW:
             break;
         case UP_ARROW:
             break;
         case RIGHT_ARROW:
+            if(state->x < state->command_s) state->x++;
             break;
         default: {
+            shift_str_right(state->command, &state->command_s, state->x);
+            state->command[(state->x++)-1] = state->ch;
         } break;
     }
 }
@@ -689,11 +713,17 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case '\b':
         case 127:
         case KEY_BACKSPACE: {
+            if(state->x != 0) {
+                shift_str_left(state->command, &state->command_s, --state->x);
+                wmove(state->status_bar, 1, state->x);
+            }
         } break;
         case ESCAPE:
             mode = NORMAL;
             break;
         case ENTER: {
+            size_t index = search(buffer, state->command, state->command_s);
+            buffer->cursor = index;
             mode = NORMAL;
         } break;
         case ctrl('s'): {
@@ -701,14 +731,18 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             QUIT = 1;
         } break;
         case LEFT_ARROW:
+            if(state->x > 1) state->x--;
             break;
         case DOWN_ARROW:
             break;
         case UP_ARROW:
             break;
         case RIGHT_ARROW:
+            if(state->x < state->command_s) state->x++;
             break;
         default: {
+            shift_str_right(state->command, &state->command_s, state->x);
+            state->command[(state->x++)-1] = state->ch;
         } break;
     }
 }
@@ -917,6 +951,8 @@ int main(int argc, char **argv) {
         mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
         mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[mode]);
 
+        if(mode == COMMAND || mode == SEARCH) mvwprintw(state.status_bar, 1, 0, ":%.*s", (int)state.command_s, state.command);
+
         for(size_t i = row_render_start; i <= row_render_start+state.main_row; i++) {
             if(i >= buffer->rows.count) break;
             size_t print_index_y = i - row_render_start;
@@ -930,8 +966,6 @@ int main(int argc, char **argv) {
             } else {
                 mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
             }
-
-
             for(size_t j = buffer->rows.data[i].start; j < buffer->rows.data[i].end; j++) {
                 if(j < buffer->rows.data[i].start+col_render_start || j > buffer->rows.data[i].end+col+state.main_col) continue;
                 size_t col = j-buffer->rows.data[i].start;
@@ -947,10 +981,15 @@ int main(int argc, char **argv) {
         }
 
         wrefresh(state.main_win);
-        wrefresh(state.status_bar);
         wrefresh(state.line_num_win);
+        wrefresh(state.status_bar);
 
-        wmove(state.main_win, cur_row-row_render_start, col-col_render_start);
+        if(mode == COMMAND || mode == SEARCH) {
+            wmove(state.status_bar, 1, state.x);
+            wrefresh(state.status_bar);
+        } else {
+            wmove(state.main_win, cur_row-row_render_start, col-col_render_start);
+        }
 
         state.ch = wgetch(main_win);
         key_func[mode](buffer, &buffer, &state);
