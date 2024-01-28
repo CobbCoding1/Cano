@@ -63,6 +63,7 @@
 #define ESCAPE      27
 #define SPACE       32 
 #define ENTER       10
+#define KEY_TAB     9
 #define DOWN_ARROW  258 
 #define UP_ARROW    259 
 #define LEFT_ARROW  260 

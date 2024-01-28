@@ -55,6 +55,16 @@ Ncurses_Color rgb_to_ncurses(int r, int g, int b) {
 
 }
 
+void free_buffer(Buffer *buffer) {
+    free(buffer->data.data);
+    free(buffer->rows.data);
+    free(buffer->filename);
+    buffer->data.count = 0;
+    buffer->rows.count = 0;
+    buffer->data.capacity = 0;
+    buffer->rows.capacity = 0;
+}
+
 
 void init_ncurses_color(int id, int r, int g, int b) {
         Ncurses_Color color = rgb_to_ncurses(r, g, b);
@@ -74,8 +84,6 @@ size_t search(Buffer *buffer, char *command, size_t command_s) {
 }
 
 #ifdef REFACTOR
-
-
 void replace(Buffer *buffer, Point position, char *new_str, size_t old_str_s, size_t new_str_s) { 
     if (buffer == NULL || new_str == NULL) {
         WRITE_LOG("Error: null pointer");
@@ -378,6 +386,13 @@ int isword(char ch) {
     return 0;
 }
 
+void buffer_newline_indent(Buffer *buffer, State *state) {
+    buffer_insert_char(buffer, '\n');
+    for(size_t i = 0; i < indent*state->num_of_braces; i++) {
+        buffer_insert_char(buffer, ' ');
+    }
+}
+
 int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
     (void)repeating_count;
     switch(ch) {
@@ -464,7 +479,9 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
                     while(buffer->cursor < buffer->data.count && isword(buffer->data.data[buffer->cursor])) {
                         buffer_delete_char(buffer);
                     }
-                    if(buffer->cursor < buffer->data.count && isspace(buffer->data.data[buffer->cursor])) buffer_delete_char(buffer); 
+                    if(buffer->cursor < buffer->data.count && isspace(buffer->data.data[buffer->cursor])) {
+                        buffer_delete_char(buffer); 
+                    }
                     break;
                 default:
                     break;
@@ -515,15 +532,14 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
             size_t row = buffer_get_row(buffer);
             size_t end = buffer->rows.data[row].end;
             buffer->cursor = end;
-            buffer_insert_char(buffer, '\n');
+            buffer_newline_indent(buffer, state);
             mode = INSERT;
         } break;
         case 'O': {
             size_t row = buffer_get_row(buffer);
             size_t start = buffer->rows.data[row].start;
             buffer->cursor = start;
-            buffer_insert_char(buffer, '\n');
-            buffer->cursor = start;
+            buffer_newline_indent(buffer, state);
             mode = INSERT;
         } break;
         default: {
@@ -560,6 +576,10 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             mode = VISUAL;
             break;
         case ctrl('o'): {
+            buffer_insert_char(buffer, '\n');
+            for(size_t i = 0; i < indent*state->num_of_braces; i++) {
+                buffer_insert_char(buffer, ' ');
+            }
         } break;
         case 'R':
             break;
@@ -625,8 +645,40 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case KEY_RESIZE: {
             resize_window(state);
         } break;
+        case KEY_TAB:
+            for(size_t i = 0; i < indent; i++) {
+                buffer_insert_char(buffer, ' ');
+            }
+            break;
+        case KEY_ENTER:
+        case ENTER: {
+            Brace brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
+            buffer_newline_indent(buffer, state);
+            if(brace.brace != '0' && brace.closing) {
+                buffer_insert_char(buffer, '\n');
+                for(size_t i = 0; i < indent*(state->num_of_braces-1); i++) {
+                    buffer_insert_char(buffer, ' ');
+                    buffer->cursor--;
+                }
+                buffer->cursor--;
+            }
+        } break;
         default: { // Handle other characters
+            Brace cur_brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
+            if((cur_brace.brace != '0' && cur_brace.closing && 
+                state->ch == find_opposite_brace(cur_brace.brace).brace) || 
+               (buffer->data.data[buffer->cursor] == '"' && state->ch == '"') ||
+               (buffer->data.data[buffer->cursor] == '\'' && state->ch == '\'')
+            ) {
+                buffer->cursor++;
+                break;
+            };
+            Brace brace = find_opposite_brace(state->ch);
             buffer_insert_char(buffer, state->ch);
+            if(brace.brace != '0' && !brace.closing) {
+                buffer_insert_char(buffer, brace.brace);
+                buffer->cursor--;
+            }
         } break;
     }
 }
@@ -699,6 +751,9 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case RIGHT_ARROW:
             if(state->x < state->command_s) state->x++;
             break;
+        case KEY_RESIZE:
+            resize_window(state);
+            break;
         default: {
             shift_str_right(state->command, &state->command_s, state->x);
             state->command[(state->x++)-1] = state->ch;
@@ -741,6 +796,9 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             break;
         case RIGHT_ARROW:
             if(state->x < state->command_s) state->x++;
+            break;
+        case KEY_RESIZE:
+            resize_window(state);
             break;
         default: {
             shift_str_right(state->command, &state->command_s, state->x);
@@ -863,7 +921,6 @@ void init_colors() {
     init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
     init_pair(MAGENTA_COLOR, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
-
 }
 
 /* ------------------------- FUNCTIONS END ------------------------- */
@@ -949,6 +1006,8 @@ int main(int argc, char **argv) {
         if(col <= col_render_start) col_render_start = col;
         if(col >= col_render_start+state.main_col) col_render_start = col-state.main_col+1;
 
+        state.num_of_braces = num_of_open_braces(buffer);
+
 
         mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
         mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[mode]);
@@ -1023,197 +1082,8 @@ int main(int argc, char **argv) {
         key_func[mode](buffer, &buffer, &state);
     }
     endwin();
-    return 0;
 
+    free_buffer(buffer);
 
-    #ifdef REFACTOR
-    // load config
-    //load_config_from_file(&state, buffer, config_filename, syntax_filename);
-
-    while(state.ch != ctrl('q') && QUIT != 1) {
-        getmaxyx(state.main_win, state.main_row, state.main_col);
-
-#ifndef NO_CLEAR
-
-        werase(state.main_win);
-        werase(state.status_bar);
-        werase(line_num_win);
-
-#endif
-
-        int row_s_len = (int)log10(buffer->row_s)+2;
-        if(row_s_len > state.line_num_col) {
-            wresize(state.main_win, state.main_row, state.main_col-(row_s_len-line_num_width));
-            wresize(line_num_win, state.line_num_row, row_s_len);
-            mvwin(state.main_win, 0, row_s_len);
-            getmaxyx(state.main_win, state.main_row, state.main_col);
-            getmaxyx(line_num_win, state.line_num_row, state.line_num_col);
-            line_num_width = row_s_len;
-        }
-
-        // status bar
-        if(state.is_print_msg) {
-            mvwprintw(state.status_bar, 1, 0, "%s", state.status_bar_msg);
-            wrefresh(state.status_bar);
-            sleep(1);
-            wclear(state.status_bar);
-            state.is_print_msg = 0;
-        }
-
-        if(mode == COMMAND || mode == SEARCH) {
-            mvwprintw(state.status_bar, 1, 0, ":%.*s", (int)state.command_s, state.command);
-        }
-
-        mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[mode]);
-        mvwprintw(state.status_bar, 0, state.gcol/2, "%.3zu:%.3zu", buffer->row_index+1, buffer->cur_pos+1);
-
-        // Adjust the line rendering start based on the current row index
-        if(buffer->row_index <= line_render_start) line_render_start = buffer->row_index;
-        if(buffer->row_index >= line_render_start+state.main_row) line_render_start = buffer->row_index-state.main_row+1;
-
-        // Adjust the column rendering start based on the current cursor position
-        if(buffer->cur_pos <= col_render_start) col_render_start = buffer->cur_pos;
-        if(buffer->cur_pos >= col_render_start+state.main_col) col_render_start = buffer->cur_pos-state.main_col+1;
-
-        for(size_t i = line_render_start; i <= line_render_start+state.main_row; i++) {
-            if(i <= buffer->row_s) {
-                size_t print_index_y = i - line_render_start;
-
-                // Set the line number color to yellow
-                wattron(line_num_win, COLOR_PAIR(YELLOW_COLOR));
-
-                if(relative_nums) {
-                    if(buffer->row_index == i) {
-                        mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
-                    }
-                    else {
-                        mvwprintw(line_num_win, print_index_y, 0, "%4zu", 
-                                (size_t)abs((int)i-(int)buffer->row_index));
-                    }
-                } else {
-                    mvwprintw(line_num_win, print_index_y, 0, "%4zu", i+1);
-                }
-
-                // Turn off the yellow color
-                wattroff(line_num_win, COLOR_PAIR(YELLOW_COLOR));
-
-                size_t off_at = 0;
-
-                // Initialize the token array for syntax highlighting
-                size_t token_capacity = 32;
-                Token *token_arr = calloc(token_capacity, sizeof(Token));
-                size_t token_s = 0;
-
-                // If syntax highlighting is enabled, generate the tokens for the current line
-                if(syntax) {
-                    token_s = generate_tokens(buffer->rows[i].contents, 
-                                                        buffer->rows[i].size, token_arr, &token_capacity);
-                }
-                
-                Color_Pairs color = 0;
-
-            size_t j = 0;
-            for(j = col_render_start; j <= col_render_start+state.main_col; j++) {
-                size_t keyword_size = 0;
-                if(syntax && is_in_tokens_index(token_arr, token_s, j, &keyword_size, 
-                                                &color)) {
-                    wattron(state.main_win, COLOR_PAIR(color));
-                    off_at = j + keyword_size;
-                }
-                if(syntax && j == off_at) wattroff(state.main_win, COLOR_PAIR(color));
-                if(mode == VISUAL) {
-                    if(buffer->visual.starting_pos.y == buffer->visual.ending_pos.y) {
-
-                    }
-                    Point point = {.x = j, .y = i};
-                    int between = 0;
-                    if(buffer->visual.starting_pos.y > buffer->visual.ending_pos.y || 
-                      (buffer->visual.starting_pos.y == buffer->visual.ending_pos.y &&
-                       buffer->visual.starting_pos.x > buffer->visual.ending_pos.x)) {
-                        //between = is_between(buffer->visual.ending_pos, buffer->visual.starting_pos, point);
-                    } else {
-                        //between = is_between(buffer->visual.starting_pos, buffer->visual.ending_pos, point);
-                    }
-                    if(between) {
-                        wattron(state.main_win, A_STANDOUT);
-                    }
-                }
-                size_t print_index_x = j - col_render_start;
-                if(j <= buffer->rows[i].size) {
-                    mvwprintw(state.main_win, print_index_y, print_index_x, "%c", buffer->rows[i].contents[j]);
-                }
-                wattroff(state.main_win, A_STANDOUT);
-            }
-            free(token_arr);
-
-            }
-        }
-
-        wrefresh(state.main_win);
-        wrefresh(state.status_bar);
-        wrefresh(line_num_win);
-
-        state.repeating.repeating_count = 1;
-
-        state.y = buffer->row_index-line_render_start;
-        state.x = buffer->cur_pos-col_render_start;
-
-        if(state.repeating.repeating) {
-            mvwprintw(state.status_bar, 1, state.gcol-10, "r");
-            wrefresh(state.status_bar);
-        }
-
-        if(mode != COMMAND && mode != SEARCH) {
-            wmove(state.main_win, state.y, state.x);
-            state.ch = wgetch(state.main_win);
-        } else if(mode == COMMAND){
-            wmove(state.status_bar, 1, buffer->cur_pos+1);
-            state.ch = wgetch(state.status_bar);
-        } else {
-            wmove(state.status_bar, 1, buffer->cur_pos+1);
-            state.ch = wgetch(state.status_bar);
-        }
-
-        if(state.repeating.repeating) {
-            char num[32] = {0};
-            size_t num_s = 0;
-            while(isdigit(state.ch)) {
-                num[num_s++] = state.ch;
-                mvwprintw(state.status_bar, 1, (state.gcol-10)+num_s, "%c", num[num_s-1]);
-                wrefresh(state.status_bar);
-                state.ch = wgetch(state.main_win);
-            }
-            state.repeating.repeating_count = atoi(num);
-            state.repeating.repeating = 0;
-        }
-
-        wmove(state.main_win, state.y, state.x);
-        state.num_of_braces = num_of_open_braces(buffer);
-
-        for(size_t i = 0; i < state.repeating.repeating_count; i++) {
-            key_func[mode](buffer, &buffer, &state);
-        }
-        if(mode != COMMAND && mode != SEARCH && buffer->cur_pos > buffer->rows[buffer->row_index].size) {
-            buffer->cur_pos = buffer->rows[buffer->row_index].size;
-        }
-        state.x = buffer->cur_pos;
-        state.y = buffer->row_index;
-        getyx(state.main_win, state.y, state.x);
-    }
-
-    endwin();
-
-    free_buffer(&buffer);
-    for(size_t i = 0; i < state.undo_stack.buf_capacity; i++) {
-        if(state.undo_stack.buf_stack[i] != NULL) {
-            free_buffer(&state.undo_stack.buf_stack[i]);
-        }
-    }
-    for(size_t i = 0; i < state.redo_stack.buf_capacity; i++) {
-        if(state.redo_stack.buf_stack[i] != NULL) {
-            free_buffer(&state.redo_stack.buf_stack[i]);
-        }
-    }
-    #endif
     return 0;
 }
