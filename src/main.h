@@ -204,10 +204,10 @@ typedef struct State {
     Sized_Str clipboard;
 
     // window sizes
-    int main_row;
-    int main_col;
     int grow;
     int gcol;
+    int main_row;
+    int main_col;
     int line_num_row;
     int line_num_col;
     int status_bar_row;
