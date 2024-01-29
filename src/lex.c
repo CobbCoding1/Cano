@@ -296,6 +296,7 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
     size_t token_arr_s = 0;
 
     String_View view = view_create(line, line_s);
+    view = view_trim_left(view);
     while(view.len > 0) {
         if(isalpha(view.data[0])) {
             Token token = generate_word(&view, line);
@@ -348,6 +349,7 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
         if(view.len == 0) break;
         view.data++;
         view.len--;
+        view = view_trim_left(view);
     }
     return token_arr_s;
 }

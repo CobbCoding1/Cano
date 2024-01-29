@@ -54,7 +54,7 @@ char *view_to_cstr(String_View view) {
 
 String_View view_trim_left(String_View view) {
     size_t i = 0;
-    while(isspace(view.data[i])) {
+    while(i < view.len && isspace(view.data[i])) {
         i++;
     }
     return (String_View){
@@ -65,7 +65,7 @@ String_View view_trim_left(String_View view) {
 
 String_View view_trim_right(String_View view) {
     size_t i = view.len - 1;
-    while(isspace(view.data[i])) {
+    while(i < view.len && isspace(view.data[i])) {
         i--;
     }
     return (String_View){
