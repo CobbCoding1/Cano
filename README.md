@@ -31,6 +31,7 @@ Command - For executing commands
 |Normal| x              | Delete character                                |
 |Normal| d + d          | Delete entire line                              |
 |Normal| d + w          | Deletes current word                            |
+|Normal| y + y          | Yanks the current line                          |
 |Normal| g              | Go to first line                                |
 |Normal| G              | Go to last line                                 |
 |Normal| 0              | Go to beginning of line                         |
