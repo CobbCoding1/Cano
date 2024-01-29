@@ -478,6 +478,12 @@ int handle_leader_keys(State *state) {
 int handle_modifying_keys(Buffer *buffer, State *state) {
     switch(state->ch) {
         case 'x': {
+            reset_command(state->clipboard.str, &state->clipboard.len);
+            state->clipboard.len = 2; 
+            state->clipboard.str = realloc(state->clipboard.str, 
+                                           state->clipboard.len*sizeof(char));
+            if(state->clipboard.str == NULL) CRASH("null");
+            strncpy(state->clipboard.str, buffer->data.data+buffer->cursor, state->clipboard.len);
             buffer_delete_char(buffer);
         } break;
         case 'w': {
@@ -620,7 +626,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                         if(i > index_get_row(buffer, buffer->data.count)) break;
                         Row cur = buffer->rows.data[row+i];
                         size_t initial_s = state->clipboard.len;
-                        state->clipboard.len = cur.end - cur.start+1;
+                        state->clipboard.len = cur.end - cur.start + 1; // account for new line
                         state->clipboard.str = realloc(state->clipboard.str, 
                                                        initial_s+state->clipboard.len*sizeof(char));
                         if(state->clipboard.str == NULL) CRASH("null");
