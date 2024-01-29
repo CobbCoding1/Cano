@@ -83,33 +83,19 @@ size_t search(Buffer *buffer, char *command, size_t command_s) {
     return buffer->cursor;
 }
 
-#ifdef REFACTOR
-void replace(Buffer *buffer, Point position, char *new_str, size_t old_str_s, size_t new_str_s) { 
+void replace(Buffer *buffer, char *new_str, size_t old_str_s, size_t new_str_s) { 
     if (buffer == NULL || new_str == NULL) {
         WRITE_LOG("Error: null pointer");
         return;
     }
 
-    Row *cur = &buffer->rows[position.y];
-    if (cur == NULL || cur->contents == NULL) {
-        WRITE_LOG("Error: null pointer");
-        return;
+    for(size_t i = 0; i < old_str_s; i++) {
+        buffer_delete_char(buffer);
     }
 
-    size_t new_s = cur->size + new_str_s - old_str_s;
-
-    for(size_t i = position.x; i < position.x+old_str_s; i++) {
-        shift_row_left(cur, position.x);
+    for(size_t i = 0; i < new_str_s; i++) {
+        buffer_insert_char(buffer, new_str[i]);
     }
-    cur->size = new_s;
-
-    // Move the contents after the old substring to make space for the new string
-    for(size_t i = position.x; i < position.x+new_str_s; i++) {
-        shift_row_right(cur, position.x);
-    }
-
-    // Copy the new string into the buffer at the specified position
-    memcpy(cur->contents + position.x, new_str, new_str_s);
 }
 
 
@@ -118,14 +104,13 @@ void find_and_replace(Buffer *buffer, char *old_str, char *new_str) {
     size_t new_str_s = strlen(new_str);
 
     // Search for the old string in the buffer
-    Point position = search(buffer, old_str, old_str_s);
-    if (position.x != (buffer->cur_pos) && position.y != (buffer->row_index)){
+    size_t position = search(buffer, old_str, old_str_s);
+    if (position != (buffer->cursor)) {
+        buffer->cursor = position;
         // If the old string is found, replace it with the new string
-        replace(buffer, position, new_str, old_str_s, new_str_s);
+        replace(buffer, new_str, old_str_s, new_str_s);
     }
 }
-
-#endif
 
 size_t num_of_open_braces(Buffer *buffer) {
     size_t index = buffer->cursor;
@@ -783,8 +768,32 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             mode = NORMAL;
             break;
         case ENTER: {
-            // TODO: reimplement search and replace
             size_t index = search(buffer, state->command, state->command_s);
+            if(state->command_s > 2 && strncmp(state->command, "s/", 2) == 0) {
+                char str[128]; // replace with the maximum length of your command
+                strncpy(str, state->command+2, state->command_s-2);
+                str[state->command_s-2] = '\0'; // ensure null termination
+
+                char *token = strtok(str, "/");
+                int count = 0;
+                char args[2][100];
+
+                while (token != NULL) {
+                    char temp_buffer[100];
+                    strcpy(temp_buffer, token);
+                    if(count == 0) {
+                        strcpy(args[0], temp_buffer);
+                    } else if(count == 1) {
+                        strcpy(args[1], temp_buffer);
+                    }
+                    count++;
+
+                    // log for args.
+                    token = strtok(NULL, "/");
+                }
+                index = search(buffer, args[0], strlen(args[0]));
+                find_and_replace(buffer, args[0], args[1]);
+            } 
             buffer->cursor = index;
             mode = NORMAL;
         } break;
