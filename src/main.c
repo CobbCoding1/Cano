@@ -128,7 +128,6 @@ size_t num_of_open_braces(Buffer *buffer) {
 }
 
 void reset_command(char *command, size_t *command_s) {
-    assert(*command_s <= 64);
     memset(command, 0, *command_s);
     *command_s = 0;
 }
@@ -467,6 +466,9 @@ int handle_leader_keys(State *state) {
         case 'd':
             state->leader = LEADER_D;
             break;
+        case 'y':
+            state->leader = LEADER_Y;
+            break;
         default:
             return 0;
     }    
@@ -608,8 +610,37 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case KEY_RESIZE: {
             resize_window(state);
         } break;
+        case 'y':
+            switch(state->leader) {
+                case LEADER_Y: {
+                    if(state->repeating.repeating_count == 0) state->repeating.repeating_count = 1;
+                    reset_command(state->clipboard.str, &state->clipboard.len);
+                    for(size_t i = 0; i < state->repeating.repeating_count; i++) {
+                        size_t row = buffer_get_row(buffer);
+                        if(i > index_get_row(buffer, buffer->data.count)) break;
+                        Row cur = buffer->rows.data[row+i];
+                        size_t initial_s = state->clipboard.len;
+                        state->clipboard.len = cur.end - cur.start+1;
+                        state->clipboard.str = realloc(state->clipboard.str, 
+                                                       initial_s+state->clipboard.len*sizeof(char));
+                        if(state->clipboard.str == NULL) CRASH("null");
+                        strncpy(state->clipboard.str+initial_s, buffer->data.data+cur.start, state->clipboard.len);
+                        state->clipboard.len += initial_s;
+                    }
+                    state->repeating.repeating_count = 0;
+                } break;
+                default:
+                    break;
+            }
+            break;
+        case 'p':
+            if(state->clipboard.len == 0) break;
+            for(size_t i = 0; i < state->clipboard.len-1; i++) {
+                buffer_insert_char(buffer, state->clipboard.str[i]);
+            }
+            break;
         default: {
-            if(isdigit(state->ch)) {
+            if(isdigit(state->ch) && state->ch != '0') {
                 char num[32] = {0};
                 size_t num_s = 0;
                 while(isdigit(state->ch)) {

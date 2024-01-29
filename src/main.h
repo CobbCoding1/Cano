@@ -86,10 +86,11 @@ typedef enum {
     LEADER_NONE,
     LEADER_R,
     LEADER_D,
+    LEADER_Y,
     LEADER_COUNT,
 } Leader;
 
-char leaders[LEADER_COUNT] = {' ', 'r', 'd'};
+char leaders[LEADER_COUNT] = {' ', 'r', 'd', 'y'};
 
 typedef struct {
     char color_name[20];
@@ -174,6 +175,11 @@ typedef struct {
     size_t repeating_count;
 } Repeating;
 
+typedef struct {
+    char *str;
+    size_t len;
+} Sized_Str;
+
 typedef struct State {
     Undo undo_stack;
     Undo redo_stack;
@@ -194,6 +200,8 @@ typedef struct State {
     size_t normal_pos;
 
     void(**key_func)(Buffer *buffer, Buffer **modify_buffer, struct State *state);
+
+    Sized_Str clipboard;
 
     // window sizes
     int main_row;
