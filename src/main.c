@@ -350,6 +350,19 @@ void buffer_move_left(Buffer *buffer) {
     if(buffer->cursor > 0) buffer->cursor--;
 }
 
+int skip_to_char(Buffer *buffer, int cur_pos, int direction, char c) {
+    if(buffer->data.data[cur_pos] == c) {
+        cur_pos += direction;
+        while(cur_pos > 0 && cur_pos <= (int)buffer->data.count && buffer->data.data[cur_pos] != c) {
+            if(cur_pos > 1 && cur_pos < (int)buffer->data.count && buffer->data.data[cur_pos] == '\\') {
+                cur_pos += direction;
+            }
+            cur_pos += direction;
+        }
+    }
+    return cur_pos;
+}
+
 void buffer_next_brace(Buffer *buffer) {
     int cur_pos = buffer->cursor;
     Brace initial_brace = find_opposite_brace(buffer->data.data[cur_pos]);
@@ -358,6 +371,8 @@ void buffer_next_brace(Buffer *buffer) {
     int direction = (initial_brace.closing) ? -1 : 1;
     while(cur_pos >= 0 && cur_pos <= (int)buffer->data.count) {
         cur_pos += direction;
+        cur_pos = skip_to_char(buffer, cur_pos, direction, '"');
+        cur_pos = skip_to_char(buffer, cur_pos, direction, '\'');
         Brace cur_brace = find_opposite_brace(buffer->data.data[cur_pos]);
         if(cur_brace.brace == '0') continue;
         if((cur_brace.closing && direction == -1) || (!cur_brace.closing && direction == 1)) {
@@ -679,14 +694,12 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         default: { // Handle other characters
             Brace cur_brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
             if((cur_brace.brace != '0' && cur_brace.closing && 
-                state->ch == find_opposite_brace(cur_brace.brace).brace) || 
-               (buffer->data.data[buffer->cursor] == '"' && state->ch == '"') ||
-               (buffer->data.data[buffer->cursor] == '\'' && state->ch == '\'')
-            ) {
+                state->ch == find_opposite_brace(cur_brace.brace).brace)) {
                 buffer->cursor++;
                 break;
             };
             Brace brace = find_opposite_brace(state->ch);
+            // TODO: make quotes auto close
             buffer_insert_char(buffer, state->ch);
             if(brace.brace != '0' && !brace.closing) {
                 buffer_insert_char(buffer, brace.brace);

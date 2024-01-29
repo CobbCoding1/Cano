@@ -339,6 +339,31 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
             view.len--;
             view.data++;
             while(view.len > 0 && view.data[0] != '"') {
+                if(view.len > 1 && view.data[0] == '\\') {
+                    string_s++;
+                    view.len--;
+                    view.data++;
+                }
+                string_s++;
+                view.len--;
+                view.data++;
+            }
+            token.size = ++string_s;
+            token_arr[token_arr_s++] = token;
+        } else if(view.data[0] == '\'') {
+            Token token = {
+                .type = Type_String,
+                .index = view.data-line,
+            };
+            size_t string_s = 1;
+            view.len--;
+            view.data++;
+            while(view.len > 0 && view.data[0] != '\'') {
+                if(view.len > 1 && view.data[0] == '\\') {
+                    string_s++;
+                    view.len--;
+                    view.data++;
+                }
                 string_s++;
                 view.len--;
                 view.data++;
