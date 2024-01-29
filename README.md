@@ -20,43 +20,52 @@ Search - For searching of text in the current buffer \
 Command - For executing commands
 
 ## Keybinds
-|Mode  | Keybind  | Action                                          |
-|------|----------|-------------------------------------------------|
-|Global| Ctrl + Q | Quit (regardless of mode)                       |
-|Global| Esc      | Enter Normal Mode                               |
-|Normal| h        | Move left                                       |
-|Normal| j        | Move down                                       |
-|Normal| k        | Move up                                         |
-|Normal| l        | Move right                                      |
-|Normal| x        | Delete character                                |
-|Normal| d + d    | Delete entire line                              |
-|Normal| d + w    | Deletes current word                            |
-|Normal| g        | Go to first line                                |
-|Normal| G        | Go to last line                                 |
-|Normal| 0        | Go to beginning of line                         |
-|Normal| $        | Go to end of line                               |
-|Normal| w        | Go to next word                                 |
-|Normal| b        | Go to last word                                 |
-|Normal| e        | Go to end of next word                          |
-|Normal| o        | Create line below current                       |
-|Normal| O        | Create line above current                       |
-|Normal| ctrl + o | Create line below current without changing mode |
-|Normal| %        | Go to corresponding brace                       |
-|Normal| i        | Enter insert mode                               |
-|Normal| I        | Go to beginning of line                         |
-|Normal| a        | Insert mode on next char                        |
-|Normal| A        | Insert mode at end of line                      |
-|Normal| v        | Enter visual mode                               |
-|Normal| V        | Enter visual mode by line                       |
-|Normal| u        | Undo                                            |
-|Normal| U        | Redo                                            |
-|Normal| /        | Enter search mode                               |
-|Normal| n        | Jump to next search                             |
-|Normal| Ctrl + S | Save and exit                                   |
-|Normal| r        | Replace current char with next char inputted    |
-|Normal| R + (n)  | Repeat next motion n times                      |
+|Mode  | Keybind        | Action                                          |
+|------|----------------|-------------------------------------------------|
+|Global| Ctrl + Q       | Quit (regardless of mode)                       |
+|Global| Esc            | Enter Normal Mode                               |
+|Normal| h              | Move left                                       |
+|Normal| j              | Move down                                       |
+|Normal| k              | Move up                                         |
+|Normal| l              | Move right                                      |
+|Normal| x              | Delete character                                |
+|Normal| d + d          | Delete entire line                              |
+|Normal| d + w          | Deletes current word                            |
+|Normal| g              | Go to first line                                |
+|Normal| G              | Go to last line                                 |
+|Normal| 0              | Go to beginning of line                         |
+|Normal| $              | Go to end of line                               |
+|Normal| w              | Go to next word                                 |
+|Normal| b              | Go to last word                                 |
+|Normal| e              | Go to end of next word                          |
+|Normal| o              | Create line below current                       |
+|Normal| O              | Create line above current                       |
+|Normal| ctrl + o       | Create line below current without changing mode |
+|Normal| %              | Go to corresponding brace                       |
+|Normal| i              | Enter insert mode                               |
+|Normal| I              | Go to beginning of line                         |
+|Normal| a              | Insert mode on next char                        |
+|Normal| A              | Insert mode at end of line                      |
+|Normal| v              | Enter visual mode                               |
+|Normal| V              | Enter visual mode by line                       |
+|Normal| u              | Undo                                            |
+|Normal| U              | Redo                                            |
+|Normal| /              | Enter search mode                               |
+|Normal| n              | Jump to next search                             |
+|Normal| Ctrl + S       | Save and exit                                   |
+|Normal| r              | Replace current char with next char inputted    |
+|Normal| (n) + motion   | Repeat next motion n times                      |
 
+## Visual
 Visual mode works the same as Normal mode, except works on the entire selection, instead of character by character.
+
+## Search
+Search mode takes a string and finds it in the file.
+if prepended with 's/' then it will replace the first substring with the second.
+```sh
+s/hello/goodbye
+```
+Will replace hello with goodbye.
 
 ## Commands 
 | Command               | Action                    |

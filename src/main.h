@@ -72,6 +72,7 @@
 #define STARTING_ROWS_SIZE 128
 #define STARTING_ROW_SIZE 64 
 
+
 typedef enum {
     NORMAL,
     INSERT,
@@ -85,9 +86,10 @@ typedef enum {
     LEADER_NONE,
     LEADER_R,
     LEADER_D,
+    LEADER_COUNT,
 } Leader;
 
-
+char leaders[LEADER_COUNT] = {' ', 'r', 'd'};
 
 typedef struct {
     char color_name[20];
@@ -172,7 +174,7 @@ typedef struct {
     size_t repeating_count;
 } Repeating;
 
-typedef struct {
+typedef struct State {
     Undo undo_stack;
     Undo redo_stack;
     size_t num_of_braces;
@@ -190,6 +192,8 @@ typedef struct {
     size_t x;
     size_t y;
     size_t normal_pos;
+
+    void(**key_func)(Buffer *buffer, Buffer **modify_buffer, struct State *state);
 
     // window sizes
     int main_row;

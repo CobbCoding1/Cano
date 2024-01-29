@@ -586,6 +586,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             QUIT = 1;
         } break;
         case ESCAPE:
+            state->repeating.repeating_count = 0;
             reset_command(state->command, &state->command_s);
             mode = NORMAL;
             break;
@@ -593,12 +594,34 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             resize_window(state);
         } break;
         default: {
+            if(isdigit(state->ch)) {
+                char num[32] = {0};
+                size_t num_s = 0;
+                while(isdigit(state->ch)) {
+                    num[num_s++] = state->ch;
+                    mvwprintw(state->status_bar, 0, state->main_col-10, "%s", num);
+                    wrefresh(state->status_bar);
+                    state->ch = wgetch(state->main_win);
+                }
+                if(state->ch == ESCAPE) break; 
+                if(handle_normal_to_insert_keys(buffer, state)) state->ch = wgetch(state->main_win);
+                state->repeating.repeating_count = atoi(num);
+                if(state->repeating.repeating_count == 0) break;
+                WRITE_LOG("%zu", state->repeating.repeating_count);
+                for(size_t i = 0; i < state->repeating.repeating_count; i++) {
+                    state->key_func[mode](buffer, modify_buffer, state);
+                }
+                state->repeating.repeating_count = 0;
+                break;
+            }
             if(handle_modifying_keys(buffer, state)) break;
             if(handle_motion_keys(buffer, state->ch, &state->repeating.repeating_count)) break;
             if(handle_normal_to_insert_keys(buffer, state)) break;
         } break;
     }
-    state->leader = LEADER_NONE;
+    if(state->repeating.repeating_count == 0) {
+        state->leader = LEADER_NONE;
+    }
 }
 
 void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
@@ -889,7 +912,6 @@ void load_config_from_file(State *state, Buffer *buffer, char *config_filename, 
         sprintf(default_config_filename, "%s/config.cano", config_dir);
         config_filename = default_config_filename;
 
-
         char *language = strip_off_dot(buffer->filename, strlen(buffer->filename));
         if(language != NULL) {
             syntax_filename = calloc(strlen(config_dir)+strlen(language)+sizeof(".cyntax")+1, sizeof(char));
@@ -937,6 +959,7 @@ void init_colors() {
     init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
 }
 
+
 /* ------------------------- FUNCTIONS END ------------------------- */
 
 
@@ -974,12 +997,13 @@ int main(int argc, char **argv) {
     init_colors();
 
     // define functions based on current mode
-    void(*key_func[MODE_COUNT])(Buffer *buffer, Buffer **modify_buffer, State *state) = {
+    void(*key_func[MODE_COUNT])(Buffer *buffer, Buffer **modify_buffer, struct State *state) = {
         handle_normal_keys, handle_insert_keys, handle_search_keys, handle_command_keys, handle_visual_keys
     };
 
     State state = init_state();
     state.command = calloc(64, sizeof(char));
+    state.key_func = key_func;
 
     getmaxyx(stdscr, state.grow, state.gcol);
     int line_num_width = 5;
@@ -1024,6 +1048,7 @@ int main(int argc, char **argv) {
 
 
         mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
+        mvwprintw(status_bar, 0, state.main_col-11, "%c", leaders[state.leader]);
         mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[mode]);
 
         if(mode == COMMAND || mode == SEARCH) mvwprintw(state.status_bar, 1, 0, ":%.*s", (int)state.command_s, state.command);
@@ -1093,7 +1118,7 @@ int main(int argc, char **argv) {
         }
 
         state.ch = wgetch(main_win);
-        key_func[mode](buffer, &buffer, &state);
+        state.key_func[mode](buffer, &buffer, &state);
     }
     endwin();
 
