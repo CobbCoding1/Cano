@@ -514,6 +514,7 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
                     }
                     break;
                 default:
+                    return 0;
                     break;
             }
         } break;
