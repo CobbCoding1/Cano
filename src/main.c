@@ -1093,8 +1093,10 @@ int main(int argc, char **argv) {
     // else{
     //     WRITE_LOG("filename: %s", filename);
     // }
-
-    bool isC = contains_c_extension(filename);
+    bool isC = false;
+    if (!(filename == NULL)){
+        isC = contains_c_extension(filename);
+    }
 
     if(isC) {
         WRITE_LOG("C file detected");
