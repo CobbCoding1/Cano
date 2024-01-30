@@ -813,6 +813,7 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                         break;
                 }
             }
+	    reset_command(state->command, &state->command_s);
             mode = NORMAL;
         } break;
         case LEFT_ARROW:
