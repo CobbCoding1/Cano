@@ -128,6 +128,7 @@ size_t num_of_open_braces(Buffer *buffer) {
 }
 
 void reset_command(char *command, size_t *command_s) {
+    assert(*command_s <= 64);
     memset(command, 0, *command_s);
     *command_s = 0;
 }
@@ -306,28 +307,6 @@ size_t index_get_row(Buffer *buffer, size_t index) {
     return 0;
 }
 
-void buffer_yank_line(Buffer *buffer, State *state, size_t offset) {
-    size_t row = buffer_get_row(buffer);
-    if(offset > index_get_row(buffer, buffer->data.count)) return;
-    Row cur = buffer->rows.data[row+offset];
-    size_t initial_s = state->clipboard.len;
-    state->clipboard.len = cur.end - cur.start + 1; // account for new line
-    state->clipboard.str = realloc(state->clipboard.str, 
-                                   initial_s+state->clipboard.len*sizeof(char));
-    if(state->clipboard.str == NULL) CRASH("null");
-    strncpy(state->clipboard.str+initial_s, buffer->data.data+cur.start, state->clipboard.len);
-    state->clipboard.len += initial_s;
-}
-
-void buffer_yank_char(Buffer *buffer, State *state) {
-    reset_command(state->clipboard.str, &state->clipboard.len);
-    state->clipboard.len = 2; 
-    state->clipboard.str = realloc(state->clipboard.str, 
-                                   state->clipboard.len*sizeof(char));
-    if(state->clipboard.str == NULL) CRASH("null");
-    strncpy(state->clipboard.str, buffer->data.data+buffer->cursor, state->clipboard.len);
-}
-
 void buffer_delete_row(Buffer *buffer) {
     size_t row = buffer_get_row(buffer);
     Row cur = buffer->rows.data[row];
@@ -371,19 +350,6 @@ void buffer_move_left(Buffer *buffer) {
     if(buffer->cursor > 0) buffer->cursor--;
 }
 
-int skip_to_char(Buffer *buffer, int cur_pos, int direction, char c) {
-    if(buffer->data.data[cur_pos] == c) {
-        cur_pos += direction;
-        while(cur_pos > 0 && cur_pos <= (int)buffer->data.count && buffer->data.data[cur_pos] != c) {
-            if(cur_pos > 1 && cur_pos < (int)buffer->data.count && buffer->data.data[cur_pos] == '\\') {
-                cur_pos += direction;
-            }
-            cur_pos += direction;
-        }
-    }
-    return cur_pos;
-}
-
 void buffer_next_brace(Buffer *buffer) {
     int cur_pos = buffer->cursor;
     Brace initial_brace = find_opposite_brace(buffer->data.data[cur_pos]);
@@ -392,8 +358,6 @@ void buffer_next_brace(Buffer *buffer) {
     int direction = (initial_brace.closing) ? -1 : 1;
     while(cur_pos >= 0 && cur_pos <= (int)buffer->data.count) {
         cur_pos += direction;
-        cur_pos = skip_to_char(buffer, cur_pos, direction, '"');
-        cur_pos = skip_to_char(buffer, cur_pos, direction, '\'');
         Brace cur_brace = find_opposite_brace(buffer->data.data[cur_pos]);
         if(cur_brace.brace == '0') continue;
         if((cur_brace.closing && direction == -1) || (!cur_brace.closing && direction == 1)) {
@@ -488,9 +452,6 @@ int handle_leader_keys(State *state) {
         case 'd':
             state->leader = LEADER_D;
             break;
-        case 'y':
-            state->leader = LEADER_Y;
-            break;
         default:
             return 0;
     }    
@@ -500,7 +461,6 @@ int handle_leader_keys(State *state) {
 int handle_modifying_keys(Buffer *buffer, State *state) {
     switch(state->ch) {
         case 'x': {
-            buffer_yank_char(buffer, state);
             buffer_delete_char(buffer);
         } break;
         case 'w': {
@@ -514,15 +474,12 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
                     }
                     break;
                 default:
-                    return 0;
                     break;
             }
         } break;
         case 'd': {
             switch(state->leader) {
                 case LEADER_D:
-                    reset_command(state->clipboard.str, &state->clipboard.len);
-                    buffer_yank_line(buffer, state, 0);
                     buffer_delete_row(buffer);
                     break;
                 default:
@@ -636,28 +593,8 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case KEY_RESIZE: {
             resize_window(state);
         } break;
-        case 'y':
-            switch(state->leader) {
-                case LEADER_Y: {
-                    if(state->repeating.repeating_count == 0) state->repeating.repeating_count = 1;
-                    reset_command(state->clipboard.str, &state->clipboard.len);
-                    for(size_t i = 0; i < state->repeating.repeating_count; i++) {
-                        buffer_yank_line(buffer, state, i);
-                    }
-                    state->repeating.repeating_count = 0;
-                } break;
-                default:
-                    break;
-            }
-            break;
-        case 'p':
-            if(state->clipboard.len == 0) break;
-            for(size_t i = 0; i < state->clipboard.len-1; i++) {
-                buffer_insert_char(buffer, state->clipboard.str[i]);
-            }
-            break;
         default: {
-            if(isdigit(state->ch) && state->ch != '0') {
+            if(isdigit(state->ch)) {
                 char num[32] = {0};
                 size_t num_s = 0;
                 while(isdigit(state->ch)) {
@@ -742,12 +679,14 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         default: { // Handle other characters
             Brace cur_brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
             if((cur_brace.brace != '0' && cur_brace.closing && 
-                state->ch == find_opposite_brace(cur_brace.brace).brace)) {
+                state->ch == find_opposite_brace(cur_brace.brace).brace) || 
+               (buffer->data.data[buffer->cursor] == '"' && state->ch == '"') ||
+               (buffer->data.data[buffer->cursor] == '\'' && state->ch == '\'')
+            ) {
                 buffer->cursor++;
                 break;
             };
             Brace brace = find_opposite_brace(state->ch);
-            // TODO: make quotes auto close
             buffer_insert_char(buffer, state->ch);
             if(brace.brace != '0' && !brace.closing) {
                 buffer_insert_char(buffer, brace.brace);
@@ -755,6 +694,88 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             }
         } break;
     }
+}
+
+void * check_for_errors(void *args) {
+    ThreadArgs *threadArgs = (ThreadArgs *)args;
+
+    bool loop = true; /* loop to be used later on, to make it constantly check for errors. Right now it just runs once. */
+    while (loop) {
+
+        char path[1035];
+
+        /* Open the command for reading. */
+        char command[1024];
+        sprintf(command, "gcc %s -o /dev/null -Wall -Wextra -Werror -std=c99 2> errors.cano && echo $? > success.cano", threadArgs->path_to_file);
+        FILE *fp = popen(command, "r");
+        if (fp == NULL) {
+            loop = false;
+            static char return_message[] = "Failed to run command";
+            WRITE_LOG("Failed to run command");
+            return (void *)return_message;
+        }
+        pclose(fp);
+
+        FILE *should_check_for_errors = fopen("success.cano", "r");
+
+        if (should_check_for_errors == NULL) {
+            loop = false;
+            WRITE_LOG("Failed to open file");
+            return (void *)NULL;
+        }
+        while (fgets(path, sizeof(path) -1, should_check_for_errors) != NULL) {
+            WRITE_LOG("return code: %s", path);
+            if (!(strcmp(path, "0") == 0)) {
+                FILE *file_contents = fopen("errors.cano", "r");
+                if (fp == NULL) {
+                    loop = false;
+                    WRITE_LOG("Failed to open file");
+                    return (void *)NULL;
+                }
+
+                fseek(file_contents, 0, SEEK_END);
+                long filesize = ftell(file_contents);
+                fseek(file_contents, 0, SEEK_SET);
+
+                char *buffer = malloc(filesize + 1);
+                if (buffer == NULL) {
+                    WRITE_LOG("Failed to allocate memory");
+                    return (void *)NULL;
+                }
+                fread(buffer, 1, filesize, file_contents);
+                buffer[filesize] = '\0';
+
+                char *bufffer = malloc(filesize + 1);
+
+                while (fgets(path, sizeof(path) -1, file_contents) != NULL) {
+                    strcat(bufffer, path);
+                    strcat(buffer, "\n");
+                }
+
+                char *return_message = malloc(filesize + 1);
+                if (return_message == NULL) {
+                    WRITE_LOG("Failed to allocate memory");
+                    free(buffer);
+                    return (void *)NULL;
+                }
+                strcpy(return_message, buffer);
+
+                free(buffer); 
+                loop = false;
+                fclose(file_contents);
+
+                return (void *)return_message;
+            }
+            else {
+                loop = false;
+                static char return_message[] = "No errors found";
+                return (void *)return_message;
+            }
+        }
+
+    }
+
+    return (void *)NULL;
 }
 
 void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
@@ -813,7 +834,6 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                         break;
                 }
             }
-	    reset_command(state->command, &state->command_s);
             mode = NORMAL;
         } break;
         case LEFT_ARROW:
@@ -950,6 +970,21 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         } break;
     }
 }
+
+bool contains_c_extension(const char *str) {
+    const char *extension = ".c";
+    size_t str_len = strlen(str);
+    size_t extension_len = strlen(extension);
+
+    if (str_len >= extension_len) {
+        const char *suffix = str + (str_len - extension_len);
+        if (strcmp(suffix, extension) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
     
 State init_state() {
     State state = {0};
@@ -1051,6 +1086,37 @@ int main(int argc, char **argv) {
     }
     (void)config_filename;
     (void)syntax_filename;
+
+    // if (filename == NULL) {
+    //     fprintf(stderr, "usage: %s <filename>\n", program);
+    // }
+    // else{
+    //     WRITE_LOG("filename: %s", filename);
+    // }
+
+    bool isC = contains_c_extension(filename);
+
+    if(isC) {
+        WRITE_LOG("C file detected");
+        lang = "C";
+    }
+
+    if (strcmp(lang, "C") == 0) {
+        pthread_t thread1;
+        int process;
+
+        ThreadArgs args = {
+            .path_to_file = filename,
+            .lang = "C"
+        };
+
+        process = pthread_create(&thread1, NULL, check_for_errors, &args);
+        if(process) {
+            WRITE_LOG("Error - pthread_create() return code: %d", process);
+            exit(EXIT_FAILURE);
+        }
+
+    }
 
     initscr();
     noecho();

@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include <curses.h>
 
@@ -72,6 +73,12 @@
 #define STARTING_ROWS_SIZE 128
 #define STARTING_ROW_SIZE 64 
 
+
+typedef struct {
+    const char* path_to_file;
+    const char* filename; /* maybe will get used? */
+    const char* lang;
+} ThreadArgs;
 
 typedef enum {
     NORMAL,
