@@ -296,8 +296,8 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
     size_t token_arr_s = 0;
 
     String_View view = view_create(line, line_s);
-    view = view_trim_left(view);
     while(view.len > 0) {
+        view = view_trim_left(view);
         if(isalpha(view.data[0])) {
             Token token = generate_word(&view, line);
             if(token_arr_s >= *token_arr_capacity) {
@@ -310,7 +310,7 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
         } else if(view.data[0] == '#') {
             Token token = {
                 .type = Type_Preprocessor,
-                .index = view.data-line,
+                .index = 0,
                 .size = view.len,
             };
 
@@ -339,31 +339,6 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
             view.len--;
             view.data++;
             while(view.len > 0 && view.data[0] != '"') {
-                if(view.len > 1 && view.data[0] == '\\') {
-                    string_s++;
-                    view.len--;
-                    view.data++;
-                }
-                string_s++;
-                view.len--;
-                view.data++;
-            }
-            token.size = ++string_s;
-            token_arr[token_arr_s++] = token;
-        } else if(view.data[0] == '\'') {
-            Token token = {
-                .type = Type_String,
-                .index = view.data-line,
-            };
-            size_t string_s = 1;
-            view.len--;
-            view.data++;
-            while(view.len > 0 && view.data[0] != '\'') {
-                if(view.len > 1 && view.data[0] == '\\') {
-                    string_s++;
-                    view.len--;
-                    view.data++;
-                }
                 string_s++;
                 view.len--;
                 view.data++;
@@ -374,7 +349,6 @@ size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *toke
         if(view.len == 0) break;
         view.data++;
         view.len--;
-        view = view_trim_left(view);
     }
     return token_arr_s;
 }
