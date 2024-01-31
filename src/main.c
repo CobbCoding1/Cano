@@ -783,7 +783,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     } 
                     break;
                 case DELETE_MULT_CHAR:
-                    for(int i = undo.end; i >= (int)undo.start; i--) {
+                    for(int i = undo.end-1; i >= (int)undo.start; i--) {
                         buffer->cursor = i;
                         buffer_delete_char(buffer, state);
                     }
@@ -1122,10 +1122,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             int cond = (buffer->visual.start > buffer->visual.end);
             size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
             size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
-            for(int i = end; i >= (int)start; i--) {
-                buffer->cursor = i;
-                buffer_delete_char(buffer, state);
-            }
+            buffer_delete_selection(buffer, state, start, end);
             mode = NORMAL;
             curs_set(1);
         } break;
