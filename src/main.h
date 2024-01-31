@@ -101,7 +101,15 @@ typedef enum {
     DELETE_CHAR,
     INSERT_MULT_CHAR,
     DELETE_MULT_CHAR,
+    REPLACE_CHAR,
 } Undo_Type;
+
+typedef enum {
+    NO_ERROR,
+    UNKNOWN_COMMAND,
+    INVALID_ARG,
+    INVALID_VALUE,
+} Command_Errors;
 
 char leaders[LEADER_COUNT] = {' ', 'r', 'd', 'y'};
 
@@ -249,13 +257,6 @@ typedef struct {
     int g;
     int b;
 } Ncurses_Color;
-
-typedef enum {
-    NO_ERROR,
-    UNKNOWN_COMMAND,
-    INVALID_ARG,
-    INVALID_VALUE,
-} Command_Errors;
 
 typedef struct {
     size_t row;

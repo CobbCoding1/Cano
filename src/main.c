@@ -649,8 +649,11 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
             }
         } break;
         case 'r': {
+            CREATE_UNDO(REPLACE_CHAR, buffer->cursor);
+            DA_APPEND(&undo.data, buffer->data.data[buffer->cursor]);
             state->ch = wgetch(state->main_win); 
             buffer->data.data[buffer->cursor] = state->ch;
+            undo_push(state, undo);
         } break;
         default: {
             return 0;
@@ -735,8 +738,6 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 buffer_insert_char(buffer, ' ');
             }
         } break;
-        case 'R':
-            break;
         case 'n': {
             size_t index = search(buffer, state->command, state->command_s);
             buffer->cursor = index;
@@ -763,6 +764,10 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                         buffer->cursor = i;
                         buffer_delete_char(buffer, state);
                     }
+                    break;
+                case REPLACE_CHAR:
+                    buffer->cursor = undo.start;
+                    buffer->data.data[buffer->cursor] = undo.data.data[0]; 
                     break;
             }
         } break;
