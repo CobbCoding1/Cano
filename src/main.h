@@ -57,6 +57,11 @@
     (da)->data[(da)->count++] = (item);                                               \
 } while (0)
 
+#define CREATE_UNDO(t, p) \
+    Undo undo = {0};      \
+    undo.type = (t);      \
+    undo.start = (p);  \
+
 #include "lex.c"
 
 #define ctrl(x) ((x) & 0x1f)
@@ -91,6 +96,13 @@ typedef enum {
     LEADER_COUNT,
 } Leader;
 
+typedef enum {
+    INSERT_CHAR,
+    DELETE_CHAR,
+    INSERT_MULT_CHAR,
+    DELETE_MULT_CHAR,
+} Undo_Type;
+
 char leaders[LEADER_COUNT] = {' ', 'r', 'd', 'y'};
 
 typedef struct {
@@ -122,15 +134,6 @@ typedef struct {
     int is_line;
 } Visual;
 
-#ifdef REFACTOR
-typedef struct {
-    size_t index;
-    size_t size;
-    size_t capacity;
-    char *contents;
-} Row;
-#endif
-
 typedef struct {
     size_t start;
     size_t end;
@@ -147,6 +150,12 @@ typedef struct {
     size_t count;
     size_t capacity;
 } Data;
+
+typedef struct {
+    size_t *data;
+    size_t count;
+    size_t capacity;
+} Positions;
 
 typedef struct {
     Data data;
@@ -172,9 +181,10 @@ typedef struct {
 } Command;
 
 typedef struct {
-    Buffer **buf_stack;
-    size_t buf_stack_s;
-    size_t buf_capacity;
+    Undo_Type type;
+    Data data;
+    size_t start;
+    size_t end;
 } Undo;
     
 typedef struct {
@@ -188,8 +198,10 @@ typedef struct {
 } Sized_Str;
 
 typedef struct State {
-    Undo undo_stack;
+    Undo undo_stack[16];
+    size_t undo_stack_s;
     Undo redo_stack;
+    Undo cur_undo;
     size_t num_of_braces;
     int ch;
     
@@ -263,8 +275,6 @@ Brace find_opposite_brace(char opening);
 Ncurses_Color rgb_to_ncurses(int r, int g, int b);
 void init_ncurses_color(int id, int r, int g, int b);
 void shift_undo_left(Undo *undo, size_t amount);
-void push_undo(Undo *undo, Buffer *buf);
-Buffer *pop_undo(Undo *undo);
 void reset_command(char *command, size_t *command_s);
 Command parse_command(char *command, size_t command_s);
 int execute_command(Command *command, Buffer *buf, State *state);
@@ -276,7 +286,7 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count);
 int handle_modifying_keys(Buffer *buffer, State *state);
 int handle_normal_to_insert_keys(Buffer *buffer, State *state);
 void buffer_insert_char(Buffer *buffer, char ch);
-void buffer_delete_char(Buffer *buffer);
+void buffer_delete_char(Buffer *buffer, State *state);
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state);
 void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state);
 void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state);
