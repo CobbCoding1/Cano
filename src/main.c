@@ -351,13 +351,12 @@ void shift_str_right(char *str, size_t *str_s, size_t index) {
 }
 
 void undo_push(State *state, Undo undo) {
-    ASSERT(state->undo_stack_s < 16, "stack overflow");
-    state->undo_stack[state->undo_stack_s++] = undo;
+    DA_APPEND(&state->undo_stack, undo);
 }
 
 Undo undo_pop(State *state) {
-    ASSERT(state->undo_stack_s > 0, "stack underflow");
-    return state->undo_stack[--state->undo_stack_s];
+    if(state->undo_stack.count <= 0) return (Undo){0};
+    return state->undo_stack.data[--state->undo_stack.count];
 }
 
 void buffer_calculate_rows(Buffer *buffer) {
@@ -455,6 +454,19 @@ void buffer_delete_row(Buffer *buffer, State *state) {
     }
     buffer_calculate_rows(buffer);
     //undo_push(state, undo);
+}
+
+void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t end) {
+    int count = end - start;
+    buffer->cursor = start;
+    CREATE_UNDO(INSERT_MULT_CHAR, start);
+    while(count >= 0) {
+        DA_APPEND(&undo.data, buffer->data.data[buffer->cursor]);
+        buffer_delete_char(buffer, state);
+        count--;
+    }
+    WRITE_LOG("%s", undo.data.data);
+    undo_push(state, undo);
 }
 
 void buffer_move_up(Buffer *buffer) {
@@ -624,14 +636,17 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
         } break;
         case 'w': {
             switch(state->leader) {
-                case LEADER_D:
+                case LEADER_D: {
+                    size_t start = buffer->cursor;
                     while(buffer->cursor < buffer->data.count && isword(buffer->data.data[buffer->cursor])) {
-                        buffer_delete_char(buffer, state);
+                        buffer->cursor++;
                     }
                     if(buffer->cursor < buffer->data.count && isspace(buffer->data.data[buffer->cursor])) {
-                        buffer_delete_char(buffer, state); 
+                        buffer->cursor++;
                     }
-                    break;
+                    size_t end = buffer->cursor;
+                    buffer_delete_selection(buffer, state, start, end-1);
+                } break;
                 default:
                     return 0;
                     break;
@@ -639,11 +654,17 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
         } break;
         case 'd': {
             switch(state->leader) {
-                case LEADER_D:
+                case LEADER_D: {
                     reset_command(state->clipboard.str, &state->clipboard.len);
                     buffer_yank_line(buffer, state, 0);
-                    buffer_delete_row(buffer, state);
-                    break;
+                    size_t row = buffer_get_row(buffer);
+                    Row cur = buffer->rows.data[row];
+                    if(row == 0) {
+                        buffer_delete_selection(buffer, state, cur.start, cur.end-1);
+                    } else {
+                        buffer_delete_selection(buffer, state, cur.start-1, cur.end-1);
+                    }
+                } break;
                 default:
                     break;
             }
@@ -745,6 +766,8 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case 'u': {
             Undo undo = undo_pop(state); 
             switch(undo.type) {
+                case NONE:
+                    break;
                 case INSERT_CHAR:
                     buffer->cursor = undo.start;
                     buffer_insert_char(buffer, undo.data.data[0]);
@@ -755,7 +778,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     break;
                 case INSERT_MULT_CHAR:
                     buffer->cursor = undo.start;
-                    for(int i = undo.data.count-1; i > 0; i--) {
+                    for(size_t i = 0; i < undo.data.count; i++) {
                         buffer_insert_char(buffer, undo.data.data[i]);
                     } 
                     break;

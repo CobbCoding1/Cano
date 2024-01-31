@@ -97,6 +97,7 @@ typedef enum {
 } Leader;
 
 typedef enum {
+    NONE = 0,
     INSERT_CHAR,
     DELETE_CHAR,
     INSERT_MULT_CHAR,
@@ -194,6 +195,12 @@ typedef struct {
     size_t start;
     size_t end;
 } Undo;
+
+typedef struct {
+    Undo *data;
+    size_t count;
+    size_t capacity;
+} Undo_Stack;
     
 typedef struct {
     int repeating;
@@ -206,8 +213,7 @@ typedef struct {
 } Sized_Str;
 
 typedef struct State {
-    Undo undo_stack[16];
-    size_t undo_stack_s;
+    Undo_Stack undo_stack;
     Undo redo_stack;
     Undo cur_undo;
     size_t num_of_braces;
