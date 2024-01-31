@@ -162,6 +162,13 @@ void free_buffer(Buffer *buffer) {
     buffer->rows.capacity = 0;
 }
 
+void free_undo(Undo_Stack *undo) {
+    for(size_t i = 0; i < undo->count; i++) {
+        free(undo->data[i].data.data);
+    }
+    free(undo->data);
+}
+
 
 void init_ncurses_color(int id, int r, int g, int b) {
         Ncurses_Color color = rgb_to_ncurses(r, g, b);
@@ -1397,6 +1404,7 @@ int main(int argc, char **argv) {
     endwin();
 
     free_buffer(buffer);
+    free_undo(&state.undo_stack);
 
     return 0;
 }
