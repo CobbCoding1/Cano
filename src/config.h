@@ -6,5 +6,6 @@ int auto_indent = 1;
 int syntax = 1;
 size_t indent = 4;
 size_t undo_size = 16;
+char *lang = " ";
 
 #endif

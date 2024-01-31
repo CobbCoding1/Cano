@@ -43,6 +43,103 @@ void resize_window(State *state) {
     wrefresh(state->main_win);
 }
 
+int contains_c_extension(const char *str) {
+    const char *extension = ".c";
+    size_t str_len = strlen(str);
+    size_t extension_len = strlen(extension);
+
+    if (str_len >= extension_len) {
+        const char *suffix = str + (str_len - extension_len);
+        if (strcmp(suffix, extension) == 0) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+void *check_for_errors(void *args) {
+    ThreadArgs *threadArgs = (ThreadArgs *)args;
+
+    bool loop = 1; /* loop to be used later on, to make it constantly check for errors. Right now it just runs once. */
+    while (loop) {
+
+        char path[1035];
+
+        /* Open the command for reading. */
+        char command[1024];
+        sprintf(command, "gcc %s -o /dev/null -Wall -Wextra -Werror -std=c99 2> errors.cano && echo $? > success.cano", threadArgs->path_to_file);
+        FILE *fp = popen(command, "r");
+        if (fp == NULL) {
+            loop = 0;
+            static char return_message[] = "Failed to run command";
+            WRITE_LOG("Failed to run command");
+            return (void *)return_message;
+        }
+        pclose(fp);
+
+        FILE *should_check_for_errors = fopen("success.cano", "r");
+
+        if (should_check_for_errors == NULL) {
+            loop = 0;
+            WRITE_LOG("Failed to open file");
+            return (void *)NULL;
+        }
+        while (fgets(path, sizeof(path) -1, should_check_for_errors) != NULL) {
+            WRITE_LOG("return code: %s", path);
+            if (!(strcmp(path, "0") == 0)) {
+                FILE *file_contents = fopen("errors.cano", "r");
+                if (fp == NULL) {
+                    loop = 0;
+                    WRITE_LOG("Failed to open file");
+                    return (void *)NULL;
+                }
+
+                fseek(file_contents, 0, SEEK_END);
+                long filesize = ftell(file_contents);
+                fseek(file_contents, 0, SEEK_SET);
+
+                char *buffer = malloc(filesize + 1);
+                if (buffer == NULL) {
+                    WRITE_LOG("Failed to allocate memory");
+                    return (void *)NULL;
+                }
+                fread(buffer, 1, filesize, file_contents);
+                buffer[filesize] = '\0';
+
+                char *bufffer = malloc(filesize + 1);
+
+                while (fgets(path, sizeof(path) -1, file_contents) != NULL) {
+                    strcat(bufffer, path);
+                    strcat(buffer, "\n");
+                }
+
+                char *return_message = malloc(filesize + 1);
+                if (return_message == NULL) {
+                    WRITE_LOG("Failed to allocate memory");
+                    free(buffer);
+                    return (void *)NULL;
+                }
+                strcpy(return_message, buffer);
+
+                free(buffer); 
+                loop = 0;
+                fclose(file_contents);
+
+                return (void *)return_message;
+            }
+            else {
+                loop = 0;
+                static char return_message[] = "No errors found";
+                return (void *)return_message;
+            }
+        }
+
+    }
+
+    return (void *)NULL;
+}
+
 
 Ncurses_Color rgb_to_ncurses(int r, int g, int b) {
 
@@ -1035,6 +1132,32 @@ int main(int argc, char **argv) {
     char *syntax_filename = NULL;
     char *filename = NULL;
     while(flag != NULL) {
+        bool isC = 0;
+        if (!(filename == NULL)) {
+            isC = contains_c_extension(filename);
+            if(isC) {
+                WRITE_LOG("C file detected");
+                lang = "C";
+            }
+        }
+
+        if (strcmp(lang, "C") == 0) {
+            pthread_t thread1;
+            int process;
+
+            ThreadArgs args = {
+                .path_to_file = filename,
+                .lang = "C"
+            };
+
+            process = pthread_create(&thread1, NULL, check_for_errors, &args);
+            if(process) {
+                WRITE_LOG("Error - pthread_create() return code: %d", process);
+                exit(EXIT_FAILURE);
+            }
+
+        }
+
         if(strcmp(flag, "--config") == 0) {
             flag = *argv++;
             if(flag == NULL) {

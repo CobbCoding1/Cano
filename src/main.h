@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include <curses.h>
 
@@ -91,6 +92,12 @@ typedef enum {
 } Leader;
 
 char leaders[LEADER_COUNT] = {' ', 'r', 'd', 'y'};
+
+typedef struct {
+    const char* path_to_file;
+    const char* filename; /* maybe will get used? */
+    const char* lang;
+} ThreadArgs;
 
 typedef struct {
     char color_name[20];
