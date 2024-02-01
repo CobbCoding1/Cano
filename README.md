@@ -6,7 +6,7 @@ It is a modal-based editor, based heavily on VIM.
 Icon from [LocalTexan](https://github.com/LocalTexan)
 
 ## Quick Start
-Dependencies: CC, Make, ncurses
+Dependencies: GCC, Make, ncurses
 ```sh
 make -B
 ./main
