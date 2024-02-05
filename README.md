@@ -29,11 +29,6 @@ Command - For executing commands
 |Normal| k              | Move up                                         |
 |Normal| l              | Move right                                      |
 |Normal| x              | Delete character                                |
-|Normal| d + d          | Delete entire line                              |
-|Normal| d + w          | Deletes current word                            |
-|Normal| d + g          | Delete current to first line                    |
-|Normal| d + G          | Delete current to last line                     |
-|Normal| y + y          | Yanks the current line                          |
 |Normal| g              | Go to first line                                |
 |Normal| G              | Go to last line                                 |
 |Normal| 0              | Go to beginning of line                         |
@@ -58,6 +53,7 @@ Command - For executing commands
 |Normal| Ctrl + S       | Save and exit                                   |
 |Normal| r              | Replace current char with next char inputted    |
 |Normal| (n) + motion   | Repeat next motion n times                      |
+|Normal| (d) + motion   | Delete characters of next motion n times        |
 
 ## Visual
 Visual mode works the same as Normal mode, except works on the entire selection, instead of character by character.
