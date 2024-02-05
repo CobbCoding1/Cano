@@ -447,6 +447,14 @@ void buffer_yank_char(Buffer *buffer, State *state) {
     strncpy(state->clipboard.str, buffer->data.data+buffer->cursor, state->clipboard.len);
 }
 
+void buffer_yank_selection(Buffer *buffer, State *state, size_t start, size_t end) {
+    state->clipboard.len = end-start+2;
+    state->clipboard.str = realloc(state->clipboard.str, 
+                                   state->clipboard.len*sizeof(char));
+    if(state->clipboard.str == NULL) CRASH("null");
+    strncpy(state->clipboard.str, buffer->data.data+start, state->clipboard.len);
+}
+
 void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t end) {
     int count = end - start;
     buffer->cursor = start;
@@ -666,6 +674,7 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
     switch(state->ch) {
         case 'x': {
             CREATE_UNDO(INSERT_CHARS, buffer->cursor);
+            reset_command(state->clipboard.str, &state->clipboard.len);
             buffer_yank_char(buffer, state);
             buffer_delete_char(buffer, state);
             undo_push(state, &state->undo_stack, state->cur_undo);
@@ -1190,6 +1199,17 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             mode = NORMAL;
             curs_set(1);
         } break;
+        case 'y': {
+            reset_command(state->clipboard.str, &state->clipboard.len);
+            int cond = (buffer->visual.start > buffer->visual.end);
+            size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
+            size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
+            buffer_yank_selection(buffer, state, start, end);
+            buffer->cursor = start;
+            mode = NORMAL;
+            curs_set(1);
+            break;
+        }
         default: {
             handle_motion_keys(buffer, state, state->ch, &state->repeating.repeating_count);
             if(buffer->visual.is_line) {
@@ -1462,6 +1482,7 @@ int main(int argc, char **argv) {
 
     free_buffer(buffer);
     free_undo_stack(&state.undo_stack);
+    free_undo_stack(&state.redo_stack);
 
     return 0;
 }
