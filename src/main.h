@@ -98,9 +98,8 @@ typedef enum {
 
 typedef enum {
     NONE = 0,
-    INSERT_CHAR,
+    INSERT_CHARS,
     DELETE_CHAR,
-    INSERT_MULT_CHAR,
     DELETE_MULT_CHAR,
     REPLACE_CHAR,
 } Undo_Type;
@@ -214,7 +213,7 @@ typedef struct {
 
 typedef struct State {
     Undo_Stack undo_stack;
-    Undo redo_stack;
+    Undo_Stack redo_stack;
     Undo cur_undo;
     size_t num_of_braces;
     int ch;
