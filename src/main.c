@@ -553,20 +553,26 @@ int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count) {
         } break;
         case 'e': { // Move to the end of the next word
             if(buffer->cursor+1 < buffer->data.count && !isword(buffer->data.data[buffer->cursor+1])) buffer->cursor++;
-            while(buffer->cursor+1 < buffer->data.count && isword(buffer->data.data[buffer->cursor+1])) {
+            while(buffer->cursor+1 < buffer->data.count && 
+                (isword(buffer->data.data[buffer->cursor+1]) || isspace(buffer->data.data[buffer->cursor]))
+            ) {
                 buffer->cursor++;
             }
         } break;
         case 'b': { // Move to the start of the previous word
             if(buffer->cursor == 0) break;
             if(buffer->cursor-1 > 0 && !isword(buffer->data.data[buffer->cursor-1])) buffer->cursor--;
-            while(buffer->cursor-1 > 0 && isword(buffer->data.data[buffer->cursor-1])) {
+            while(buffer->cursor-1 > 0 && 
+                (isword(buffer->data.data[buffer->cursor-1]) || isspace(buffer->data.data[buffer->cursor+1]))
+            ) {
                 buffer->cursor--;
             }
             if(buffer->cursor-1 == 0) buffer->cursor--;
         } break;
         case 'w': { // Move to the start of the next word
-            while(buffer->cursor < buffer->data.count && isword(buffer->data.data[buffer->cursor])) {
+            while(buffer->cursor < buffer->data.count && 
+                (isword(buffer->data.data[buffer->cursor]) || isspace(buffer->data.data[buffer->cursor+1]))
+            ) {
                 buffer->cursor++;
             }
             if(buffer->cursor < buffer->data.count) buffer->cursor++;
@@ -639,7 +645,6 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
                 } break;
                 default:
                     return 0;
-                    break;
             }
         } break;
         case 'd': {
