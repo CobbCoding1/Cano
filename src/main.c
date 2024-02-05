@@ -647,6 +647,36 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
                     return 0;
             }
         } break;
+        case 'g': {
+            switch(state->leader) {
+                case LEADER_D: {
+                    size_t row = buffer_get_row(buffer);
+                    size_t start = 0;
+                    size_t end = buffer->rows.data[row].end;
+                    CREATE_UNDO(INSERT_CHARS, start);
+                    state->cur_undo = undo;
+                    buffer_delete_selection(buffer, state, start, end);
+                    undo_push(state, &state->undo_stack, state->cur_undo);
+                } break;
+                default:
+                    return 0;
+            }
+        } break;
+        case 'G': {
+            switch(state->leader) {
+                case LEADER_D: {
+                    size_t row = buffer_get_row(buffer);
+                    size_t start = buffer->rows.data[row].start;
+                    size_t end = buffer->data.count;
+                    CREATE_UNDO(INSERT_CHARS, start);
+                    state->cur_undo = undo;
+                    buffer_delete_selection(buffer, state, start, end);
+                    undo_push(state, &state->undo_stack, state->cur_undo);
+                } break;
+                default:
+                    return 0;
+            }
+        } break;
         case 'd': {
             switch(state->leader) {
                 case LEADER_D: {
