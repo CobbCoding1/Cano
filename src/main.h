@@ -11,12 +11,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include <curses.h>
 
 #include "colors.h"
 #include "config.h"
-#include "lex.c"
+
+#define DATA_START_CAPACITY 1024
 
 #define CRASH(str)                    \
         do {                          \
@@ -24,6 +26,17 @@
             fprintf(stderr, str"\n"); \
             exit(1);                  \
         } while(0) 
+
+#define ASSERT(cond, ...) \
+    do { \
+        if (!(cond)) { \
+            endwin();   \
+            fprintf(stderr, "%s:%d: ASSERTION FAILED: ", __FILE__, __LINE__); \
+            fprintf(stderr, __VA_ARGS__); \
+            fprintf(stderr, "\n"); \
+            exit(1); \
+        } \
+    } while (0)
 
 #define WRITE_LOG(message, ...)                                                         \
     do {                                                                                \
@@ -35,11 +48,29 @@
     } while(0)
 
 
+#define DA_APPEND(da, item) do {                                                       \
+    if ((da)->count >= (da)->capacity) {                                               \
+        (da)->capacity = (da)->capacity == 0 ? DATA_START_CAPACITY : (da)->capacity*2; \
+        (da)->data = realloc((da)->data, (da)->capacity*sizeof(*(da)->data));       \
+        ASSERT((da)->data != NULL, "outta ram");                               \
+    }                                                                                  \
+    (da)->data[(da)->count++] = (item);                                               \
+} while (0)
+
+#define CREATE_UNDO(t, p)    \
+    Undo undo = {0};         \
+    undo.type = (t);         \
+    undo.start = (p);        \
+    state->cur_undo = undo   \
+
+#include "lex.c"
+
 #define ctrl(x) ((x) & 0x1f)
 
 #define ESCAPE      27
 #define SPACE       32 
 #define ENTER       10
+#define KEY_TAB     9
 #define DOWN_ARROW  258 
 #define UP_ARROW    259 
 #define LEFT_ARROW  260 
@@ -47,6 +78,7 @@
 
 #define STARTING_ROWS_SIZE 128
 #define STARTING_ROW_SIZE 64 
+
 
 typedef enum {
     NORMAL,
@@ -61,16 +93,32 @@ typedef enum {
     LEADER_NONE,
     LEADER_R,
     LEADER_D,
+    LEADER_Y,
+    LEADER_COUNT,
 } Leader;
 
+typedef enum {
+    NONE = 0,
+    INSERT_CHARS,
+    DELETE_CHAR,
+    DELETE_MULT_CHAR,
+    REPLACE_CHAR,
+} Undo_Type;
+
+typedef enum {
+    NO_ERROR,
+    UNKNOWN_COMMAND,
+    INVALID_ARG,
+    INVALID_VALUE,
+} Command_Errors;
+
+char leaders[LEADER_COUNT] = {' ', 'r', 'd', 'y'};
 
 typedef struct {
-    size_t index;
-    size_t size;
-    size_t capacity;
-    char *contents;
-} Row;
-
+    const char* path_to_file;
+    const char* filename; /* maybe will get used? */
+    const char* lang;
+} ThreadArgs;
 
 typedef struct {
     char color_name[20];
@@ -90,17 +138,41 @@ typedef struct {
 } Point;
 
 typedef struct {
-    Point starting_pos;
-    Point ending_pos;
+    size_t start;
+    size_t end;
     int is_line;
 } Visual;
 
 typedef struct {
-    Row *rows;
-    size_t row_capacity;
-    size_t row_index;
-    size_t cur_pos;
-    size_t row_s;
+    size_t start;
+    size_t end;
+} Row;
+
+typedef struct {
+    Row *data;
+    size_t count;
+    size_t capacity;
+} Rows;
+
+typedef struct {
+    char *data;
+    size_t count;
+    size_t capacity;
+} Data;
+
+typedef struct {
+    size_t *data;
+    size_t count;
+    size_t capacity;
+} Positions;
+
+typedef struct {
+    Data data;
+    Rows rows;
+    size_t cursor;
+    size_t row;
+    size_t col;
+
     char *filename;
     Visual visual;
 } Buffer;
@@ -118,10 +190,17 @@ typedef struct {
 } Command;
 
 typedef struct {
-    Buffer **buf_stack;
-    size_t buf_stack_s;
-    size_t buf_capacity;
+    Undo_Type type;
+    Data data;
+    size_t start;
+    size_t end;
 } Undo;
+
+typedef struct {
+    Undo *data;
+    size_t count;
+    size_t capacity;
+} Undo_Stack;
     
 typedef struct {
     int repeating;
@@ -129,8 +208,14 @@ typedef struct {
 } Repeating;
 
 typedef struct {
-    Undo undo_stack;
-    Undo redo_stack;
+    char *str;
+    size_t len;
+} Sized_Str;
+
+typedef struct State {
+    Undo_Stack undo_stack;
+    Undo_Stack redo_stack;
+    Undo cur_undo;
     size_t num_of_braces;
     int ch;
     
@@ -147,11 +232,15 @@ typedef struct {
     size_t y;
     size_t normal_pos;
 
+    void(**key_func)(Buffer *buffer, Buffer **modify_buffer, struct State *state);
+
+    Sized_Str clipboard;
+
     // window sizes
-    int main_row;
-    int main_col;
     int grow;
     int gcol;
+    int main_row;
+    int main_col;
     int line_num_row;
     int line_num_col;
     int status_bar_row;
@@ -175,13 +264,6 @@ typedef struct {
     int b;
 } Ncurses_Color;
 
-typedef enum {
-    NO_ERROR,
-    UNKNOWN_COMMAND,
-    INVALID_ARG,
-    INVALID_VALUE,
-} Command_Errors;
-
 typedef struct {
     size_t row;
     size_t col;
@@ -194,43 +276,24 @@ int QUIT = 0;
 
 /* --------------------------- FUNCTIONS --------------------------- */
 
-int is_between(Point a, Point b, Point c);
+int is_between(size_t a, size_t b, size_t c);
 char *stringify_mode();
 Brace find_opposite_brace(char opening);
 Ncurses_Color rgb_to_ncurses(int r, int g, int b);
 void init_ncurses_color(int id, int r, int g, int b);
-void free_buffer(Buffer **buffer);
-Buffer *copy_buffer(Buffer *buffer);
 void shift_undo_left(Undo *undo, size_t amount);
-void push_undo(Undo *undo, Buffer *buf);
-Buffer *pop_undo(Undo *undo);
-void resize_rows(Buffer *buffer, size_t capacity);
-void resize_row(Row **row, size_t capacity);
-void insert_char(Row *row, size_t pos, char c);
-Point search(Buffer *buffer, char *command, size_t command_s);
-void replace(Buffer *buffer, Point position, char *new_str, size_t old_str_s, size_t new_str_s);
-void find_and_replace(Buffer *buffer, char *old_str, char *new_str);
-size_t num_of_open_braces(Buffer *buffer);
 void reset_command(char *command, size_t *command_s);
-void handle_save(Buffer *buffer);
 Command parse_command(char *command, size_t command_s);
 int execute_command(Command *command, Buffer *buf, State *state);
-void shift_rows_left(Buffer *buf, size_t index);
-void shift_rows_right(Buffer *buf, size_t index);
-void shift_row_left(Row *row, size_t index);
-void shift_row_right(Row *row, size_t index);
-void delete_char(Buffer *buffer, size_t row, size_t col, size_t *y, WINDOW *main_win);
-void delete_row(Buffer *buffer, size_t row);
 void shift_str_left(char *str, size_t *str_s, size_t index);
 void shift_str_right(char *str, size_t *str_s, size_t index);
-void append_rows(Row *a, Row *b);
-void delete_and_append_row(Buffer *buf, size_t index);
-void create_and_cut_row(Buffer *buf, size_t dest_index, size_t *str_s, size_t index);
-void create_newline_indent(Buffer *buffer, size_t num_of_braces);
 Buffer *read_file_to_buffer(char *filename);
-int handle_motion_keys(Buffer *buffer, int ch, size_t *repeating_count);
-int handle_modifying_keys(Buffer *buffer, State *state, int ch, WINDOW *main_win, size_t *y);
-int handle_normal_to_insert_keys(Buffer *buffer, State *state, int ch);
+void buffer_calculate_rows(Buffer *buffer);
+int handle_motion_keys(Buffer *buffer, State *state, int ch, size_t *repeating_count);
+int handle_modifying_keys(Buffer *buffer, State *state);
+int handle_normal_to_insert_keys(Buffer *buffer, State *state);
+void buffer_insert_char(Buffer *buffer, char ch);
+void buffer_delete_char(Buffer *buffer, State *state);
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state);
 void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state);
 void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state);
