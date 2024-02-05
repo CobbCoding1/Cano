@@ -162,9 +162,13 @@ void free_buffer(Buffer *buffer) {
     buffer->rows.capacity = 0;
 }
 
-void free_undo(Undo_Stack *undo) {
+void free_undo(Undo *undo) {
+    free(undo->data.data);
+}
+
+void free_undo_stack(Undo_Stack *undo) {
     for(size_t i = 0; i < undo->count; i++) {
-        free(undo->data[i].data.data);
+        free_undo(&undo->data[i]);
     }
     free(undo->data);
 }
@@ -359,6 +363,7 @@ void shift_str_right(char *str, size_t *str_s, size_t index) {
 
 void undo_push(State *state, Undo undo) {
     DA_APPEND(&state->undo_stack, undo);
+    state->cur_undo = (Undo){0};
 }
 
 Undo undo_pop(State *state) {
@@ -390,8 +395,8 @@ void buffer_insert_char(Buffer *buffer, char ch) {
 }
 
 void buffer_delete_char(Buffer *buffer, State *state) {
-    (void)state;
     if(buffer->cursor < buffer->data.count) {
+        DA_APPEND(&state->cur_undo.data, buffer->data.data[buffer->cursor]);
         memmove(&buffer->data.data[buffer->cursor], &buffer->data.data[buffer->cursor+1], buffer->data.count - buffer->cursor - 1);
         buffer->data.count--;
         buffer_calculate_rows(buffer);
@@ -442,38 +447,13 @@ void buffer_yank_char(Buffer *buffer, State *state) {
     strncpy(state->clipboard.str, buffer->data.data+buffer->cursor, state->clipboard.len);
 }
 
-void buffer_delete_row(Buffer *buffer, State *state) {
-    size_t row = buffer_get_row(buffer);
-    Row cur = buffer->rows.data[row];
-    size_t start = (row == 0) ? cur.start+1 : cur.start;
-    //CREATE_UNDO(INSERT_MULT_CHAR, start);
-    buffer->cursor = cur.end;
-    //DA_APPEND(&undo.data, buffer->data.data[buffer->cursor]);
-    while(buffer->cursor >= start) {
-        buffer->cursor--;
-        //WRITE_LOG("cur: %c", buffer->data.data[buffer->cursor]);
-        //DA_APPEND(&undo.data, buffer->data.data[buffer->cursor]);
-        buffer_delete_char(buffer, state);
-    } 
-    if(row == 0) {
-        //DA_APPEND(&undo.data, buffer->data.data[buffer->cursor]);
-        buffer_delete_char(buffer, state);
-    }
-    buffer_calculate_rows(buffer);
-    //undo_push(state, undo);
-}
-
 void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t end) {
     int count = end - start;
     buffer->cursor = start;
-    CREATE_UNDO(INSERT_MULT_CHAR, start);
     while(count >= 0) {
-        DA_APPEND(&undo.data, buffer->data.data[buffer->cursor]);
         buffer_delete_char(buffer, state);
         count--;
     }
-    WRITE_LOG("%s", undo.data.data);
-    undo_push(state, undo);
 }
 
 void buffer_move_up(Buffer *buffer) {
@@ -636,10 +616,10 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
     switch(state->ch) {
         case 'x': {
             CREATE_UNDO(INSERT_CHAR, buffer->cursor);
-            DA_APPEND(&undo.data, buffer->data.data[buffer->cursor]);
-            undo_push(state, undo);
+            state->cur_undo = undo;
             buffer_yank_char(buffer, state);
             buffer_delete_char(buffer, state);
+            undo_push(state, state->cur_undo);
         } break;
         case 'w': {
             switch(state->leader) {
@@ -652,7 +632,10 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
                         buffer->cursor++;
                     }
                     size_t end = buffer->cursor;
+                    CREATE_UNDO(INSERT_MULT_CHAR, start);
+                    state->cur_undo = undo;
                     buffer_delete_selection(buffer, state, start, end-1);
+                    undo_push(state, state->cur_undo);
                 } break;
                 default:
                     return 0;
@@ -666,11 +649,15 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
                     buffer_yank_line(buffer, state, 0);
                     size_t row = buffer_get_row(buffer);
                     Row cur = buffer->rows.data[row];
+                    CREATE_UNDO(INSERT_MULT_CHAR, cur.start);
+                    state->cur_undo = undo;
                     if(row == 0) {
                         buffer_delete_selection(buffer, state, cur.start, cur.end-1);
                     } else {
+                        state->cur_undo.start -= 1;
                         buffer_delete_selection(buffer, state, cur.start-1, cur.end-1);
                     }
+                    undo_push(state, state->cur_undo);
                 } break;
                 default:
                     break;
@@ -681,7 +668,7 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
             DA_APPEND(&undo.data, buffer->data.data[buffer->cursor]);
             state->ch = wgetch(state->main_win); 
             buffer->data.data[buffer->cursor] = state->ch;
-            undo_push(state, undo);
+            undo_push(state, state->cur_undo);
         } break;
         default: {
             return 0;
@@ -800,6 +787,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     buffer->data.data[buffer->cursor] = undo.data.data[0]; 
                     break;
             }
+            free_undo(&undo);
         } break;
         case 'U': {
         } break;
@@ -832,11 +820,12 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case 'p':
             if(state->clipboard.len == 0) break;
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+            state->cur_undo = undo;
             for(size_t i = 0; i < state->clipboard.len-1; i++) {
                 buffer_insert_char(buffer, state->clipboard.str[i]);
             }
-            undo.end = buffer->cursor;
-            undo_push(state, undo); 
+            state->cur_undo.end = buffer->cursor;
+            undo_push(state, state->cur_undo); 
             break;
         default: {
             if(isdigit(state->ch) && state->ch != '0') {
@@ -1129,7 +1118,10 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             int cond = (buffer->visual.start > buffer->visual.end);
             size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
             size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
+            CREATE_UNDO(INSERT_MULT_CHAR, start);
+            state->cur_undo = undo;
             buffer_delete_selection(buffer, state, start, end);
+            undo_push(state, state->cur_undo);
             mode = NORMAL;
             curs_set(1);
         } break;
@@ -1404,7 +1396,7 @@ int main(int argc, char **argv) {
     endwin();
 
     free_buffer(buffer);
-    free_undo(&state.undo_stack);
+    free_undo_stack(&state.undo_stack);
 
     return 0;
 }
