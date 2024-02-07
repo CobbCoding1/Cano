@@ -70,7 +70,6 @@ Will replace hello with goodbye.
 | Command               | Action                    |
 |-----------------------|---------------------------|
 | set-output            | change output file        |
-| q                     | Quit                      |
 | we                    | Write and quit            |
 | e                     | Write without quitting    |
 | set-var (var) (value) | Change a config variable  |

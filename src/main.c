@@ -293,60 +293,6 @@ Command parse_command(char *command, size_t command_s) {
     return cmd;
 }
 
-
-int execute_command(Command *command, Buffer *buf, State *state) {
-    (void)state;
-    if(command->command_s == 10 && strncmp(command->command, "set-output", 10) == 0) {
-        if(command->args_s < 1) return INVALID_ARG; 
-        char *filename = command->args[0].arg;
-        free(buf->filename);
-        buf->filename = calloc(command->args[0].size, sizeof(char));
-        strncpy(buf->filename, filename, command->args[0].size);
-    } else if(command->command_s == 1 && strncmp(command->command, "e", 1) == 0) {
-        QUIT = 1;
-    } else if(command->command_s == 2 && strncmp(command->command, "we", 2) == 0) {
-        handle_save(buf);
-        QUIT = 1;
-    } else if(command->command_s == 1 && strncmp(command->command, "w", 1) == 0) {
-        handle_save(buf);
-    } else if(command->command_s == 7 && strncmp(command->command, "set-var", 7) == 0) {
-        if(command->args_s != 2) return INVALID_ARG;
-        if(command->args[0].size >= 8 && strncmp(command->args[0].arg, "relative", 8) == 0) {
-            if(command->args[1].size < 1) return INVALID_VALUE;
-            int value = 0;
-            if(command->args[1].arg != NULL) value = atoi(command->args[1].arg);
-            if(value != 0 && value != 1) return INVALID_VALUE;
-            relative_nums = value;
-        } else if(command->args[0].size >= 11 && strncmp(command->args[0].arg, "auto-indent", 11) == 0) {
-            if(command->args[1].size < 1) return INVALID_VALUE;
-            int value = 0;
-            if(command->args[1].arg != NULL) value = atoi(command->args[1].arg);
-            if(value != 0 && value != 1) return INVALID_VALUE;
-            auto_indent = value;
-        } else if(command->args[0].size >= 6 && strncmp(command->args[0].arg, "indent", 6) == 0) {
-            if(command->args[1].size < 1) return INVALID_VALUE;
-            int value = 0;
-            if(command->args[1].arg != NULL) value = atoi(command->args[1].arg);
-            if(value < 0) return INVALID_VALUE;
-            indent = value;
-        } else if(command->args[0].size >= 6 && strncmp(command->args[0].arg, "syntax", 6) == 0) {
-            if(command->args[1].size < 1) return INVALID_VALUE;
-            int value = 0;
-            if(command->args[1].arg != NULL) value = atoi(command->args[1].arg);
-            if(value < 0) return INVALID_VALUE;
-            syntax = value;
-        } else if(command->args[0].size >= 9 && strncmp(command->args[0].arg, "undo-size", 9) == 0) {
-        } else {
-            return UNKNOWN_COMMAND;
-        }
-    } else {
-        return UNKNOWN_COMMAND;
-    }
-    for(size_t i = 0; i < command->args_s; i++) free(command->args[i].arg);
-    free(command->command);
-    return NO_ERROR;
-}
-
 void shift_str_left(char *str, size_t *str_s, size_t index) {
     for(size_t i = index; i < *str_s; i++) {
         str[i] = str[i+1];
@@ -986,7 +932,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             resize_window(state);
         } break;
         case KEY_TAB:
-            for(size_t i = 0; i < indent; i++) {
+            for(size_t i = 0; (int)i < indent; i++) {
                 buffer_insert_char(buffer, ' ');
             }
             break;
@@ -1054,30 +1000,11 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 }
                 pclose(file);
             } else {
-                Command cmd = parse_command(state->command, state->command_s);
-                int err = execute_command(&cmd, buffer, state);
-                switch(err) {
-                    case NO_ERROR:
-                        break;
-                    case UNKNOWN_COMMAND:
-                        sprintf(state->status_bar_msg, "Unnown command: %s", cmd.command);
-                        state->is_print_msg = 1;
-                        break;
-                    case INVALID_ARG:
-                        sprintf(state->status_bar_msg, "Invalid arg %s\n", cmd.args[0].arg);
-                        state->is_print_msg = 1;
-                        break;
-                    case INVALID_VALUE:
-                        sprintf(state->status_bar_msg, "Invalid value %s\n", cmd.args[1].arg);
-                        state->is_print_msg = 1;
-                        break;
-                    default:
-                        sprintf(state->status_bar_msg, "err");
-                        state->is_print_msg = 1;
-                        break;
-                }
+                size_t command_s = 0;
+                Command_Token *command = lex_command(view_create(state->command, state->command_s), &command_s);
+                execute_command(buffer, state, command, command_s);
             }
-	    reset_command(state->command, &state->command_s);
+            reset_command(state->command, &state->command_s);
             mode = NORMAL;
         } break;
         case LEFT_ARROW:
@@ -1256,9 +1183,11 @@ void load_config_from_file(State *state, Buffer *buffer, char *config_filename, 
     int err = read_file_by_lines(config_filename, &lines, &lines_s);
     if(err == 0) {
         for(size_t i = 0; i < lines_s; i++) {
+            /*
             Command cmd = parse_command(lines[i], strlen(lines[i]));
             execute_command(&cmd, buffer, state);
             free(lines[i]);
+            */
         }
     }
     free(lines);

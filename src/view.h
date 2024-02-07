@@ -32,6 +32,7 @@ size_t view_split(String_View view, char c, String_View *arr, size_t arr_s);
 String_View view_chop(String_View view, char c);
 String_View view_rev(String_View view, char *data, size_t data_s);
 size_t view_find(String_View haystack, String_View needle);
+int view_to_int(String_View view);
 
 #endif
 
