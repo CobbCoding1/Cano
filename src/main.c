@@ -267,32 +267,6 @@ Buffer *load_buffer_from_file(char *filename) {
     return buffer;
 }
 
-
-Command parse_command(char *command, size_t command_s) {
-    Command cmd = {0};
-    size_t args_start = 0;
-    for(size_t i = 0; i < command_s; i++) {
-        if(i == command_s-1 || command[i] == ' ') {
-            cmd.command_s = (i == command_s-1) ? i+1 : i;
-            cmd.command = calloc(cmd.command_s+1, sizeof(char));
-            strncpy(cmd.command, command, cmd.command_s);
-            args_start = i+1;
-            break;
-        }
-    }
-    if(args_start <= command_s) {
-        for(size_t i = args_start; i < command_s; i++) {
-            if(i == command_s-1 || command[i] == ' ') {
-                cmd.args[cmd.args_s].arg = calloc(i-args_start+1, sizeof(char));
-                strncpy(cmd.args[cmd.args_s].arg, command+args_start, i-args_start+1);
-                cmd.args[cmd.args_s++].size = i-args_start+1;
-                args_start = i+1;
-            }
-        }
-    } 
-    return cmd;
-}
-
 void shift_str_left(char *str, size_t *str_s, size_t index) {
     for(size_t i = index; i < *str_s; i++) {
         str[i] = str[i+1];
@@ -969,7 +943,6 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 
 void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
-    (void)buffer;
     switch(state->ch) {
         case '\b':
         case 127:
@@ -1002,7 +975,22 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             } else {
                 size_t command_s = 0;
                 Command_Token *command = lex_command(view_create(state->command, state->command_s), &command_s);
-                execute_command(buffer, state, command, command_s);
+                switch(execute_command(buffer, state, command, command_s)) {
+                    case NO_ERROR:
+                        break;
+                    case NOT_ENOUGH_ARGS:
+                        sprintf(state->status_bar_msg, "not enough args");
+                        state->is_print_msg = 1;
+                        break;
+                    case INVALID_ARGS:
+                        sprintf(state->status_bar_msg, "invalid args");
+                        state->is_print_msg = 1;
+                        break;
+                    case UNKNOWN_COMMAND:
+                        sprintf(state->status_bar_msg, "unknown command %s", state->command);
+                        state->is_print_msg = 1;
+                        break;
+                }
             }
             reset_command(state->command, &state->command_s);
             mode = NORMAL;

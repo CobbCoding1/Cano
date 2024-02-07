@@ -89,10 +89,8 @@ void print_token(Command_Token token) {
     printf("location: %zu, type: %d, value: "View_Print"\n", token.location, token.type, View_Arg(token.value));
 }
 
-void expect_token(Command_Token token, Command_Type type) {
-    if(token.type != type) {
-        CRASH("Incorrect token type");
-    }
+int expect_token(Command_Token token, Command_Type type) {
+    return(token.type == type);
 }
 
 typedef struct {
@@ -109,14 +107,14 @@ Config_Vars vars[CONFIG_VARS] = {
     {{"relative", sizeof("relative")-1}, &relative_nums},
 };    
 
-int execute_command(Buffer *buffer, State *state, Command_Token *command, size_t command_s) {
+Command_Error execute_command(Buffer *buffer, State *state, Command_Token *command, size_t command_s) {
     (void)state;
     assert(command_s > 0);
     switch(command[0].type) {
         case TT_SET_VAR:
-            if(command_s != 3) return 1;
-            expect_token(command[1], TT_CONFIG_IDENT);
-            expect_token(command[2], TT_INT_LIT);
+            if(command_s != 3) return NOT_ENOUGH_ARGS;
+            if(!expect_token(command[1], TT_CONFIG_IDENT)) return INVALID_ARGS;
+            if(!expect_token(command[2], TT_INT_LIT)) return INVALID_ARGS;
             int value = view_to_int(command[2].value);
             for(size_t i = 0; i < CONFIG_VARS; i++) {
                 if(view_cmp(command[1].value, vars[i].label)) {
@@ -125,7 +123,7 @@ int execute_command(Buffer *buffer, State *state, Command_Token *command, size_t
             }            
             break;   
         case TT_SET_OUTPUT:
-            if(command_s != 2) return 1;
+            if(command_s != 2) return NOT_ENOUGH_ARGS;
             buffer->filename = view_to_cstr(command[1].value);
             break;
         case TT_EXIT:
@@ -136,9 +134,10 @@ int execute_command(Buffer *buffer, State *state, Command_Token *command, size_t
             QUIT = 1;
             break;
         case TT_CONFIG_IDENT:
-            break;
         case TT_INT_LIT:
+        default:
+            return UNKNOWN_COMMAND;
             break;
     }
-    return 0;
+    return NO_ERROR;
 }

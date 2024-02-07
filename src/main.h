@@ -35,7 +35,6 @@ Ncurses_Color rgb_to_ncurses(int r, int g, int b);
 void init_ncurses_color(int id, int r, int g, int b);
 void shift_undo_left(Undo *undo, size_t amount);
 void reset_command(char *command, size_t *command_s);
-Command parse_command(char *command, size_t command_s);
 void shift_str_left(char *str, size_t *str_s, size_t index);
 void shift_str_right(char *str, size_t *str_s, size_t index);
 Buffer *read_file_to_buffer(char *filename);

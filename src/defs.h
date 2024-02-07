@@ -79,11 +79,11 @@ typedef enum {
 } Undo_Type;
 
 typedef enum {
-    NO_ERROR,
+    NO_ERROR = 0,
+    NOT_ENOUGH_ARGS,
+    INVALID_ARGS,
     UNKNOWN_COMMAND,
-    INVALID_ARG,
-    INVALID_VALUE,
-} Command_Errors;
+} Command_Error;
 
 char leaders[LEADER_COUNT] = {' ', 'r', 'd', 'y'};
 
@@ -154,13 +154,6 @@ typedef struct {
     size_t size;
     char *arg;
 } Arg;
-
-typedef struct {
-    char *command;
-    size_t command_s;
-    Arg args[16];
-    size_t args_s;
-} Command;
 
 typedef struct {
     Undo_Type type;
