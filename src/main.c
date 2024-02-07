@@ -1183,11 +1183,10 @@ void load_config_from_file(State *state, Buffer *buffer, char *config_filename, 
     int err = read_file_by_lines(config_filename, &lines, &lines_s);
     if(err == 0) {
         for(size_t i = 0; i < lines_s; i++) {
-            /*
-            Command cmd = parse_command(lines[i], strlen(lines[i]));
-            execute_command(&cmd, buffer, state);
+            size_t cmd_s = 0;
+            Command_Token *cmd = lex_command(view_create(lines[i], strlen(lines[i])), &cmd_s);
+            execute_command(buffer, state, cmd, cmd_s);
             free(lines[i]);
-            */
         }
     }
     free(lines);

@@ -110,6 +110,7 @@ Config_Vars vars[CONFIG_VARS] = {
 };    
 
 int execute_command(Buffer *buffer, State *state, Command_Token *command, size_t command_s) {
+    (void)state;
     assert(command_s > 0);
     switch(command[0].type) {
         case TT_SET_VAR:
