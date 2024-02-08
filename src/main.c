@@ -502,7 +502,7 @@ int handle_motion_keys(Buffer *buffer, State *state, int ch, size_t *repeating_c
             if(state->leader != LEADER_D) break;
             size_t end = buffer->cursor;
             CREATE_UNDO(INSERT_CHARS, start);
-            buffer_delete_selection(buffer, state, start, end);
+            buffer_delete_selection(buffer, state, start, end-1);
             undo_push(state, &state->undo_stack, state->cur_undo);
         } break;
         case 'e': { // Move to the end of the next word
