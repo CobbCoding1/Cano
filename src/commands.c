@@ -99,6 +99,13 @@ Command_Type get_token_type(String_View view) {
 Command_Token create_token(String_View command) {
     String_View starting = command;
     while(command.len > 0 && *command.data != ' ') {
+        if(*command.data == '"') {
+            command = view_chop_left(command, 1);
+            while(command.len > 0 && *command.data != '"') {
+                command = view_chop_left(command, 1);
+                WRITE_LOG("command is3: "View_Print"\n", View_Arg(command));
+            }
+        }
         command = view_chop_left(command, 1);
     }       
     String_View result = {
@@ -113,10 +120,17 @@ Command_Token create_token(String_View command) {
 Command_Token *lex_command(String_View command, size_t *token_s) {
     size_t count = 0;
     for(size_t i = 0; i < command.len; i++) {
+        if(command.data[i] == '"') {
+            i++;
+            while(i < command.len && command.data[i] != '"') {
+                i++;
+            }
+        }
         if(command.data[i] == ' ') {
             count++;
         }
     }
+    WRITE_LOG("count: %zu", count);
     *token_s = count + 1;
     Command_Token *result = malloc(sizeof(Command_Token)*(*token_s));
     size_t result_s = 0;
