@@ -8,6 +8,8 @@ typedef enum {
     TT_SET_VAR,
     TT_SET_OUTPUT,
     TT_SET_MAP,
+    TT_LET,
+    TT_ECHO,
     TT_SAVE,
     TT_EXIT,
     TT_SAVE_EXIT,
@@ -68,6 +70,10 @@ Command_Type get_token_type(String_View view) {
         return TT_INT_LIT;   
     } else if(*view.data == '"') {
         return TT_STRING;
+    } else if(view_cmp(view, LITERAL_CREATE("let"))) {
+        return TT_LET;
+    } else if(view_cmp(view, LITERAL_CREATE("echo"))) {
+        return TT_ECHO;
     } else if(view_cmp(view, LITERAL_CREATE("set-var"))) {
         return TT_SET_VAR;   
     } else if(view_cmp(view, LITERAL_CREATE("w"))) {
@@ -163,6 +169,31 @@ Command_Error execute_command(Buffer *buffer, State *state, Command_Token *comma
             Map map = (Map){.a = command[1].value.data[0], .b = str_str, .b_s = str.len+1};
             DA_APPEND(&key_maps, map);
             break;
+        case TT_LET:
+            if(command_s != 3) return NOT_ENOUGH_ARGS;
+            if(!expect_token(command[1], TT_IDENT)) return INVALID_ARGS;
+            if(!expect_token(command[2], TT_INT_LIT)) return INVALID_ARGS;
+            Variable var = {.name = view_to_cstr(command[1].value), .value = view_to_int(command[2].value)};
+            DA_APPEND(&state->variables, var);
+            break;
+        case TT_ECHO: {
+            if(command_s != 2) return NOT_ENOUGH_ARGS;
+            if(!expect_token(command[1], TT_IDENT) && !expect_token(command[1], TT_STRING)) return INVALID_ARGS;
+            state->is_print_msg = 1;
+            if(command[1].type == TT_STRING) {
+                String_View str = view_string_internals(command[1].value);
+                state->status_bar_msg = view_to_cstr(str);
+            } else {
+                for(size_t i = 0; i < state->variables.count; i++) {
+                    String_View var = view_create(state->variables.data[i].name, strlen(state->variables.data[i].name));
+                    if(view_cmp(command[1].value, var)) {
+                       sprintf(state->status_bar_msg, "%d", state->variables.data[i].value);
+                       return NO_ERROR;
+                    }
+                }
+                return INVALID_IDENT;
+            }
+        } break;
         case TT_SAVE:
             handle_save(buffer);
             break;

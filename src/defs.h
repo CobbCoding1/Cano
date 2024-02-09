@@ -2,6 +2,8 @@
 
 #include <curses.h>
 
+#include "view.h"
+
 #define DATA_START_CAPACITY 1024
 
 #define CRASH(str)                    \
@@ -85,6 +87,7 @@ typedef enum {
     NOT_ENOUGH_ARGS,
     INVALID_ARGS,
     UNKNOWN_COMMAND,
+    INVALID_IDENT,
 } Command_Error;
 
 char leaders[LEADER_COUNT] = {' ', 'r', 'd', 'y'};
@@ -194,6 +197,17 @@ typedef struct {
     
 Maps key_maps = {0};
 
+typedef struct {
+    char *name;
+    int value;    
+} Variable;
+
+typedef struct {
+    Variable *data;
+    size_t count;
+    size_t capacity;
+} Variables;
+
 typedef struct State {
     Undo_Stack undo_stack;
     Undo_Stack redo_stack;
@@ -203,6 +217,8 @@ typedef struct State {
     
     char *command;
     size_t command_s;
+    
+    Variables variables;
     
     Repeating repeating;
     Data num;

@@ -1006,6 +1006,11 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                         sprintf(state->status_bar_msg, "unknown command %s", state->command);
                         state->is_print_msg = 1;
                         break;
+                    case INVALID_IDENT:
+                        sprintf(state->status_bar_msg, "unknown identifier %s", state->command);
+                        state->is_print_msg = 1;
+                        break;
+
                 }
             }
             reset_command(state->command, &state->command_s);
@@ -1335,12 +1340,19 @@ int main(int argc, char **argv) {
         if(col >= col_render_start+state.main_col) col_render_start = col-state.main_col+1;
 
         state.num_of_braces = num_of_open_braces(buffer);
-
-
+        
+        if(state.is_print_msg) {
+            mvwprintw(state.status_bar, 1, 0, "%s", state.status_bar_msg);    
+            wrefresh(state.status_bar);
+            sleep(1);
+            wclear(state.status_bar);
+            state.is_print_msg = 0;
+        }
+            
         mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
         mvwprintw(status_bar, 0, state.main_col-11, "%c", leaders[state.leader]);
         mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[mode]);
-
+        
         if(mode == COMMAND || mode == SEARCH) mvwprintw(state.status_bar, 1, 0, ":%.*s", (int)state.command_s, state.command);
 
         for(size_t i = row_render_start; i <= row_render_start+state.main_row; i++) {
