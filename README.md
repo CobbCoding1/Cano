@@ -68,7 +68,7 @@ Will replace hello with goodbye.
 
 ## Commands 
 | Command               | Action                                 |
-|-----------------------|---------------------------~~~~-------------|
+|-----------------------|----------------------------------------|
 | set-output            | change output file                     |
 | we                    | Write and quit                         |
 | e                     | Write without quitting                 |
