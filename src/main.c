@@ -544,7 +544,7 @@ int handle_motion_keys(Buffer *buffer, State *state, int ch, size_t *repeating_c
             }
             if(buffer->cursor < buffer->data.count) buffer->cursor++;
             if(state->leader != LEADER_D) break;
-            size_t end = buffer->cursor;
+            size_t end = buffer->cursor-1;
             CREATE_UNDO(INSERT_CHARS, start);
             buffer_delete_selection(buffer, state, start, end-1);
             undo_push(state, &state->undo_stack, state->cur_undo);
