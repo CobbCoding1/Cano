@@ -676,19 +676,23 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
     return 1;
 }
     
-void check_keymaps(Buffer *buffer, State *state) {
+int check_keymaps(Buffer *buffer, State *state) {
     (void)buffer;
     for(size_t i = 0; i < key_maps.count; i++) {
         if(state->ch == key_maps.data[i].a) {
-            state->ch = key_maps.data[i].b;
-            return;
+            for(size_t j = 0; j < key_maps.data[i].b_s; j++) {
+                state->ch = key_maps.data[i].b[j];
+                state->key_func[mode](buffer, &buffer, state);   
+            }
+            return 1;
         }
     }
+    return 0;
 }
 
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
-    check_keymaps(buffer, state);
+    if(check_keymaps(buffer, state)) return;
     if(state->leader == LEADER_NONE && handle_leader_keys(state)) return;   
     switch(state->ch) {
         case ':':

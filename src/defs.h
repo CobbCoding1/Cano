@@ -182,7 +182,8 @@ typedef struct {
 
 typedef struct {
     char a;
-    char b;
+    char *b;
+    size_t b_s;
 } Map;
     
 typedef struct {

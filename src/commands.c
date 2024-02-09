@@ -12,6 +12,7 @@ typedef enum {
     TT_EXIT,
     TT_SAVE_EXIT,
     TT_IDENT,
+    TT_STRING,
     TT_CONFIG_IDENT,
     TT_INT_LIT,
 } Command_Type;
@@ -48,9 +49,25 @@ String_View view_chop_left(String_View view, size_t amount) {
     return view;
 }
     
+String_View view_chop_right(String_View view) {
+    if(view.len > 0) {
+        view.len -= 1;
+    }
+    return view;
+}
+
+    
+String_View view_string_internals(String_View view) {
+    view = view_chop_left(view, 1);
+    view = view_chop_right(view);
+    return view;
+}
+    
 Command_Type get_token_type(String_View view) {
     if(isdigit(*view.data)) {
         return TT_INT_LIT;   
+    } else if(*view.data == '"') {
+        return TT_STRING;
     } else if(view_cmp(view, LITERAL_CREATE("set-var"))) {
         return TT_SET_VAR;   
     } else if(view_cmp(view, LITERAL_CREATE("w"))) {
@@ -82,10 +99,9 @@ Command_Token create_token(String_View command) {
         .data = starting.data,
         .len = starting.len-command.len
     };    
-    return (Command_Token){
-        .value = result,
-        .type = get_token_type(result),
-    };
+    Command_Token token = {.value = result};
+    token.type = get_token_type(result);
+    return token;
 }
     
 Command_Token *lex_command(String_View command, size_t *token_s) {
@@ -141,8 +157,10 @@ Command_Error execute_command(Buffer *buffer, State *state, Command_Token *comma
         case TT_SET_MAP:
             if(command_s != 3) return NOT_ENOUGH_ARGS;
             if(!expect_token(command[1], TT_IDENT)) return INVALID_ARGS;
-            if(!expect_token(command[2], TT_IDENT)) return INVALID_ARGS;
-            Map map = {.a = command[1].value.data[0], .b = command[2].value.data[0]};
+            if(!expect_token(command[2], TT_STRING)) return INVALID_ARGS;
+            String_View str = view_string_internals(command[2].value);
+            char *str_str = view_to_cstr(str);
+            Map map = (Map){.a = command[1].value.data[0], .b = str_str, .b_s = str.len+1};
             DA_APPEND(&key_maps, map);
             break;
         case TT_SAVE:
