@@ -33,6 +33,7 @@ String_View view_chop(String_View view, char c);
 String_View view_rev(String_View view, char *data, size_t data_s);
 size_t view_find(String_View haystack, String_View needle);
 int view_to_int(String_View view);
+float view_to_float(String_View view);
 
 #endif
 
@@ -193,12 +194,31 @@ size_t view_find(String_View haystack, String_View needle) {
     }
     return 0;
 }
-
+    
+int power(int n,int m) {
+    if(m==1) return n;
+    else return n*(power(n,m-1));
+}
+    
 int view_to_int(String_View view) {
     int result = 0;
     for(size_t i = 0; i < view.len; i++) {
         result = result * 10 + view.data[i] - '0';
     }
+    return result;
+}
+
+float view_to_float(String_View view) {
+    float result = 0;
+    size_t dotpos = 0;
+    for(size_t i = 0; i < view.len; i++) {
+        if (view.data[i] == '.') {
+            dotpos = view.len - i - 1;
+        } else {
+            result = result * 10 + (view.data[i] - '0');
+        }
+    }
+    result /= power(10,dotpos);
     return result;
 }
 

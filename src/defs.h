@@ -197,9 +197,22 @@ typedef struct {
     
 Maps key_maps = {0};
 
+typedef union {
+    int as_int;    
+    float as_float;
+    void *as_ptr;
+} Var_Value;
+
+typedef enum {
+    VAR_INT,
+    VAR_FLOAT,
+    VAR_PTR,
+} Var_Type;
+
 typedef struct {
     char *name;
-    int value;    
+    Var_Value value;    
+    Var_Type type;
 } Variable;
 
 typedef struct {

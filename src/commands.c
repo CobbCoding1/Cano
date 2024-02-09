@@ -9,6 +9,10 @@ typedef enum {
     TT_SET_OUTPUT,
     TT_SET_MAP,
     TT_LET,
+    TT_PLUS,
+    TT_MINUS,
+    TT_MULT,
+    TT_DIV,
     TT_ECHO,
     TT_SAVE,
     TT_EXIT,
@@ -17,6 +21,7 @@ typedef enum {
     TT_STRING,
     TT_CONFIG_IDENT,
     TT_INT_LIT,
+    TT_FLOAT_LIT,
 } Command_Type;
 
 typedef struct {
@@ -67,9 +72,25 @@ String_View view_string_internals(String_View view) {
     
 Command_Type get_token_type(String_View view) {
     if(isdigit(*view.data)) {
+        for(size_t i = 0; i < view.len; i++) {
+            if(view.data[i] == ' ') {
+                break;
+            }
+            if(view.data[i] == '.') {
+                return TT_FLOAT_LIT;
+            }
+        }
         return TT_INT_LIT;   
     } else if(*view.data == '"') {
         return TT_STRING;
+    } else if(*view.data == '+') {
+        return TT_PLUS;
+    } else if(*view.data == '-') {
+        return TT_MINUS;
+    } else if(*view.data == '*') {
+        return TT_MULT;  
+    } else if(*view.data == '/') {
+        return TT_DIV;  
     } else if(view_cmp(view, LITERAL_CREATE("let"))) {
         return TT_LET;
     } else if(view_cmp(view, LITERAL_CREATE("echo"))) {
@@ -103,7 +124,6 @@ Command_Token create_token(String_View command) {
             command = view_chop_left(command, 1);
             while(command.len > 0 && *command.data != '"') {
                 command = view_chop_left(command, 1);
-                WRITE_LOG("command is3: "View_Print"\n", View_Arg(command));
             }
         }
         command = view_chop_left(command, 1);
@@ -130,7 +150,6 @@ Command_Token *lex_command(String_View command, size_t *token_s) {
             count++;
         }
     }
-    WRITE_LOG("count: %zu", count);
     *token_s = count + 1;
     Command_Token *result = malloc(sizeof(Command_Token)*(*token_s));
     size_t result_s = 0;
@@ -183,13 +202,22 @@ Command_Error execute_command(Buffer *buffer, State *state, Command_Token *comma
             Map map = (Map){.a = command[1].value.data[0], .b = str_str, .b_s = str.len+1};
             DA_APPEND(&key_maps, map);
             break;
-        case TT_LET:
+        case TT_LET: {
             if(command_s != 3) return NOT_ENOUGH_ARGS;
             if(!expect_token(command[1], TT_IDENT)) return INVALID_ARGS;
-            if(!expect_token(command[2], TT_INT_LIT)) return INVALID_ARGS;
-            Variable var = {.name = view_to_cstr(command[1].value), .value = view_to_int(command[2].value)};
+            if(!expect_token(command[2], TT_INT_LIT) && !expect_token(command[2], TT_FLOAT_LIT)) return INVALID_ARGS;
+            Variable var = {0};
+            var.name = view_to_cstr(command[1].value);
+            if(command[2].type == TT_INT_LIT) {
+                var.type = VAR_INT;
+                var.value.as_int = view_to_int(command[2].value);   
+            } else {
+                var.type = VAR_FLOAT;
+                var.value.as_float = view_to_float(command[2].value);   
+                WRITE_LOG("%f", var.value.as_float);
+            }
             DA_APPEND(&state->variables, var);
-            break;
+        } break;
         case TT_ECHO: {
             if(command_s != 2) return NOT_ENOUGH_ARGS;
             if(!expect_token(command[1], TT_IDENT) && !expect_token(command[1], TT_STRING)) return INVALID_ARGS;
@@ -201,7 +229,8 @@ Command_Error execute_command(Buffer *buffer, State *state, Command_Token *comma
                 for(size_t i = 0; i < state->variables.count; i++) {
                     String_View var = view_create(state->variables.data[i].name, strlen(state->variables.data[i].name));
                     if(view_cmp(command[1].value, var)) {
-                       sprintf(state->status_bar_msg, "%d", state->variables.data[i].value);
+                       if(state->variables.data[i].type == VAR_INT) sprintf(state->status_bar_msg, "%d", state->variables.data[i].value.as_int);
+                       else if(state->variables.data[i].type == VAR_FLOAT) sprintf(state->status_bar_msg, "%f", state->variables.data[i].value.as_float);
                        return NO_ERROR;
                     }
                 }
