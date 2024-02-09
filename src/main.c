@@ -675,9 +675,20 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
     CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
     return 1;
 }
+    
+void check_keymaps(Buffer *buffer, State *state) {
+    (void)buffer;
+    for(size_t i = 0; i < key_maps.count; i++) {
+        if(state->ch == key_maps.data[i].a) {
+            state->ch = key_maps.data[i].b;
+            return;
+        }
+    }
+}
 
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
+    check_keymaps(buffer, state);
     if(state->leader == LEADER_NONE && handle_leader_keys(state)) return;   
     switch(state->ch) {
         case ':':

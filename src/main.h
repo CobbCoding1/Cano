@@ -18,8 +18,6 @@
 #include "lex.c"
 #include "commands.c"
 
-#define DATA_START_CAPACITY 1024
-
 #define CREATE_UNDO(t, p)    \
     Undo undo = {0};         \
     undo.type = (t);         \

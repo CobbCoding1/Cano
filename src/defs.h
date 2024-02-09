@@ -2,6 +2,8 @@
 
 #include <curses.h>
 
+#define DATA_START_CAPACITY 1024
+
 #define CRASH(str)                    \
         do {                          \
             endwin();                 \
@@ -178,6 +180,19 @@ typedef struct {
     size_t len;
 } Sized_Str;
 
+typedef struct {
+    char a;
+    char b;
+} Map;
+    
+typedef struct {
+    Map *data;
+    size_t count;
+    size_t capacity;
+} Maps;
+    
+Maps key_maps = {0};
+
 typedef struct State {
     Undo_Stack undo_stack;
     Undo_Stack redo_stack;
@@ -222,7 +237,6 @@ typedef struct {
     char brace;
     int closing;
 } Brace;
-
 
 typedef struct {
     int r;

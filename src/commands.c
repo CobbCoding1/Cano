@@ -138,6 +138,13 @@ Command_Error execute_command(Buffer *buffer, State *state, Command_Token *comma
             if(command_s != 2) return NOT_ENOUGH_ARGS;
             buffer->filename = view_to_cstr(command[1].value);
             break;
+        case TT_SET_MAP:
+            if(command_s != 3) return NOT_ENOUGH_ARGS;
+            if(!expect_token(command[1], TT_IDENT)) return INVALID_ARGS;
+            if(!expect_token(command[2], TT_IDENT)) return INVALID_ARGS;
+            Map map = {.a = command[1].value.data[0], .b = command[2].value.data[0]};
+            DA_APPEND(&key_maps, map);
+            break;
         case TT_SAVE:
             handle_save(buffer);
             break;
