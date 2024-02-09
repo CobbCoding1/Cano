@@ -205,6 +205,7 @@ typedef struct State {
     size_t command_s;
     
     Repeating repeating;
+    Data num;
     Leader leader;
 
     int is_print_msg;

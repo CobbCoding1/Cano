@@ -692,8 +692,29 @@ int check_keymaps(Buffer *buffer, State *state) {
 
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
+    mvwprintw(state->status_bar, 0, state->main_col-10, "%s", state->num.data);
+    wrefresh(state->status_bar);
+     
     if(check_keymaps(buffer, state)) return;
     if(state->leader == LEADER_NONE && handle_leader_keys(state)) return;   
+    if(isdigit(state->ch) && state->ch != '0') {
+        DA_APPEND(&state->num, state->ch);
+        mvwprintw(state->status_bar, 0, state->main_col-10, "%s", state->num.data);
+        wrefresh(state->status_bar);
+    } 
+    
+    if(!isdigit(state->ch) && state->num.count > 0) {
+        state->repeating.repeating_count = atoi(state->num.data);
+        if(state->repeating.repeating_count == 0) return;
+        state->num.count = 0;
+        for(size_t i = 0; i < state->repeating.repeating_count; i++) {
+            state->key_func[mode](buffer, modify_buffer, state);
+        }
+        state->repeating.repeating_count = 0;
+        memset(state->num.data, 0, state->num.capacity);
+        return;
+    }
+
     switch(state->ch) {
         case ':':
             state->x = 1;
@@ -842,26 +863,6 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             undo_push(state, &state->undo_stack, state->cur_undo); 
             break;
         default: {
-            if(isdigit(state->ch) && state->ch != '0') {
-                char num[32] = {0};
-                size_t num_s = 0;
-                while(isdigit(state->ch)) {
-                    num[num_s++] = state->ch;
-                    mvwprintw(state->status_bar, 0, state->main_col-10, "%s", num);
-                    wrefresh(state->status_bar);
-                    state->ch = wgetch(state->main_win);
-                }
-                if(state->ch == ESCAPE) break; 
-                if(handle_normal_to_insert_keys(buffer, state)) state->ch = wgetch(state->main_win);
-                state->repeating.repeating_count = atoi(num);
-                if(state->repeating.repeating_count == 0) break;
-                WRITE_LOG("%zu", state->repeating.repeating_count);
-                for(size_t i = 0; i < state->repeating.repeating_count; i++) {
-                    state->key_func[mode](buffer, modify_buffer, state);
-                }
-                state->repeating.repeating_count = 0;
-                break;
-            }
             if(handle_modifying_keys(buffer, state)) break;
             if(handle_motion_keys(buffer, state, state->ch, &state->repeating.repeating_count)) break;
             if(handle_normal_to_insert_keys(buffer, state)) break;
