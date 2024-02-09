@@ -67,14 +67,16 @@ s/hello/goodbye
 Will replace hello with goodbye.
 
 ## Commands 
-| Command               | Action                                 |
-|-----------------------|----------------------------------------|
-| set-output            | change output file                     |
-| we                    | Write and quit                         |
-| e                     | Write without quitting                 |
-| set-var (var) (value) | Change a config variable               |
-| set-map (a) (b)       | Map key a to any combination of keys b |
-| !(command)            | Execute a shell command                |
+| Command               | Action                                                    |
+|-----------------------|-----------------------------------------------------------|
+| set-output            | change output file                                        |
+| echo (v)              | echo value (v) where v is either an ident or a literal    |
+| we                    | Write and quit                                            |
+| e                     | Write without quitting                                    |
+| set-var (var) (value) | Change a config variable                                  |
+| set-map (a) "(b)"     | Map key a to any combination of keys b                    |
+| let (n) (v)           | Create variable (n) with value (v)                        |
+| !(command)            | Execute a shell command                                   |
 
 ## Config file
 The config file is stored in ~/.config/cano/config.cano by default, or can be set at runtime like so:
