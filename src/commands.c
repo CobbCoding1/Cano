@@ -7,8 +7,11 @@
 typedef enum {
     TT_SET_VAR,
     TT_SET_OUTPUT,
+    TT_SET_MAP,
+    TT_SAVE,
     TT_EXIT,
     TT_SAVE_EXIT,
+    TT_IDENT,
     TT_CONFIG_IDENT,
     TT_INT_LIT,
 } Command_Type;
@@ -18,6 +21,20 @@ typedef struct {
     String_View value;
     size_t location;
 } Command_Token;
+
+typedef struct {
+    String_View label;
+    int *val;
+} Config_Vars;
+
+#define CONFIG_VARS 5
+Config_Vars vars[CONFIG_VARS] = {
+    {{"syntax", sizeof("syntax")-1}, &syntax},
+    {{"indent", sizeof("indent")-1}, &indent},
+    {{"auto-indent", sizeof("auto-indent")-1}, &auto_indent},
+    {{"undo-size", sizeof("undo-size")-1}, &undo_size},
+    {{"relative", sizeof("relative")-1}, &relative_nums},
+};    
     
 String_View view_chop_left(String_View view, size_t amount) {
     if(view.len < amount) {
@@ -36,14 +53,23 @@ Command_Type get_token_type(String_View view) {
         return TT_INT_LIT;   
     } else if(view_cmp(view, LITERAL_CREATE("set-var"))) {
         return TT_SET_VAR;   
+    } else if(view_cmp(view, LITERAL_CREATE("w"))) {
+        return TT_SAVE;
     } else if(view_cmp(view, LITERAL_CREATE("e"))) {
         return TT_EXIT;
     } else if(view_cmp(view, LITERAL_CREATE("we"))) {
         return TT_SAVE_EXIT;
     } else if(view_cmp(view, LITERAL_CREATE("set-output"))) {
         return TT_SET_OUTPUT;
+    } else if(view_cmp(view, LITERAL_CREATE("set-map"))) {
+        return TT_SET_MAP;
     } else {
-        return TT_CONFIG_IDENT;
+        for(size_t i = 0; i < CONFIG_VARS; i++) {
+            if(view_cmp(view, vars[i].label)) {
+                 return TT_CONFIG_IDENT;       
+            }   
+        }
+        return TT_IDENT;
     }
 }
 
@@ -93,20 +119,6 @@ int expect_token(Command_Token token, Command_Type type) {
     return(token.type == type);
 }
 
-typedef struct {
-    String_View label;
-    int *val;
-} Config_Vars;
-
-#define CONFIG_VARS 5
-Config_Vars vars[CONFIG_VARS] = {
-    {{"syntax", sizeof("syntax")-1}, &syntax},
-    {{"indent", sizeof("indent")-1}, &indent},
-    {{"auto-indent", sizeof("auto-indent")-1}, &auto_indent},
-    {{"undo-size", sizeof("undo-size")-1}, &undo_size},
-    {{"relative", sizeof("relative")-1}, &relative_nums},
-};    
-
 Command_Error execute_command(Buffer *buffer, State *state, Command_Token *command, size_t command_s) {
     (void)state;
     assert(command_s > 0);
@@ -125,6 +137,9 @@ Command_Error execute_command(Buffer *buffer, State *state, Command_Token *comma
         case TT_SET_OUTPUT:
             if(command_s != 2) return NOT_ENOUGH_ARGS;
             buffer->filename = view_to_cstr(command[1].value);
+            break;
+        case TT_SAVE:
+            handle_save(buffer);
             break;
         case TT_EXIT:
             QUIT = 1;
