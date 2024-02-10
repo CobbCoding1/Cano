@@ -35,6 +35,59 @@ typedef struct {
     int *val;
 } Config_Vars;
 
+typedef struct {
+    String_View name;
+    int value;
+} Identifier;
+
+typedef struct {
+    String_View value;
+} Str_Literal;
+
+typedef struct {
+    int value;
+} Expr;
+    
+typedef enum {
+    OP_PLUS,
+    OP_MINUS,
+    OP_MULT,
+    OP_DIV,
+} Operator;
+
+typedef struct Bin_Expr {
+    Expr lvalue;
+    struct Bin_Expr *right;
+    Expr rvalue;
+    Operator operator;
+} Bin_Expr;
+    
+typedef union {
+    Expr as_expr;
+    Bin_Expr as_bin;   
+    Command_Type as_keyword;
+    Str_Literal as_str;
+    Identifier as_ident;
+    Config_Vars *as_config;
+} Node_Val;
+
+typedef enum {
+    NODE_EXPR,
+    NODE_BIN,
+    NODE_KEYWORD,
+    NODE_STR,
+    NODE_IDENT,
+    NODE_CONFIG,
+} Node_Type;
+ 
+typedef struct Node {
+    Node_Val value;
+    Node_Type type;
+    struct Node *left;
+    struct Node *right;
+} Node;
+
+
 #define CONFIG_VARS 5
 Config_Vars vars[CONFIG_VARS] = {
     {{"syntax", sizeof("syntax")-1}, &syntax},
@@ -173,10 +226,208 @@ void print_token(Command_Token token) {
 int expect_token(Command_Token token, Command_Type type) {
     return(token.type == type);
 }
+    
+Node *create_node(Node_Type type, Node_Val value) {
+    Node *node = malloc(sizeof(Node));
+    node->type = type;
+    node->value = value;        
+    node->left = NULL;
+    node->right = NULL;
+    return node;
+}
+    
+Bin_Expr *parse_bin_expr(Command_Token *command, size_t command_s) {
+    Bin_Expr *expr = malloc(sizeof(Bin_Expr));
+    expr->lvalue = (Expr){view_to_int(command[0].value)};
+    if(!expect_token(command[1], TT_PLUS)) return NULL;
+    if(!expect_token(command[2], TT_INT_LIT)) return NULL;
+    if(command_s == 3) {
+        expr->rvalue = (Expr){view_to_int(command[2].value)};
+    } else {
+        expr->right = parse_bin_expr(command+2, command_s-2);
+    }
+    return expr;
+}
+    
+Node *parse_command(Command_Token *command, size_t command_s) {
+    Node *root = NULL;
+    switch(command[0].type) {
+        case TT_SET_VAR:
+            if(!expect_token(command[1], TT_CONFIG_IDENT)) return NULL;
+            if(!expect_token(command[2], TT_INT_LIT)) return NULL;
+            Node_Val val;
+            val.as_keyword = command[0].type;
+            root = create_node(NODE_KEYWORD, val);
+        
+            for(size_t i = 0; i < CONFIG_VARS; i++) {
+                if(view_cmp(command[1].value, vars[i].label)) {
+                    val.as_config = &vars[i];
+                }
+            }            
+
+            Node *left = create_node(NODE_CONFIG, val);
+            root->left = left;
+            if(command_s == 3) {
+                int value = view_to_int(command[2].value);
+                val.as_expr = (Expr){.value = value};
+                Node *right = create_node(NODE_EXPR, val);
+                root->right = right;
+                break;
+            } else {
+                Bin_Expr *expr = parse_bin_expr(command+2, command_s-2);
+                val.as_bin = *expr;
+                root->right = create_node(NODE_BIN, val);
+            }
+            break;
+        case TT_SET_OUTPUT:
+            break;
+        case TT_SET_MAP:
+            break;
+        case TT_LET:
+            break;
+        case TT_PLUS:
+            break;
+        case TT_MINUS:
+            break;
+        case TT_MULT:
+            break;
+        case TT_DIV:
+            break;
+        case TT_ECHO:
+            break;
+        case TT_SAVE:
+            break;
+        case TT_EXIT:
+            break;
+        case TT_SAVE_EXIT:
+            break;
+        case TT_IDENT:
+            break;
+        case TT_STRING:
+            break;
+        case TT_CONFIG_IDENT:
+            break;
+        case TT_INT_LIT:
+            break;
+        case TT_FLOAT_LIT:
+            break;
+    }
+    return root;
+}
+
+int interpret_expr(Bin_Expr *expr) {
+    int value = expr->lvalue.value;    
+    if(expr->right == NULL) {
+        value += expr->rvalue.value;
+    } else {
+        value += interpret_expr(expr->right);
+    }
+    return value;
+}
+
+void interpret_command(Buffer *buffer, State *state, Node *root) {
+    if(root == NULL) return;
+ 
+    switch(root->type) {
+        case NODE_EXPR:
+            break;
+        case NODE_BIN:
+            break;
+        case NODE_KEYWORD:
+            switch(root->value.as_keyword) {
+                case TT_SET_VAR: {
+                    Config_Vars *var = root->left->value.as_config;                    
+                    if(root->right->type == NODE_EXPR) {
+                        *var->val = root->right->value.as_expr.value;
+                    } else {
+                        Node *node = root->right;
+                        int value = interpret_expr(&node->value.as_bin);
+                        *var->val = value;
+                    }
+                    return;
+                } break;
+                case TT_SET_OUTPUT:
+                    break;
+                case TT_SET_MAP:
+                    break;
+                case TT_LET:
+                    break;
+                case TT_PLUS:
+                    break;
+                case TT_MINUS:
+                    break;
+                case TT_MULT:
+                    break;
+                case TT_DIV:
+                    break;
+                case TT_ECHO:
+                    break;
+                case TT_SAVE:
+                    break;
+                case TT_EXIT:
+                    break;
+                case TT_SAVE_EXIT:
+                    break;
+                case TT_IDENT:
+                    break;
+                case TT_STRING:
+                    break;
+                case TT_CONFIG_IDENT:
+                    break;
+                case TT_INT_LIT:
+                    break;
+                case TT_FLOAT_LIT:
+                    break;
+            }
+            break;
+        case NODE_STR:
+            break;
+        case NODE_IDENT:
+            break;
+        case NODE_CONFIG:
+            break;
+    }
+    
+    interpret_command(buffer, state, root->left);   
+    interpret_command(buffer, state, root->right);   
+}
+    
+void print_tree(Node *node) {
+    if(node == NULL) return;
+    if(node->right != NULL) WRITE_LOG("NODE->RIGHT");
+    if(node->left != NULL) WRITE_LOG("NODE->LEFT");
+    switch(node->type) {
+    case NODE_EXPR: 
+        WRITE_LOG("EXPR");
+        break;
+    case NODE_BIN: 
+        WRITE_LOG("BIN");
+        break;
+    case NODE_KEYWORD: 
+        WRITE_LOG("KEYWORD");
+        break;
+    case NODE_STR: 
+        WRITE_LOG("STR");
+        break;
+    case NODE_IDENT: 
+        WRITE_LOG("IDENT");
+        break;
+    case NODE_CONFIG: 
+        WRITE_LOG("CONFIG");
+        break;
+
+    }
+    print_tree(node->left);
+    print_tree(node->right);    
+}
 
 Command_Error execute_command(Buffer *buffer, State *state, Command_Token *command, size_t command_s) {
     (void)state;
     assert(command_s > 0);
+    Node *root = parse_command(command, command_s);
+    print_tree(root);
+    interpret_command(buffer, state, root);
+    return NO_ERROR;
     switch(command[0].type) {
         case TT_SET_VAR:
             if(command_s != 3) return NOT_ENOUGH_ARGS;
