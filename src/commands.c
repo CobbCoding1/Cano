@@ -253,15 +253,22 @@ Operator get_operator(Command_Token token) {
 }
     
 Bin_Expr *parse_bin_expr(Command_Token *command, size_t command_s) {
-    Bin_Expr *expr = malloc(sizeof(Bin_Expr));
+    if(command_s == 0) return NULL;
+    Bin_Expr *expr = calloc(0, sizeof(Bin_Expr));
     expr->lvalue = (Expr){view_to_int(command[0].value)};
-    expr->operator = get_operator(command[1]);
+    WRITE_LOG("lvalue: %d", expr->lvalue.value);
+    if(command_s <= 2) return expr;
+    expr->operator = get_operator(command[1]);        
+        
     if(expr->operator == OP_NONE) return NULL;
     if(!expect_token(command[2], TT_INT_LIT)) return NULL;
-    if(command_s == 3) {
-        expr->rvalue = (Expr){view_to_int(command[2].value)};
-    } else {
-        expr->right = parse_bin_expr(command+2, command_s-2);
+    
+    expr->rvalue = (Expr){view_to_int(command[2].value)};        
+    WRITE_LOG("rvalue: %d", expr->rvalue.value);
+    
+    if(command_s > 3) {
+        expr->right = parse_bin_expr(command+4, command_s-4);
+        expr->right->operator = get_operator(command[3]);
     }
     return expr;
 }
@@ -357,9 +364,8 @@ Node *parse_command(Command_Token *command, size_t command_s) {
 }
     
 int interpret_expr(Bin_Expr *expr) {
-    int value = expr->lvalue.value;    
-    WRITE_LOG("value: %d", value);
-    if(expr->right == NULL) {
+    int value = expr->lvalue.value;
+    if(expr->rvalue.value != 0 && expr->operator != OP_NONE) {
         switch(expr->operator) {
             case OP_PLUS:
                 value += expr->rvalue.value;
@@ -376,8 +382,10 @@ int interpret_expr(Bin_Expr *expr) {
             default:
                 assert(0 && "unreachable");
         }
-    } else {
-        switch(expr->operator) {
+    }
+    
+    if(expr->right != NULL) {
+        switch(expr->right->operator) {
             case OP_PLUS:
                 value += interpret_expr(expr->right);                                                
                 break;
@@ -394,7 +402,6 @@ int interpret_expr(Bin_Expr *expr) {
                 assert(0 && "unreachable");
         }
     }
-    WRITE_LOG("value after: %d", value);
     return value;
 }
 
