@@ -49,6 +49,7 @@ typedef struct {
 } Expr;
     
 typedef enum {
+    OP_NONE = 0,
     OP_PLUS,
     OP_MINUS,
     OP_MULT,
@@ -235,11 +236,27 @@ Node *create_node(Node_Type type, Node_Val value) {
     node->right = NULL;
     return node;
 }
+
+Operator get_operator(Command_Token token) {
+    switch(token.type) {
+        case TT_PLUS:
+            return OP_PLUS;
+        case TT_MINUS:
+            return OP_MINUS;
+        case TT_MULT:
+            return OP_MULT;
+        case TT_DIV:
+            return OP_DIV;
+        default:
+            return OP_NONE;
+    }
+}
     
 Bin_Expr *parse_bin_expr(Command_Token *command, size_t command_s) {
     Bin_Expr *expr = malloc(sizeof(Bin_Expr));
     expr->lvalue = (Expr){view_to_int(command[0].value)};
-    if(!expect_token(command[1], TT_PLUS)) return NULL;
+    expr->operator = get_operator(command[1]);
+    if(expr->operator == OP_NONE) return NULL;
     if(!expect_token(command[2], TT_INT_LIT)) return NULL;
     if(command_s == 3) {
         expr->rvalue = (Expr){view_to_int(command[2].value)};
@@ -311,14 +328,6 @@ Node *parse_command(Command_Token *command, size_t command_s) {
                 root->right = create_node(NODE_BIN, val);
             }
             break;
-        case TT_PLUS:
-            break;
-        case TT_MINUS:
-            break;
-        case TT_MULT:
-            break;
-        case TT_DIV:
-            break;
         case TT_ECHO:
             if(command_s > 2) return NULL;
             if(!expect_token(command[1], TT_IDENT) && !expect_token(command[1], TT_STRING)) return NULL;
@@ -330,31 +339,62 @@ Node *parse_command(Command_Token *command, size_t command_s) {
                 root->right = create_node(NODE_IDENT, val);
             }
             break;
+        case TT_PLUS:
+        case TT_MINUS:
+        case TT_MULT:
+        case TT_DIV:
         case TT_SAVE:
         case TT_EXIT:
         case TT_SAVE_EXIT:
-            break;
         case TT_IDENT:
-            break;
         case TT_STRING:
-            break;
         case TT_CONFIG_IDENT:
-            break;
         case TT_INT_LIT:
-            break;
         case TT_FLOAT_LIT:
             break;
     }
     return root;
 }
-
+    
 int interpret_expr(Bin_Expr *expr) {
     int value = expr->lvalue.value;    
+    WRITE_LOG("value: %d", value);
     if(expr->right == NULL) {
-        value += expr->rvalue.value;
+        switch(expr->operator) {
+            case OP_PLUS:
+                value += expr->rvalue.value;
+                break;
+            case OP_MINUS:
+                value -= expr->rvalue.value;
+                break;
+            case OP_MULT:
+                value *= expr->rvalue.value;            
+                break;
+            case OP_DIV:
+                value /= expr->rvalue.value;                        
+                break;
+            default:
+                assert(0 && "unreachable");
+        }
     } else {
-        value += interpret_expr(expr->right);
+        switch(expr->operator) {
+            case OP_PLUS:
+                value += interpret_expr(expr->right);                                                
+                break;
+            case OP_MINUS:
+                value -= interpret_expr(expr->right);                                    
+                break;
+            case OP_MULT:
+                value *= interpret_expr(expr->right);                        
+                break;
+            case OP_DIV:
+                value /= interpret_expr(expr->right);                        
+                break;
+            default:
+                assert(0 && "unreachable");
+        }
     }
+    WRITE_LOG("value after: %d", value);
     return value;
 }
 
@@ -380,7 +420,6 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
                     return;
                 } break;
                 case TT_SET_OUTPUT:
-                    WRITE_LOG("TEST");
                     buffer->filename = view_to_cstr(root->right->value.as_str.value);
                     break;
                 case TT_SET_MAP: {
@@ -401,14 +440,6 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
                     }
                     DA_APPEND(&state->variables, var);
                 } break;
-                case TT_PLUS:
-                    break;
-                case TT_MINUS:
-                    break;
-                case TT_MULT:
-                    break;
-                case TT_DIV:
-                    break;
                 case TT_ECHO:
                     state->is_print_msg = 1;
                     if(root->right->type == NODE_STR) {
@@ -435,11 +466,6 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
                     handle_save(buffer);
                     QUIT = 1;
                     break;
-                case TT_IDENT:
-                case TT_STRING:
-                case TT_CONFIG_IDENT:
-                case TT_INT_LIT:
-                case TT_FLOAT_LIT:
                 default:
                     assert(0 && "UNREACHABLE");
             }
@@ -456,7 +482,7 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
     interpret_command(buffer, state, root->right);   
 }
     
-void print_tree(Node *node) {
+void print_tree(Node *node, size_t depth) {
     if(node == NULL) return;
     if(node->right != NULL) WRITE_LOG("NODE->RIGHT");
     if(node->left != NULL) WRITE_LOG("NODE->LEFT");
@@ -481,93 +507,15 @@ void print_tree(Node *node) {
         break;
 
     }
-    print_tree(node->left);
-    print_tree(node->right);    
+    print_tree(node->left, depth+1);
+    print_tree(node->right, depth+1);    
 }
 
 Command_Error execute_command(Buffer *buffer, State *state, Command_Token *command, size_t command_s) {
-    (void)state;
     assert(command_s > 0);
     Node *root = parse_command(command, command_s);
     if(root == NULL) return INVALID_ARGS;
-    print_tree(root);
+    print_tree(root, 0);
     interpret_command(buffer, state, root);
-    return NO_ERROR;
-    switch(command[0].type) {
-        case TT_SET_VAR:
-            if(command_s != 3) return NOT_ENOUGH_ARGS;
-            if(!expect_token(command[1], TT_CONFIG_IDENT)) return INVALID_ARGS;
-            if(!expect_token(command[2], TT_INT_LIT)) return INVALID_ARGS;
-            int value = view_to_int(command[2].value);
-            for(size_t i = 0; i < CONFIG_VARS; i++) {
-                if(view_cmp(command[1].value, vars[i].label)) {
-                    *vars[i].val = value;
-                }
-            }            
-            break;   
-        case TT_SET_OUTPUT:
-            if(command_s != 2) return NOT_ENOUGH_ARGS;
-            buffer->filename = view_to_cstr(command[1].value);
-            break;
-        case TT_SET_MAP:
-            if(command_s != 3) return NOT_ENOUGH_ARGS;
-            if(!expect_token(command[1], TT_IDENT)) return INVALID_ARGS;
-            if(!expect_token(command[2], TT_STRING)) return INVALID_ARGS;
-            String_View str = view_string_internals(command[2].value);
-            char *str_str = view_to_cstr(str);
-            Map map = (Map){.a = command[1].value.data[0], .b = str_str, .b_s = str.len+1};
-            DA_APPEND(&key_maps, map);
-            break;
-        case TT_LET: {
-            if(command_s != 3) return NOT_ENOUGH_ARGS;
-            if(!expect_token(command[1], TT_IDENT)) return INVALID_ARGS;
-            if(!expect_token(command[2], TT_INT_LIT) && !expect_token(command[2], TT_FLOAT_LIT)) return INVALID_ARGS;
-            Variable var = {0};
-            var.name = view_to_cstr(command[1].value);
-            if(command[2].type == TT_INT_LIT) {
-                var.type = VAR_INT;
-                var.value.as_int = view_to_int(command[2].value);   
-            } else {
-                var.type = VAR_FLOAT;
-                var.value.as_float = view_to_float(command[2].value);   
-                WRITE_LOG("%f", var.value.as_float);
-            }
-            DA_APPEND(&state->variables, var);
-        } break;
-        case TT_ECHO: {
-            if(command_s != 2) return NOT_ENOUGH_ARGS;
-            if(!expect_token(command[1], TT_IDENT) && !expect_token(command[1], TT_STRING)) return INVALID_ARGS;
-            state->is_print_msg = 1;
-            if(command[1].type == TT_STRING) {
-                String_View str = view_string_internals(command[1].value);
-                state->status_bar_msg = view_to_cstr(str);
-            } else {
-                for(size_t i = 0; i < state->variables.count; i++) {
-                    String_View var = view_create(state->variables.data[i].name, strlen(state->variables.data[i].name));
-                    if(view_cmp(command[1].value, var)) {
-                       if(state->variables.data[i].type == VAR_INT) sprintf(state->status_bar_msg, "%d", state->variables.data[i].value.as_int);
-                       else if(state->variables.data[i].type == VAR_FLOAT) sprintf(state->status_bar_msg, "%f", state->variables.data[i].value.as_float);
-                       return NO_ERROR;
-                    }
-                }
-                return INVALID_IDENT;
-            }
-        } break;
-        case TT_SAVE:
-            handle_save(buffer);
-            break;
-        case TT_EXIT:
-            QUIT = 1;
-            break;
-        case TT_SAVE_EXIT:
-            handle_save(buffer);
-            QUIT = 1;
-            break;
-        case TT_CONFIG_IDENT:
-        case TT_INT_LIT:
-        default:
-            return UNKNOWN_COMMAND;
-            break;
-    }
     return NO_ERROR;
 }
