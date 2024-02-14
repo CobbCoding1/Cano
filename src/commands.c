@@ -287,6 +287,22 @@ Node *parse_command(Command_Token *command, size_t command_s) {
         case TT_SET_MAP:
             break;
         case TT_LET:
+            if(!expect_token(command[1], TT_IDENT)) return NULL;
+            if(!expect_token(command[2], TT_INT_LIT)) return NULL;
+        
+            val.as_ident = (Identifier){.name = command[1].value};
+            root->left = create_node(NODE_IDENT, val);
+            if(command_s == 3) {
+                int value = view_to_int(command[2].value);
+                val.as_expr = (Expr){.value = value};
+                Node *right = create_node(NODE_EXPR, val);
+                root->right = right;
+                break;
+            } else {
+                Bin_Expr *expr = parse_bin_expr(command+2, command_s-2);
+                val.as_bin = *expr;
+                root->right = create_node(NODE_BIN, val);
+            }
             break;
         case TT_PLUS:
             break;
@@ -297,6 +313,15 @@ Node *parse_command(Command_Token *command, size_t command_s) {
         case TT_DIV:
             break;
         case TT_ECHO:
+            if(command_s > 2) return NULL;
+            if(!expect_token(command[1], TT_IDENT) && !expect_token(command[1], TT_STRING)) return NULL;
+            if(command[1].type == TT_STRING) {
+                val.as_str = (Str_Literal){view_string_internals(command[1].value)};
+                root->right = create_node(NODE_STR, val);
+            } else {
+                val.as_ident = (Identifier){.name = command[1].value};
+                root->right = create_node(NODE_IDENT, val);
+            }
             break;
         case TT_SAVE:
             break;
@@ -355,8 +380,19 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
                     break;
                 case TT_SET_MAP:
                     break;
-                case TT_LET:
-                    break;
+                case TT_LET: {
+                    Variable var = {0};
+                    var.name = view_to_cstr(root->left->value.as_ident.name);
+                    var.type = VAR_INT;
+                    if(root->right->type == NODE_EXPR) {
+                        var.value.as_int = root->right->value.as_expr.value;
+                    } else {
+                        Node *node = root->right;
+                        int value = interpret_expr(&node->value.as_bin);
+                        var.value.as_int = value;
+                    }
+                    DA_APPEND(&state->variables, var);
+                } break;
                 case TT_PLUS:
                     break;
                 case TT_MINUS:
@@ -366,6 +402,21 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
                 case TT_DIV:
                     break;
                 case TT_ECHO:
+                    state->is_print_msg = 1;
+                    if(root->right->type == NODE_STR) {
+                        String_View str = root->right->value.as_str.value;
+                        state->status_bar_msg = view_to_cstr(str);
+                    } else {
+                        for(size_t i = 0; i < state->variables.count; i++) {
+                            String_View var = view_create(state->variables.data[i].name, strlen(state->variables.data[i].name));
+                            if(view_cmp(root->right->value.as_ident.name, var)) {
+                                if(state->variables.data[i].type == VAR_INT) sprintf(state->status_bar_msg, "%d", state->variables.data[i].value.as_int);
+                                else if(state->variables.data[i].type == VAR_FLOAT) sprintf(state->status_bar_msg, "%f", state->variables.data[i].value.as_float);
+                                return;
+                            }
+                        }
+                    }
+            
                     break;
                 case TT_SAVE:
                     break;
