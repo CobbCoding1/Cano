@@ -251,13 +251,13 @@ Bin_Expr *parse_bin_expr(Command_Token *command, size_t command_s) {
     
 Node *parse_command(Command_Token *command, size_t command_s) {
     Node *root = NULL;
+    Node_Val val;
+    val.as_keyword = command[0].type;
+    root = create_node(NODE_KEYWORD, val);    
     switch(command[0].type) {
         case TT_SET_VAR:
             if(!expect_token(command[1], TT_CONFIG_IDENT)) return NULL;
             if(!expect_token(command[2], TT_INT_LIT)) return NULL;
-            Node_Val val;
-            val.as_keyword = command[0].type;
-            root = create_node(NODE_KEYWORD, val);
         
             for(size_t i = 0; i < CONFIG_VARS; i++) {
                 if(view_cmp(command[1].value, vars[i].label)) {
@@ -280,6 +280,9 @@ Node *parse_command(Command_Token *command, size_t command_s) {
             }
             break;
         case TT_SET_OUTPUT:
+            if(command_s != 2) return NULL;
+            val.as_str = (Str_Literal){.value = view_string_internals(command[1].value)};
+            root->right = create_node(NODE_STR, val);
             break;
         case TT_SET_MAP:
             break;
@@ -347,6 +350,8 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
                     return;
                 } break;
                 case TT_SET_OUTPUT:
+                    WRITE_LOG("TEST");
+                    buffer->filename = view_to_cstr(root->right->value.as_str.value);
                     break;
                 case TT_SET_MAP:
                     break;
@@ -425,6 +430,7 @@ Command_Error execute_command(Buffer *buffer, State *state, Command_Token *comma
     (void)state;
     assert(command_s > 0);
     Node *root = parse_command(command, command_s);
+    if(root == NULL) return INVALID_ARGS;
     print_tree(root);
     interpret_command(buffer, state, root);
     return NO_ERROR;
