@@ -285,6 +285,13 @@ Node *parse_command(Command_Token *command, size_t command_s) {
             root->right = create_node(NODE_STR, val);
             break;
         case TT_SET_MAP:
+            if(command_s != 3) return NULL;
+            if(!expect_token(command[1], TT_IDENT)) return NULL;
+            if(!expect_token(command[2], TT_STRING)) return NULL;
+            val.as_ident = (Identifier){.name = command[1].value};
+            root->left = create_node(NODE_IDENT, val);
+            val.as_str = (Str_Literal){view_string_internals(command[2].value)};
+            root->right = create_node(NODE_STR, val);
             break;
         case TT_LET:
             if(!expect_token(command[1], TT_IDENT)) return NULL;
@@ -324,9 +331,7 @@ Node *parse_command(Command_Token *command, size_t command_s) {
             }
             break;
         case TT_SAVE:
-            break;
         case TT_EXIT:
-            break;
         case TT_SAVE_EXIT:
             break;
         case TT_IDENT:
@@ -378,8 +383,11 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
                     WRITE_LOG("TEST");
                     buffer->filename = view_to_cstr(root->right->value.as_str.value);
                     break;
-                case TT_SET_MAP:
-                    break;
+                case TT_SET_MAP: {
+                        char *str = view_to_cstr(root->right->value.as_str.value);
+                        Map map = (Map){.a = root->left->value.as_ident.name.data[0], .b = str, .b_s = root->right->value.as_str.value.len+1};
+                        DA_APPEND(&key_maps, map);
+                } break;
                 case TT_LET: {
                     Variable var = {0};
                     var.name = view_to_cstr(root->left->value.as_ident.name);
@@ -416,24 +424,24 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
                             }
                         }
                     }
-            
                     break;
                 case TT_SAVE:
+                    handle_save(buffer);
                     break;
                 case TT_EXIT:
+                    QUIT = 1;
                     break;
                 case TT_SAVE_EXIT:
+                    handle_save(buffer);
+                    QUIT = 1;
                     break;
                 case TT_IDENT:
-                    break;
                 case TT_STRING:
-                    break;
                 case TT_CONFIG_IDENT:
-                    break;
                 case TT_INT_LIT:
-                    break;
                 case TT_FLOAT_LIT:
-                    break;
+                default:
+                    assert(0 && "UNREACHABLE");
             }
             break;
         case NODE_STR:
