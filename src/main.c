@@ -773,6 +773,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             Undo redo = {0};
             redo.start = undo.start;
             state->cur_undo = redo;
+            WRITE_LOG("type: %d, start: %zu, undo.data.count: %zu", undo.type, undo.start, undo.data.count);
             switch(undo.type) {
                 case NONE:
                     break;
@@ -794,7 +795,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     state->cur_undo.type = INSERT_CHARS;
                     state->cur_undo.end = undo.end;
                     buffer->cursor = undo.start;
-                    for(size_t i = 0; i < undo.end; i++) {
+                    for(size_t i = undo.start; i < undo.end; i++) {
                         buffer_delete_char(buffer, state);
                     }
                     break;
@@ -813,8 +814,10 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             Undo undo = {0};
             undo.start = redo.start;
             state->cur_undo = undo;
+            WRITE_LOG("type: %d, start: %zu, end: %zu, undo.data.count: %zu", redo.type, redo.start, redo.end, redo.data.count);            
             switch(redo.type) {
                 case NONE:
+                    return;
                     break;
                 case INSERT_CHARS:
                     state->cur_undo.type = (redo.data.count > 1) ? DELETE_MULT_CHAR : DELETE_CHAR;
@@ -833,7 +836,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     state->cur_undo.type = INSERT_CHARS;
                     state->cur_undo.end = redo.end;
                     buffer->cursor = undo.start;
-                    for(size_t i = 0; i < redo.end; i++) {
+                    for(size_t i = redo.start; i < redo.end; i++) {
                         buffer_delete_char(buffer, state);
                     }
                     break;
