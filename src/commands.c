@@ -474,7 +474,7 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
                     QUIT = 1;
                     break;
                 default:
-                    assert(0 && "UNREACHABLE");
+                    return;
             }
             break;
         case NODE_STR:
