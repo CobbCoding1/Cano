@@ -466,11 +466,15 @@ int handle_motion_keys(Buffer *buffer, State *state, int ch, size_t *repeating_c
     (void)repeating_count;
     switch(ch) {
         case 'g': { // Move to the start of the file or to the line specified by repeating_count
-            size_t row = buffer_get_row(buffer);
-            size_t end = buffer->rows.data[row].end;
-            buffer->cursor = 0;
+            size_t row = buffer_get_row(buffer);            
+            if(state->repeating.repeating_count >= buffer->rows.count) state->repeating.repeating_count = buffer->rows.count;
+            if(state->repeating.repeating_count == 0) state->repeating.repeating_count = 1;                
+            buffer->cursor = buffer->rows.data[state->repeating.repeating_count-1].start;
+            state->repeating.repeating_count = 0;
             if(state->leader != LEADER_D) break;
-            size_t start = 0;
+            // TODO: this doens't work with row jumps
+            size_t end = buffer->rows.data[row].end;
+            size_t start = buffer->cursor;
             CREATE_UNDO(INSERT_CHARS, start);
             buffer_delete_selection(buffer, state, start, end);
             undo_push(state, &state->undo_stack, state->cur_undo);
@@ -478,8 +482,15 @@ int handle_motion_keys(Buffer *buffer, State *state, int ch, size_t *repeating_c
         case 'G': { // Move to the end of the file or to the line specified by repeating_count
             size_t row = buffer_get_row(buffer);
             size_t start = buffer->rows.data[row].start;
-            buffer->cursor = buffer->data.count;
+            if(state->repeating.repeating_count > 0) {
+                if(state->repeating.repeating_count >= buffer->rows.count) state->repeating.repeating_count = buffer->rows.count;
+                buffer->cursor = buffer->rows.data[state->repeating.repeating_count-1].start;
+                state->repeating.repeating_count = 0;                
+            } else {
+                buffer->cursor = buffer->data.count;   
+            }
             if(state->leader != LEADER_D) break;
+            // TODO: this doesn't work with row jumps
             size_t end = buffer->cursor;
             CREATE_UNDO(INSERT_CHARS, start);
             buffer_delete_selection(buffer, state, start, end);
