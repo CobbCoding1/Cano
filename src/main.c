@@ -613,18 +613,30 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
         case 'd': {
             switch(state->leader) {
                 case LEADER_D: {
-                    reset_command(state->clipboard.str, &state->clipboard.len);
-                    buffer_yank_line(buffer, state, 0);
-                    size_t row = buffer_get_row(buffer);
-                    Row cur = buffer->rows.data[row];
-                    CREATE_UNDO(INSERT_CHARS, cur.start);
-                    if(row == 0) {
-                        buffer_delete_selection(buffer, state, cur.start, cur.end-1);
-                    } else {
-                        state->cur_undo.start -= 1;
-                        buffer_delete_selection(buffer, state, cur.start-1, cur.end-1);
+                    size_t repeat = state->repeating.repeating_count;
+                    if(repeat == 0) repeat = 1;
+                    if(repeat > buffer->rows.count - buffer_get_row(buffer)) repeat = buffer->rows.count - buffer_get_row(buffer);
+                    for(size_t i = 0; i < repeat; i++) {
+                        reset_command(state->clipboard.str, &state->clipboard.len);
+                        buffer_yank_line(buffer, state, 0);
+                        size_t row = buffer_get_row(buffer);
+                        Row cur = buffer->rows.data[row];
+                        size_t offset = buffer->cursor - cur.start;
+                        CREATE_UNDO(INSERT_CHARS, cur.start);
+                        if(row == 0) {
+                            buffer_delete_selection(buffer, state, cur.start, cur.end-1);
+                        } else {
+                            state->cur_undo.start -= 1;
+                            buffer_delete_selection(buffer, state, cur.start-1, cur.end-1);
+                        }
+                        undo_push(state, &state->undo_stack, state->cur_undo);
+                        if(row >= buffer->rows.count) row = buffer->rows.count-1;
+                        cur = buffer->rows.data[row];
+                        size_t pos = cur.start + offset;
+                        if(pos > buffer->data.count) pos = buffer->data.count;
+                        buffer->cursor = pos;
                     }
-                    undo_push(state, &state->undo_stack, state->cur_undo);
+                    state->repeating.repeating_count = 0;
                 } break;
                 default:
                     break;
