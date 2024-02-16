@@ -663,8 +663,9 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
         } break;
         case 'I': {
             size_t row = buffer_get_row(buffer);
-            size_t start = buffer->rows.data[row].start;
-            buffer->cursor = start;
+            Row cur = buffer->rows.data[row];
+            buffer->cursor = cur.start;            
+            while(buffer->cursor < cur.end && isspace(buffer->data.data[buffer->cursor])) buffer->cursor++;
             mode = INSERT;
         } break;
         case 'a':
@@ -1180,7 +1181,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             int cond = (buffer->visual.start > buffer->visual.end);
             size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
             size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
-            size_t position = buffer->cursor;
+            //size_t position = buffer->cursor;
             size_t row = index_get_row(buffer, start);
             size_t end_row = index_get_row(buffer, end);            
             size_t offset = 0;
