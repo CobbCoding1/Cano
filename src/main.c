@@ -1158,6 +1158,47 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             mode = NORMAL;
             curs_set(1);
         } break;
+        case '>': {
+            int cond = (buffer->visual.start > buffer->visual.end);
+            size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
+            size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
+            size_t position = buffer->cursor + indent;
+            size_t row = index_get_row(buffer, start);
+            size_t end_row = index_get_row(buffer, end);
+            for(size_t i = row; i <= end_row; i++) {
+                buffer_calculate_rows(buffer);
+                buffer->cursor = buffer->rows.data[i].start;
+                for(size_t i = 0; (int)i < indent; i++) {
+                    buffer_insert_char(buffer, ' ');
+                }
+            }
+            buffer->cursor = position;
+            mode = NORMAL;
+            curs_set(1);
+        } break;
+        case '<': {
+            int cond = (buffer->visual.start > buffer->visual.end);
+            size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
+            size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
+            size_t position = buffer->cursor;
+            size_t row = index_get_row(buffer, start);
+            size_t end_row = index_get_row(buffer, end);            
+            size_t offset = 0;
+            for(size_t i = row; i <= end_row; i++) {
+                buffer_calculate_rows(buffer);                
+                buffer->cursor = buffer->rows.data[i].start;
+                WRITE_LOG("cursor: %zu, row: %zu", buffer->cursor, i);
+                for(size_t i = 0; (int)i < indent; i++) {
+                    if(isspace(buffer->data.data[buffer->cursor])) {
+                        buffer_delete_char(buffer, state);
+                        offset++;
+                        buffer_calculate_rows(buffer);
+                    }
+                }
+            }
+            mode = NORMAL;
+            curs_set(1);
+        } break;
         case 'y': {
             reset_command(state->clipboard.str, &state->clipboard.len);
             int cond = (buffer->visual.start > buffer->visual.end);
