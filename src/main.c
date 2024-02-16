@@ -703,15 +703,11 @@ int check_keymaps(Buffer *buffer, State *state) {
 
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
-    mvwprintw(state->status_bar, 0, state->main_col-10, "%s", state->num.data);
-    wrefresh(state->status_bar);
-     
+    
     if(check_keymaps(buffer, state)) return;
     if(state->leader == LEADER_NONE && handle_leader_keys(state)) return;   
     if(isdigit(state->ch) && !(state->ch == '0' && state->num.count == 0)) {
         DA_APPEND(&state->num, state->ch);
-        mvwprintw(state->status_bar, 0, state->main_col-10, "%s", state->num.data);
-        wrefresh(state->status_bar);
         return;
     } 
     
@@ -1364,6 +1360,7 @@ int main(int argc, char **argv) {
         mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
         mvwprintw(status_bar, 0, state.main_col-11, "%c", leaders[state.leader]);
         mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[mode]);
+        mvwprintw(state.status_bar, 0, state.main_col-5, "%.*s", (int)state.num.count, state.num.data);
         
         if(mode == COMMAND || mode == SEARCH) mvwprintw(state.status_bar, 1, 0, ":%.*s", (int)state.command_s, state.command);
 
