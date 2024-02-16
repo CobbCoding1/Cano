@@ -57,6 +57,10 @@ Command - For executing commands
 
 ## Visual
 Visual mode works the same as Normal mode, except works on the entire selection, instead of character by character.
+| Keybind        | Action                                          |
+|----------------|-------------------------------------------------|
+| >              | Indent current selection                        |
+| <              | Unindent current selection                      |
 
 ## Search
 Search mode takes a string and finds it in the file.
