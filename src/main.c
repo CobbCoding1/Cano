@@ -708,10 +708,11 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
      
     if(check_keymaps(buffer, state)) return;
     if(state->leader == LEADER_NONE && handle_leader_keys(state)) return;   
-    if(isdigit(state->ch) && state->ch != '0') {
+    if(isdigit(state->ch) && !(state->ch == '0' && state->num.count == 0)) {
         DA_APPEND(&state->num, state->ch);
         mvwprintw(state->status_bar, 0, state->main_col-10, "%s", state->num.data);
         wrefresh(state->status_bar);
+        return;
     } 
     
     if(!isdigit(state->ch) && state->num.count > 0) {
