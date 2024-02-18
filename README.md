@@ -75,8 +75,8 @@ Will replace hello with goodbye.
 |-----------------------|-----------------------------------------------------------|
 | set-output            | change output file                                        |
 | echo (v)              | echo value (v) where v is either an ident or a literal    |
-| we                    | Write and quit                                            |
-| e                     | Write without quitting                                    |
+| we                    | Write and exit                                            |
+| e                     | Write without exiting                                     |
 | set-var (var) (value) | Change a config variable                                  |
 | set-map (a) "(b)"     | Map key a to any combination of keys b                    |
 | let (n) (v)           | Create variable (n) with value (v)                        |

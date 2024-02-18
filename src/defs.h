@@ -184,7 +184,7 @@ typedef struct {
 } Sized_Str;
 
 typedef struct {
-    char a;
+    int a;
     char *b;
     size_t b_s;
 } Map;

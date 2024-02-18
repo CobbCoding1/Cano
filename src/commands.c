@@ -18,6 +18,7 @@ typedef enum {
     TT_EXIT,
     TT_SAVE_EXIT,
     TT_IDENT,
+    TT_SPECIAL_CHAR,
     TT_STRING,
     TT_CONFIG_IDENT,
     TT_INT_LIT,
@@ -70,6 +71,7 @@ typedef union {
     Str_Literal as_str;
     Identifier as_ident;
     Config_Vars *as_config;
+    int as_int;
 } Node_Val;
 
 typedef enum {
@@ -79,6 +81,7 @@ typedef enum {
     NODE_STR,
     NODE_IDENT,
     NODE_CONFIG,
+    NODE_INT,
 } Node_Type;
  
 typedef struct Node {
@@ -137,6 +140,8 @@ Command_Type get_token_type(String_View view) {
         return TT_INT_LIT;   
     } else if(*view.data == '"') {
         return TT_STRING;
+    } else if(*view.data == '<') {
+        return TT_SPECIAL_CHAR;   
     } else if(*view.data == '+') {
         return TT_PLUS;
     } else if(*view.data == '-') {
@@ -177,6 +182,12 @@ Command_Token create_token(String_View command) {
         if(*command.data == '"') {
             command = view_chop_left(command, 1);
             while(command.len > 0 && *command.data != '"') {
+                command = view_chop_left(command, 1);
+            }
+        }
+        if(*command.data == '<') {
+            command = view_chop_left(command, 1);
+            while(command.len > 0 && *command.data != '>') {
                 command = view_chop_left(command, 1);
             }
         }
@@ -252,6 +263,22 @@ Operator get_operator(Command_Token token) {
     }
 }
     
+int get_special_char(String_View view) {
+    if(view_cmp(view, LITERAL_CREATE("<space>"))) {
+        return SPACE;
+    } else if(view_cmp(view, LITERAL_CREATE("<esc>"))) {
+        return ESCAPE;
+    } else if(view_cmp(view, LITERAL_CREATE("<ctrl-t>"))) {
+        return ctrl('t');   
+    } else if(view_cmp(view, LITERAL_CREATE("<backspace>"))) {
+        return KEY_BACKSPACE;
+    } else if(view_cmp(view, LITERAL_CREATE("<enter>"))) {
+        return ENTER;
+    } else {
+        return -1;
+    }
+}
+    
 Bin_Expr *parse_bin_expr(Command_Token *command, size_t command_s) {
     if(command_s == 0) return NULL;
     Bin_Expr *expr = calloc(0, sizeof(Bin_Expr));
@@ -310,10 +337,16 @@ Node *parse_command(Command_Token *command, size_t command_s) {
             break;
         case TT_SET_MAP:
             if(command_s != 3) return NULL;
-            if(!expect_token(command[1], TT_IDENT)) return NULL;
             if(!expect_token(command[2], TT_STRING)) return NULL;
-            val.as_ident = (Identifier){.name = command[1].value};
-            root->left = create_node(NODE_IDENT, val);
+            if(command[1].type == TT_SPECIAL_CHAR) {
+                int special = get_special_char(command[1].value);
+                if(special == -1) return NULL;
+                val.as_int = special;
+                root->left = create_node(NODE_INT, val); 
+            } else {
+                val.as_ident = (Identifier){.name = command[1].value};            
+                root->left = create_node(NODE_IDENT, val);            
+            }
             val.as_str = (Str_Literal){view_string_internals(command[2].value)};
             root->right = create_node(NODE_STR, val);
             break;
@@ -357,6 +390,7 @@ Node *parse_command(Command_Token *command, size_t command_s) {
         case TT_STRING:
         case TT_CONFIG_IDENT:
         case TT_INT_LIT:
+        case TT_SPECIAL_CHAR:
         case TT_FLOAT_LIT:
             break;
     }
@@ -431,7 +465,12 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
                     break;
                 case TT_SET_MAP: {
                         char *str = view_to_cstr(root->right->value.as_str.value);
-                        Map map = (Map){.a = root->left->value.as_ident.name.data[0], .b = str, .b_s = root->right->value.as_str.value.len+1};
+                        Map map = {.b = str, .b_s = root->right->value.as_str.value.len+1};
+                        if(root->left->type == NODE_IDENT) {
+                            map.a = root->left->value.as_ident.name.data[0];
+                        } else {
+                            map.a = root->left->value.as_int;
+                        }
                         DA_APPEND(&key_maps, map);
                 } break;
                 case TT_LET: {
@@ -478,9 +517,8 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
             }
             break;
         case NODE_STR:
-            break;
         case NODE_IDENT:
-            break;
+        case NODE_INT:
         case NODE_CONFIG:
             break;
     }
@@ -512,7 +550,9 @@ void print_tree(Node *node, size_t depth) {
     case NODE_CONFIG: 
         WRITE_LOG("CONFIG");
         break;
-
+    case NODE_INT:
+        WRITE_LOG("INT");
+        break;
     }
     print_tree(node->left, depth+1);
     print_tree(node->right, depth+1);    
