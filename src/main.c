@@ -243,7 +243,6 @@ void reset_command(char *command, size_t *command_s) {
 
 void handle_save(Buffer *buffer) {
     FILE *file = fopen(buffer->filename, "w"); 
-    WRITE_LOG("%s, %zu", buffer->data.data, buffer->data.count);
     fwrite(buffer->data.data, buffer->data.count, 1, file);
     fclose(file);
 }
@@ -775,7 +774,6 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             Undo redo = {0};
             redo.start = undo.start;
             state->cur_undo = redo;
-            WRITE_LOG("type: %d, start: %zu, undo.data.count: %zu", undo.type, undo.start, undo.data.count);
             switch(undo.type) {
                 case NONE:
                     break;
@@ -783,7 +781,6 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     state->cur_undo.type = (undo.data.count > 1) ? DELETE_MULT_CHAR : DELETE_CHAR;
                     state->cur_undo.end = undo.start + undo.data.count;
                     buffer->cursor = undo.start;
-                    WRITE_LOG("%zu, %zu, %zu, %s", undo.start, undo.end, undo.data.count, undo.data.data);
                     for(size_t i = 0; i < undo.data.count; i++) {
                         buffer_insert_char(buffer, undo.data.data[i]);
                     } 
@@ -816,7 +813,6 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             Undo undo = {0};
             undo.start = redo.start;
             state->cur_undo = undo;
-            WRITE_LOG("type: %d, start: %zu, end: %zu, undo.data.count: %zu", redo.type, redo.start, redo.end, redo.data.count);            
             switch(redo.type) {
                 case NONE:
                     return;
@@ -1169,7 +1165,6 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             for(size_t i = row; i <= end_row; i++) {
                 buffer_calculate_rows(buffer);                
                 buffer->cursor = buffer->rows.data[i].start;
-                WRITE_LOG("cursor: %zu, row: %zu", buffer->cursor, i);
                 for(size_t i = 0; (int)i < indent; i++) {
                     if(isspace(buffer->data.data[buffer->cursor])) {
                         buffer_delete_char(buffer, state);
