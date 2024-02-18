@@ -82,6 +82,16 @@ Will replace hello with goodbye.
 | let (n) (v)           | Create variable (n) with value (v)                        |
 | !(command)            | Execute a shell command                                   |
 
+### Special Keys
+There are a couple special keys for the key remaps.
+| Key         |
+|-------------|
+| <space>     |
+| <esc>       |
+| <backspace> |
+| <enter>     |
+| <ctrl-t>    |
+
 ## Config file
 The config file is stored in ~/.config/cano/config.cano by default, or can be set at runtime like so:
 ```sh
