@@ -243,6 +243,7 @@ void reset_command(char *command, size_t *command_s) {
 
 void handle_save(Buffer *buffer) {
     FILE *file = fopen(buffer->filename, "w"); 
+    WRITE_LOG("SAVED!");
     fwrite(buffer->data.data, buffer->data.count, 1, file);
     fclose(file);
 }

@@ -351,6 +351,16 @@ Node *parse_command(State *state, Command_Token *command, size_t command_s) {
     root = create_node(NODE_KEYWORD, val);    
     switch(command[0].type) {
         case TT_SET_VAR:
+            if(command_s > 3) {
+                sprintf(state->status_bar_msg, "Too many args");
+                state->is_print_msg = 1;
+                return NULL;
+            } else if(command_s < 3) {
+                sprintf(state->status_bar_msg, "Not enough args");
+                state->is_print_msg = 1;
+                return NULL;
+            }
+        
             if(!expect_token(state, command[1], TT_CONFIG_IDENT) || !expect_token(state, command[2], TT_INT_LIT)) return NULL;
         
             for(size_t i = 0; i < CONFIG_VARS; i++) {
