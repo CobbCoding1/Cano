@@ -270,19 +270,57 @@ Operator get_operator(Command_Token token) {
             return OP_NONE;
     }
 }
+
+typedef struct {
+    char *name;
+    int value;
+} Ctrl_Key;
+
+Ctrl_Key ctrl_keys[] = {
+    {"<ctrl-a>", ctrl('a')},
+    {"<ctrl-b>", ctrl('b')},    
+    {"<ctrl-c>", ctrl('c')},    
+    {"<ctrl-d>", ctrl('d')},
+    {"<ctrl-e>", ctrl('e')},    
+    {"<ctrl-f>", ctrl('f')},    
+    {"<ctrl-g>", ctrl('g')},
+    {"<ctrl-h>", ctrl('h')},    
+    {"<ctrl-i>", ctrl('i')},    
+    {"<ctrl-j>", ctrl('j')},
+    {"<ctrl-k>", ctrl('k')},    
+    {"<ctrl-l>", ctrl('l')},    
+    {"<ctrl-m>", ctrl('m')},
+    {"<ctrl-n>", ctrl('n')},    
+    {"<ctrl-o>", ctrl('o')},    
+    {"<ctrl-p>", ctrl('p')},
+    {"<ctrl-q>", ctrl('q')},    
+    {"<ctrl-r>", ctrl('r')},    
+    {"<ctrl-s>", ctrl('s')},
+    {"<ctrl-t>", ctrl('t')},    
+    {"<ctrl-u>", ctrl('u')},    
+    {"<ctrl-v>", ctrl('v')},
+    {"<ctrl-w>", ctrl('w')},    
+    {"<ctrl-x>", ctrl('x')},    
+    {"<ctrl-y>", ctrl('y')},
+    {"<ctrl-z>", ctrl('z')},    
+};
+#define NUM_OF_CTRL_KEYS sizeof(ctrl_keys)/sizeof(*ctrl_keys)
     
 int get_special_char(String_View view) {
     if(view_cmp(view, LITERAL_CREATE("<space>"))) {
         return SPACE;
     } else if(view_cmp(view, LITERAL_CREATE("<esc>"))) {
         return ESCAPE;
-    } else if(view_cmp(view, LITERAL_CREATE("<ctrl-t>"))) {
-        return ctrl('t');   
     } else if(view_cmp(view, LITERAL_CREATE("<backspace>"))) {
         return KEY_BACKSPACE;
     } else if(view_cmp(view, LITERAL_CREATE("<enter>"))) {
         return ENTER;
     } else {
+        for(size_t i = 0; i < NUM_OF_CTRL_KEYS; i++) {
+            if(view_cmp(view, view_create(ctrl_keys[i].name, strlen(ctrl_keys[i].name)))) {
+                return ctrl_keys[i].value;        
+            }          
+        }
         return -1;
     }
 }
