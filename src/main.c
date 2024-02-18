@@ -895,7 +895,6 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 }
 
 void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
-    (void)buffer;
     (void)modify_buffer;
     switch(state->ch) { 
         case '\b':
@@ -984,7 +983,7 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case '\b':
         case 127:
         case KEY_BACKSPACE: {
-            if(state->x != 0) {
+            if(state->x != 1) {
                 shift_str_left(state->command, &state->command_s, --state->x);
                 wmove(state->status_bar, 1, state->x);
             }
@@ -1044,7 +1043,7 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case '\b':
         case 127:
         case KEY_BACKSPACE: {
-            if(state->x != 0) {
+            if(state->x != 1) {
                 shift_str_left(state->command, &state->command_s, --state->x);
                 wmove(state->status_bar, 1, state->x);
             }
