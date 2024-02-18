@@ -300,15 +300,18 @@ Bin_Expr *parse_bin_expr(Command_Token *command, size_t command_s) {
     return expr;
 }
     
-Node *parse_command(Command_Token *command, size_t command_s) {
+Node *parse_command(State *state, Command_Token *command, size_t command_s) {
     Node *root = NULL;
     Node_Val val;
     val.as_keyword = command[0].type;
     root = create_node(NODE_KEYWORD, val);    
     switch(command[0].type) {
         case TT_SET_VAR:
-            if(!expect_token(command[1], TT_CONFIG_IDENT)) return NULL;
-            if(!expect_token(command[2], TT_INT_LIT)) return NULL;
+            if(!expect_token(command[1], TT_CONFIG_IDENT) || !expect_token(command[2], TT_INT_LIT)) {
+                sprintf(state->status_bar_msg, "Invalid arg");
+                state->is_print_msg = 1;
+                return NULL;
+            }
         
             for(size_t i = 0; i < CONFIG_VARS; i++) {
                 if(view_cmp(command[1].value, vars[i].label)) {
@@ -331,16 +334,32 @@ Node *parse_command(Command_Token *command, size_t command_s) {
             }
             break;
         case TT_SET_OUTPUT:
-            if(command_s != 2) return NULL;
+            if(command_s != 2) {
+                sprintf(state->status_bar_msg, "Not enough args");
+                state->is_print_msg = 1;
+                return NULL;
+            }
             val.as_str = (Str_Literal){.value = view_string_internals(command[1].value)};
             root->right = create_node(NODE_STR, val);
             break;
         case TT_SET_MAP:
-            if(command_s != 3) return NULL;
-            if(!expect_token(command[2], TT_STRING)) return NULL;
+            if(command_s != 3) {
+                sprintf(state->status_bar_msg, "Not enough args");
+                state->is_print_msg = 1;
+                return NULL;
+            }
+            if(!expect_token(command[2], TT_STRING)) {
+                sprintf(state->status_bar_msg, "Invalid arg");
+                state->is_print_msg = 1;
+                return NULL;
+            };
             if(command[1].type == TT_SPECIAL_CHAR) {
                 int special = get_special_char(command[1].value);
-                if(special == -1) return NULL;
+                if(special == -1) {
+                    sprintf(state->status_bar_msg, "Invalid special key");
+                    state->is_print_msg = 1;
+                    return NULL;
+                }
                 val.as_int = special;
                 root->left = create_node(NODE_INT, val); 
             } else {
@@ -351,8 +370,11 @@ Node *parse_command(Command_Token *command, size_t command_s) {
             root->right = create_node(NODE_STR, val);
             break;
         case TT_LET:
-            if(!expect_token(command[1], TT_IDENT)) return NULL;
-            if(!expect_token(command[2], TT_INT_LIT)) return NULL;
+            if(!expect_token(command[1], TT_IDENT) || !expect_token(command[2], TT_INT_LIT)) {
+                sprintf(state->status_bar_msg, "Invalid arg");
+                state->is_print_msg = 1;
+                return NULL;
+            }
         
             val.as_ident = (Identifier){.name = command[1].value};
             root->left = create_node(NODE_IDENT, val);
@@ -369,8 +391,17 @@ Node *parse_command(Command_Token *command, size_t command_s) {
             }
             break;
         case TT_ECHO:
-            if(command_s > 2) return NULL;
-            if(!expect_token(command[1], TT_IDENT) && !expect_token(command[1], TT_STRING)) return NULL;
+            if(command_s > 2) {
+                sprintf(state->status_bar_msg, "Too many args");
+                state->is_print_msg = 1;
+                return NULL;
+            }
+        
+            if(!expect_token(command[1], TT_IDENT) && !expect_token(command[1], TT_STRING)) {
+                sprintf(state->status_bar_msg, "Invalid arg");
+                state->is_print_msg = 1;
+                return NULL;
+            }
             if(command[1].type == TT_STRING) {
                 val.as_str = (Str_Literal){view_string_internals(command[1].value)};
                 root->right = create_node(NODE_STR, val);
@@ -558,11 +589,11 @@ void print_tree(Node *node, size_t depth) {
     print_tree(node->right, depth+1);    
 }
 
-Command_Error execute_command(Buffer *buffer, State *state, Command_Token *command, size_t command_s) {
+int execute_command(Buffer *buffer, State *state, Command_Token *command, size_t command_s) {
     assert(command_s > 0);
-    Node *root = parse_command(command, command_s);
-    if(root == NULL) return INVALID_ARGS;
+    Node *root = parse_command(state, command, command_s);
+    if(root == NULL) return 1;
     print_tree(root, 0);
     interpret_command(buffer, state, root);
-    return NO_ERROR;
+    return 0;
 }

@@ -743,6 +743,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             mode = COMMAND;
             break;
         case '/':
+            reset_command(state->command, &state->command_s);        
             state->x = state->command_s+1;
             wmove(state->status_bar, state->x, 1);
             mode = SEARCH;
@@ -1015,27 +1016,7 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             } else {
                 size_t command_s = 0;
                 Command_Token *command = lex_command(view_create(state->command, state->command_s), &command_s);
-                switch(execute_command(buffer, state, command, command_s)) {
-                    case NO_ERROR:
-                        break;
-                    case NOT_ENOUGH_ARGS:
-                        sprintf(state->status_bar_msg, "not enough args");
-                        state->is_print_msg = 1;
-                        break;
-                    case INVALID_ARGS:
-                        sprintf(state->status_bar_msg, "invalid args");
-                        state->is_print_msg = 1;
-                        break;
-                    case UNKNOWN_COMMAND:
-                        sprintf(state->status_bar_msg, "unknown command %s", state->command);
-                        state->is_print_msg = 1;
-                        break;
-                    case INVALID_IDENT:
-                        sprintf(state->status_bar_msg, "unknown identifier %s", state->command);
-                        state->is_print_msg = 1;
-                        break;
-
-                }
+                execute_command(buffer, state, command, command_s);
             }
             reset_command(state->command, &state->command_s);
             mode = NORMAL;
