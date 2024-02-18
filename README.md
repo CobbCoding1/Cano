@@ -84,13 +84,13 @@ Will replace hello with goodbye.
 
 ### Special Keys
 There are a couple special keys for the key remaps.
-| Key         |
-|-------------|
-| <space>     |
-| <esc>       |
-| <backspace> |
-| <enter>     |
-| <ctrl-t>    |
+| Key          |
+|--------------|
+| \<space>     |
+| \<esc>       |
+| \<backspace> |
+| \<enter>     |
+| \<ctrl-t>    |
 
 ## Config file
 The config file is stored in ~/.config/cano/config.cano by default, or can be set at runtime like so:
