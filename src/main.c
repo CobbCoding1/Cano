@@ -1437,7 +1437,7 @@ int main(int argc, char **argv) {
                     wattron(state.main_win, COLOR_PAIR(color));
                     off_at = col+keyword_size;
                 }
-                if(syntax && col == off_at) wattroff(state.main_win, COLOR_PAIR(color));
+                if(col == off_at) wattroff(state.main_win, COLOR_PAIR(color));
 
                 if(col > buffer->rows.data[i].end) break;
                 int between = (buffer->visual.start > buffer->visual.end) 
@@ -1448,6 +1448,7 @@ int main(int argc, char **argv) {
 
                 mvwprintw(state.main_win, print_index_y, print_index_x, "%c", buffer->data.data[buffer->rows.data[i].start+col]);
             }
+            free(token_arr);
         }
 
         wrefresh(state.main_win);

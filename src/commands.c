@@ -643,7 +643,7 @@ void print_tree(Node *node, size_t depth) {
 }
 
 int execute_command(Buffer *buffer, State *state, Command_Token *command, size_t command_s) {
-    assert(command_s > 0);
+    ASSERT(command_s > 0, "Invalid command size");
     Node *root = parse_command(state, command, command_s);
     if(root == NULL) return 1;
     print_tree(root, 0);
