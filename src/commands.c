@@ -23,7 +23,11 @@ typedef enum {
     TT_CONFIG_IDENT,
     TT_INT_LIT,
     TT_FLOAT_LIT,
+    TT_COUNT,
 } Command_Type;
+    
+char *tt_string[TT_COUNT] = {"set_var", "set_output", "set_map", "let", "plus", "minus", 
+    "mult", "div", "echo", "w", "e", "we", "ident", "special key", "string", "config var", "int", "float"};
 
 typedef struct {
     Command_Type type;
@@ -235,7 +239,11 @@ void print_token(Command_Token token) {
     printf("location: %zu, type: %d, value: "View_Print"\n", token.location, token.type, View_Arg(token.value));
 }
 
-int expect_token(Command_Token token, Command_Type type) {
+int expect_token(State *state, Command_Token token, Command_Type type) {
+    if(token.type != type) {
+        sprintf(state->status_bar_msg, "Invalid arg, expected %s but found %s", tt_string[type], tt_string[token.type]);    
+        state->is_print_msg = 1;
+    }
     return(token.type == type);
 }
     
@@ -279,7 +287,7 @@ int get_special_char(String_View view) {
     }
 }
     
-Bin_Expr *parse_bin_expr(Command_Token *command, size_t command_s) {
+Bin_Expr *parse_bin_expr(State *state, Command_Token *command, size_t command_s) {
     if(command_s == 0) return NULL;
     Bin_Expr *expr = calloc(0, sizeof(Bin_Expr));
     expr->lvalue = (Expr){view_to_int(command[0].value)};
@@ -288,13 +296,13 @@ Bin_Expr *parse_bin_expr(Command_Token *command, size_t command_s) {
     expr->operator = get_operator(command[1]);        
         
     if(expr->operator == OP_NONE) return NULL;
-    if(!expect_token(command[2], TT_INT_LIT)) return NULL;
+    if(!expect_token(state, command[2], TT_INT_LIT)) return NULL;
     
     expr->rvalue = (Expr){view_to_int(command[2].value)};        
     WRITE_LOG("rvalue: %d", expr->rvalue.value);
     
     if(command_s > 3) {
-        expr->right = parse_bin_expr(command+4, command_s-4);
+        expr->right = parse_bin_expr(state, command+4, command_s-4);
         expr->right->operator = get_operator(command[3]);
     }
     return expr;
@@ -307,11 +315,7 @@ Node *parse_command(State *state, Command_Token *command, size_t command_s) {
     root = create_node(NODE_KEYWORD, val);    
     switch(command[0].type) {
         case TT_SET_VAR:
-            if(!expect_token(command[1], TT_CONFIG_IDENT) || !expect_token(command[2], TT_INT_LIT)) {
-                sprintf(state->status_bar_msg, "Invalid arg");
-                state->is_print_msg = 1;
-                return NULL;
-            }
+            if(!expect_token(state, command[1], TT_CONFIG_IDENT) || !expect_token(state, command[2], TT_INT_LIT)) return NULL;
         
             for(size_t i = 0; i < CONFIG_VARS; i++) {
                 if(view_cmp(command[1].value, vars[i].label)) {
@@ -328,14 +332,18 @@ Node *parse_command(State *state, Command_Token *command, size_t command_s) {
                 root->right = right;
                 break;
             } else {
-                Bin_Expr *expr = parse_bin_expr(command+2, command_s-2);
+                Bin_Expr *expr = parse_bin_expr(state, command+2, command_s-2);
                 val.as_bin = *expr;
                 root->right = create_node(NODE_BIN, val);
             }
             break;
         case TT_SET_OUTPUT:
-            if(command_s != 2) {
+            if(command_s < 2) {
                 sprintf(state->status_bar_msg, "Not enough args");
+                state->is_print_msg = 1;
+                return NULL;
+            } else if(command_s > 2) {
+                sprintf(state->status_bar_msg, "Too many args");
                 state->is_print_msg = 1;
                 return NULL;
             }
@@ -343,16 +351,16 @@ Node *parse_command(State *state, Command_Token *command, size_t command_s) {
             root->right = create_node(NODE_STR, val);
             break;
         case TT_SET_MAP:
-            if(command_s != 3) {
+            if(command_s < 3) {
+                sprintf(state->status_bar_msg, "Not enough args");
+                state->is_print_msg = 1;
+                return NULL;
+            } else if(command_s > 3) {
                 sprintf(state->status_bar_msg, "Not enough args");
                 state->is_print_msg = 1;
                 return NULL;
             }
-            if(!expect_token(command[2], TT_STRING)) {
-                sprintf(state->status_bar_msg, "Invalid arg");
-                state->is_print_msg = 1;
-                return NULL;
-            };
+            if(!expect_token(state, command[2], TT_STRING)) return NULL;
             if(command[1].type == TT_SPECIAL_CHAR) {
                 int special = get_special_char(command[1].value);
                 if(special == -1) {
@@ -370,12 +378,7 @@ Node *parse_command(State *state, Command_Token *command, size_t command_s) {
             root->right = create_node(NODE_STR, val);
             break;
         case TT_LET:
-            if(!expect_token(command[1], TT_IDENT) || !expect_token(command[2], TT_INT_LIT)) {
-                sprintf(state->status_bar_msg, "Invalid arg");
-                state->is_print_msg = 1;
-                return NULL;
-            }
-        
+            if(!expect_token(state, command[1], TT_IDENT) || !expect_token(state, command[2], TT_INT_LIT)) return NULL;
             val.as_ident = (Identifier){.name = command[1].value};
             root->left = create_node(NODE_IDENT, val);
             if(command_s == 3) {
@@ -385,7 +388,7 @@ Node *parse_command(State *state, Command_Token *command, size_t command_s) {
                 root->right = right;
                 break;
             } else {
-                Bin_Expr *expr = parse_bin_expr(command+2, command_s-2);
+                Bin_Expr *expr = parse_bin_expr(state, command+2, command_s-2);
                 val.as_bin = *expr;
                 root->right = create_node(NODE_BIN, val);
             }
@@ -396,12 +399,13 @@ Node *parse_command(State *state, Command_Token *command, size_t command_s) {
                 state->is_print_msg = 1;
                 return NULL;
             }
-        
-            if(!expect_token(command[1], TT_IDENT) && !expect_token(command[1], TT_STRING)) {
-                sprintf(state->status_bar_msg, "Invalid arg");
+            if(command_s < 2) {
+                sprintf(state->status_bar_msg, "Not enough args");
                 state->is_print_msg = 1;
                 return NULL;
             }
+        
+            if(!expect_token(state, command[1], TT_IDENT) && !expect_token(state, command[1], TT_STRING)) return NULL;
             if(command[1].type == TT_STRING) {
                 val.as_str = (Str_Literal){view_string_internals(command[1].value)};
                 root->right = create_node(NODE_STR, val);
@@ -424,6 +428,8 @@ Node *parse_command(State *state, Command_Token *command, size_t command_s) {
         case TT_SPECIAL_CHAR:
         case TT_FLOAT_LIT:
             break;
+        case TT_COUNT:
+            assert(0 && "UNREACHABLE");
     }
     return root;
 }
