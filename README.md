@@ -9,7 +9,7 @@ Icon from [LocalTexan](https://github.com/LocalTexan)
 Dependencies: GCC, Make, ncurses
 ```sh
 make -B
-./main
+./cano <file>
 ```
 
 ## Modes
