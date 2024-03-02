@@ -1389,6 +1389,11 @@ int main(int argc, char **argv) {
             wclear(state.status_bar);
             state.is_print_msg = 0;
         }
+
+        if (is_term_resized(state.line_num_row, state.line_num_col)) {
+            getmaxyx(stdscr, state.grow, state.gcol);
+            mvwin(state.status_bar, state.grow-2, 0);
+        }
             
         mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
         mvwprintw(status_bar, 0, state.main_col-11, "%c", leaders[state.leader]);
