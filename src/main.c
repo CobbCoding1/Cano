@@ -630,10 +630,11 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
                             buffer_delete_selection(buffer, state, cur.start-1, cur.end-1);
                         }
                         undo_push(state, &state->undo_stack, state->cur_undo);
+                        buffer_calculate_rows(buffer);
                         if(row >= buffer->rows.count) row = buffer->rows.count-1;
                         cur = buffer->rows.data[row];
                         size_t pos = cur.start + offset;
-                        if(pos > buffer->data.count) pos = buffer->data.count;
+                        if(pos > cur.end) pos = cur.end;
                         buffer->cursor = pos;
                     }
                     state->repeating.repeating_count = 0;
