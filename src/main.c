@@ -907,8 +907,10 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                         }
                         break;
                     case ENTER: {
-                        state->buffer = load_buffer_from_file(state->files->data[state->explore_cursor].path);
-                        state->is_exploring = false;
+                        if (!state->files->data[state->explore_cursor].is_directory) {
+                            state->buffer = load_buffer_from_file(state->files->data[state->explore_cursor].path);
+                            state->is_exploring = false;
+                        }
                     } break;
                 }
                 break;
@@ -1470,6 +1472,7 @@ int main(int argc, char **argv) {
             wattron(state.main_win, COLOR_PAIR(BLUE_COLOR));
             for(size_t i = row_render_start; i <= row_render_start+state.main_row; i++) {
                 if(i >= state.files->count) break;
+                // Directories could be filtered out right here but that would need extra work in the cursor
                 size_t print_index_y = i - row_render_start;
                 mvwprintw(state.main_win, print_index_y, 0, "%s", state.files->data[i].path);
             }

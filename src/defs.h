@@ -224,6 +224,7 @@ typedef struct {
 typedef struct {
     const char *name;
     char *path;
+    // Including directories may be useful for making the explorer prettier
     bool is_directory;
 } File;
 
