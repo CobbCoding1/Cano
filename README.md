@@ -38,7 +38,7 @@ Command - For executing commands
 |Normal| e              | Go to end of next word                          |
 |Normal| o              | Create line below current                       |
 |Normal| O              | Create line above current                       |
-|Normal| ctrl + o       | Create line below current without changing mode |
+|Normal| Ctrl + o       | Create line below current without changing mode |
 |Normal| %              | Go to corresponding brace                       |
 |Normal| i              | Enter insert mode                               |
 |Normal| I              | Go to beginning of line                         |
@@ -54,6 +54,7 @@ Command - For executing commands
 |Normal| r              | Replace current char with next char inputted    |
 |Normal| (n) + motion   | Repeat next motion n times                      |
 |Normal| (d) + motion   | Delete characters of next motion n times        |
+|Normal| Ctrl + n       | Open file explorer                              |
 
 ## Visual
 Visual mode works the same as Normal mode, except works on the entire selection, instead of character by character.

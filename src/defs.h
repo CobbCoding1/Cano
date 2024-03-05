@@ -221,6 +221,19 @@ typedef struct {
     size_t capacity;
 } Variables;
 
+typedef struct {
+    const char *name;
+    char *path;
+    // Including directories may be useful for making the explorer prettier
+    bool is_directory;
+} File;
+
+typedef struct {
+    File *data;
+    size_t count;
+    size_t capacity;
+} Files;
+
 typedef struct State {
     Undo_Stack undo_stack;
     Undo_Stack redo_stack;
@@ -247,6 +260,11 @@ typedef struct State {
     void(**key_func)(Buffer *buffer, Buffer **modify_buffer, struct State *state);
 
     Sized_Str clipboard;
+
+    Files* files;
+    bool is_exploring;
+    size_t explore_cursor;
+    Buffer* buffer;
 
     // window sizes
     int grow;

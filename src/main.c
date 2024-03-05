@@ -744,18 +744,21 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             mode = COMMAND;
             break;
         case '/':
+            if(state->is_exploring) break;
             reset_command(state->command, &state->command_s);        
             state->x = state->command_s+1;
             wmove(state->status_bar, state->x, 1);
             mode = SEARCH;
             break;
         case 'v':
+            if(state->is_exploring) break;
             buffer->visual.start = buffer->cursor;
             buffer->visual.end = buffer->cursor;
             buffer->visual.is_line = 0;
             mode = VISUAL;
             break;
         case 'V':
+            if(state->is_exploring) break;
             buffer->visual.start = buffer->rows.data[buffer_get_row(buffer)].start;
             buffer->visual.end = buffer->rows.data[buffer_get_row(buffer)].end;
             buffer->visual.is_line = 1;
@@ -862,7 +865,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case KEY_RESIZE: {
             resize_window(state);
         } break;
-        case 'y':
+        case 'y': {
             switch(state->leader) {
                 case LEADER_Y: {
                     if(state->repeating.repeating_count == 0) state->repeating.repeating_count = 1;
@@ -875,8 +878,8 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 default:
                     break;
             }
-            break;
-        case 'p':
+        } break;
+        case 'p': {
             if(state->clipboard.len == 0) break;
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
             for(size_t i = 0; i < state->clipboard.len-1; i++) {
@@ -884,8 +887,35 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             }
             state->cur_undo.end = buffer->cursor;
             undo_push(state, &state->undo_stack, state->cur_undo); 
-            break;
+        } break;
+        case ctrl('n'): {
+            state->is_exploring = !state->is_exploring;
+        } break;
         default: {
+            if(state->is_exploring) {
+                switch(state->ch) {
+                    case DOWN_ARROW:
+                    case 'j': // Move down
+                        if (state->explore_cursor < state->files->count) {
+                            state->explore_cursor++;
+                        }
+                        break;
+                    case UP_ARROW:
+                    case 'k': // Move up
+                        if (state->explore_cursor > 0) {
+                            state->explore_cursor--;
+                        }
+                        break;
+                    case ENTER: {
+                        if (!state->files->data[state->explore_cursor].is_directory) {
+                            state->buffer = load_buffer_from_file(state->files->data[state->explore_cursor].path);
+                            state->is_exploring = false;
+                        }
+                    } break;
+                }
+                break;
+            }
+
             if(handle_modifying_keys(buffer, state)) break;
             if(handle_motion_keys(buffer, state, state->ch, &state->repeating.repeating_count)) break;
             if(handle_normal_to_insert_keys(buffer, state)) break;
@@ -1270,6 +1300,37 @@ void init_colors() {
     init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
 }
 
+void scan_files_recursive(Files *files, char *directory) {
+    DIR *dp = opendir(directory);
+    if(dp == NULL) {
+        printf("Failed to open directory: %s\n", directory);
+        exit(EXIT_FAILURE);
+    }
+
+    struct dirent *dent;
+    while((dent = readdir(dp)) != NULL) {
+        if(strcmp(dent->d_name, ".") == 0 || strcmp(dent->d_name, "..") == 0) continue;
+        
+        char *next_dir = calloc(128, sizeof(char));
+        strcpy(next_dir, directory);
+        strcat(next_dir, "/");
+        strcat(next_dir, dent->d_name);
+        if(dent->d_type == DT_DIR) {
+            DA_APPEND(files, ((File){dent->d_name, next_dir, true}));
+            scan_files_recursive(files, next_dir);
+        } else if(dent->d_type == DT_REG) {
+            DA_APPEND(files, ((File){dent->d_name, next_dir, false}));
+        }
+    }
+    closedir(dp);
+}
+
+void free_files(Files *files) {
+    for(size_t i = 0; i < files->count; ++i) {
+        free(files->data[i].path);
+    }
+    free(files);
+}
 
 /* ------------------------- FUNCTIONS END ------------------------- */
 
@@ -1327,12 +1388,6 @@ int main(int argc, char **argv) {
     (void)config_filename;
     (void)syntax_filename;
 
-    initscr();
-    noecho();
-    raw();
-
-    init_colors();
-
     // define functions based on current mode
     void(*key_func[MODE_COUNT])(Buffer *buffer, Buffer **modify_buffer, struct State *state) = {
         handle_normal_keys, handle_insert_keys, handle_search_keys, handle_command_keys, handle_visual_keys
@@ -1341,6 +1396,14 @@ int main(int argc, char **argv) {
     State state = init_state();
     state.command = calloc(64, sizeof(char));
     state.key_func = key_func;
+    state.files = calloc(32, sizeof(File));
+    scan_files_recursive(state.files, ".");
+
+    initscr();
+    noecho();
+    raw();
+
+    init_colors();
 
     getmaxyx(stdscr, state.grow, state.gcol);
     int line_num_width = 5;
@@ -1357,13 +1420,13 @@ int main(int argc, char **argv) {
     keypad(main_win, TRUE);
 
     if(filename == NULL) filename = "out.txt";
-    Buffer *buffer = load_buffer_from_file(filename);
-
-    load_config_from_file(&state, buffer, config_filename, syntax_filename);
+    state.buffer = load_buffer_from_file(filename);
+    
+    load_config_from_file(&state, state.buffer, config_filename, syntax_filename);
 
     char status_bar_msg[128] = {0};
     state.status_bar_msg = status_bar_msg;
-    buffer_calculate_rows(buffer);
+    buffer_calculate_rows(state.buffer);
 
     size_t row_render_start = 0;
     size_t col_render_start = 0;
@@ -1372,16 +1435,18 @@ int main(int argc, char **argv) {
         werase(main_win);
         werase(status_bar);
         werase(line_num_win);
-        size_t cur_row = buffer_get_row(buffer);
-        Row cur = buffer->rows.data[cur_row]; 
-        size_t col = buffer->cursor - cur.start;
+        size_t cur_row = buffer_get_row(state.buffer);
+        if(state.is_exploring) cur_row = state.explore_cursor;
+        Row cur = state.buffer->rows.data[cur_row]; 
+        size_t col = state.buffer->cursor - cur.start;
+        if(state.is_exploring) col = 0;
         if(cur_row <= row_render_start) row_render_start = cur_row;
         if(cur_row >= row_render_start+state.main_row) row_render_start = cur_row-state.main_row+1;
 
         if(col <= col_render_start) col_render_start = col;
         if(col >= col_render_start+state.main_col) col_render_start = col-state.main_col+1;
 
-        state.num_of_braces = num_of_open_braces(buffer);
+        state.num_of_braces = num_of_open_braces(state.buffer);
         
         if(state.is_print_msg) {
             mvwprintw(state.status_bar, 1, 0, "%s", state.status_bar_msg);    
@@ -1403,58 +1468,68 @@ int main(int argc, char **argv) {
         
         if(mode == COMMAND || mode == SEARCH) mvwprintw(state.status_bar, 1, 0, ":%.*s", (int)state.command_s, state.command);
 
-        for(size_t i = row_render_start; i <= row_render_start+state.main_row; i++) {
-            if(i >= buffer->rows.count) break;
-            size_t print_index_y = i - row_render_start;
+        if(state.is_exploring) {
+            wattron(state.main_win, COLOR_PAIR(BLUE_COLOR));
+            for(size_t i = row_render_start; i <= row_render_start+state.main_row; i++) {
+                if(i >= state.files->count) break;
+                // Directories could be filtered out right here but that would need extra work in the cursor
+                size_t print_index_y = i - row_render_start;
+                mvwprintw(state.main_win, print_index_y, 0, "%s", state.files->data[i].path);
+            }
+        } else {
+            for(size_t i = row_render_start; i <= row_render_start+state.main_row; i++) {
+                if(i >= state.buffer->rows.count) break;
+                size_t print_index_y = i - row_render_start;
 
-            wattron(state.line_num_win, COLOR_PAIR(YELLOW_COLOR));
-            if(relative_nums) {
-                if(cur_row == i) {
-                    mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
+                wattron(state.line_num_win, COLOR_PAIR(YELLOW_COLOR));
+                if(relative_nums) {
+                    if(cur_row == i) {
+                        mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
+                    } else {
+                        mvwprintw(state.line_num_win, print_index_y, 0, "%zu", (size_t)abs((int)i-(int)cur_row));
+                    }
                 } else {
-                    mvwprintw(state.line_num_win, print_index_y, 0, "%zu", (size_t)abs((int)i-(int)cur_row));
+                    mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
                 }
-            } else {
-                mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
-            }
-            wattroff(state.line_num_win, COLOR_PAIR(YELLOW_COLOR));
+                wattroff(state.line_num_win, COLOR_PAIR(YELLOW_COLOR));
 
-            size_t off_at = 0;
-            size_t token_capacity = 32;
-            Token *token_arr = calloc(token_capacity, sizeof(Token));
-            size_t token_s = 0;
+                size_t off_at = 0;
+                size_t token_capacity = 32;
+                Token *token_arr = calloc(token_capacity, sizeof(Token));
+                size_t token_s = 0;
 
-            if(syntax) {
-                token_s = generate_tokens(buffer->data.data+buffer->rows.data[i].start, 
-                                          buffer->rows.data[i].end-buffer->rows.data[i].start, 
-                                          token_arr, &token_capacity);
-            }
-
-            Color_Pairs color = 0;
-
-
-            for(size_t j = buffer->rows.data[i].start; j < buffer->rows.data[i].end; j++) {
-                if(j < buffer->rows.data[i].start+col_render_start || j > buffer->rows.data[i].end+col+state.main_col) continue;
-                size_t col = j-buffer->rows.data[i].start;
-                size_t print_index_x = col-col_render_start;
-
-                size_t keyword_size = 0;
-                if(syntax && is_in_tokens_index(token_arr, token_s, col, &keyword_size, &color)) {
-                    wattron(state.main_win, COLOR_PAIR(color));
-                    off_at = col+keyword_size;
+                if(syntax) {
+                    token_s = generate_tokens(state.buffer->data.data+state.buffer->rows.data[i].start, 
+                                            state.buffer->rows.data[i].end-state.buffer->rows.data[i].start, 
+                                            token_arr, &token_capacity);
                 }
-                if(col == off_at) wattroff(state.main_win, COLOR_PAIR(color));
 
-                if(col > buffer->rows.data[i].end) break;
-                int between = (buffer->visual.start > buffer->visual.end) 
-                    ? is_between(buffer->visual.end, buffer->visual.start, buffer->rows.data[i].start+col) 
-                    : is_between(buffer->visual.start, buffer->visual.end, buffer->rows.data[i].start+col);
-                if(mode == VISUAL && between) wattron(state.main_win, A_STANDOUT);
-                else wattroff(state.main_win, A_STANDOUT);
+                Color_Pairs color = 0;
 
-                mvwprintw(state.main_win, print_index_y, print_index_x, "%c", buffer->data.data[buffer->rows.data[i].start+col]);
+
+                for(size_t j = state.buffer->rows.data[i].start; j < state.buffer->rows.data[i].end; j++) {
+                    if(j < state.buffer->rows.data[i].start+col_render_start || j > state.buffer->rows.data[i].end+col+state.main_col) continue;
+                    size_t col = j-state.buffer->rows.data[i].start;
+                    size_t print_index_x = col-col_render_start;
+
+                    size_t keyword_size = 0;
+                    if(syntax && is_in_tokens_index(token_arr, token_s, col, &keyword_size, &color)) {
+                        wattron(state.main_win, COLOR_PAIR(color));
+                        off_at = col+keyword_size;
+                    }
+                    if(col == off_at) wattroff(state.main_win, COLOR_PAIR(color));
+
+                    if(col > state.buffer->rows.data[i].end) break;
+                    int between = (state.buffer->visual.start > state.buffer->visual.end) 
+                        ? is_between(state.buffer->visual.end, state.buffer->visual.start, state.buffer->rows.data[i].start+col) 
+                        : is_between(state.buffer->visual.start, state.buffer->visual.end, state.buffer->rows.data[i].start+col);
+                    if(mode == VISUAL && between) wattron(state.main_win, A_STANDOUT);
+                    else wattroff(state.main_win, A_STANDOUT);
+
+                    mvwprintw(state.main_win, print_index_y, print_index_x, "%c", state.buffer->data.data[state.buffer->rows.data[i].start+col]);
+                }
+                free(token_arr);
             }
-            free(token_arr);
         }
 
         wrefresh(state.main_win);
@@ -1469,13 +1544,14 @@ int main(int argc, char **argv) {
         }
 
         state.ch = wgetch(main_win);
-        state.key_func[mode](buffer, &buffer, &state);
+        state.key_func[mode](state.buffer, &state.buffer, &state);
     }
     endwin();
 
-    free_buffer(buffer);
+    free_buffer(state.buffer);
     free_undo_stack(&state.undo_stack);
     free_undo_stack(&state.redo_stack);
+    free_files(state.files);
 
     return 0;
 }
