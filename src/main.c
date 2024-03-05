@@ -1303,8 +1303,8 @@ void init_colors() {
 void scan_files_recursive(Files *files, char *directory) {
     DIR *dp = opendir(directory);
     if(dp == NULL) {
-        printf("Failed to open directory: %s\n", directory);
-        exit(EXIT_FAILURE);
+        WRITE_LOG("Failed to open directory: %s\n", directory);
+        CRASH("Failed to open directory");
     }
 
     struct dirent *dent;
