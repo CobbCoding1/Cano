@@ -40,7 +40,7 @@ void buffer_calculate_rows(Buffer *buffer);
 int handle_motion_keys(Buffer *buffer, State *state, int ch, size_t *repeating_count);
 int handle_modifying_keys(Buffer *buffer, State *state);
 int handle_normal_to_insert_keys(Buffer *buffer, State *state);
-void buffer_insert_char(Buffer *buffer, char ch);
+void buffer_insert_char(State *state, Buffer *buffer, char ch);
 void buffer_delete_char(Buffer *buffer, State *state);
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state);
 void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state);

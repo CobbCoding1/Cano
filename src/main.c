@@ -202,7 +202,7 @@ void replace(Buffer *buffer, State *state, char *new_str, size_t old_str_s, size
     }
 
     for(size_t i = 0; i < new_str_s; i++) {
-        buffer_insert_char(buffer, new_str[i]);
+        buffer_insert_char(state, buffer, new_str[i]);
     }
 }
 
@@ -305,12 +305,13 @@ void buffer_calculate_rows(Buffer *buffer) {
     DA_APPEND(&buffer->rows, ((Row){.start = start, .end = buffer->data.count}));
 }
 
-void buffer_insert_char(Buffer *buffer, char ch) {
+void buffer_insert_char(State *state, Buffer *buffer, char ch) {
     if(buffer->cursor > buffer->data.count) buffer->cursor = buffer->data.count;
     DA_APPEND(&buffer->data, ch);
     memmove(&buffer->data.data[buffer->cursor + 1], &buffer->data.data[buffer->cursor], buffer->data.count - 1 - buffer->cursor);
     buffer->data.data[buffer->cursor] = ch;
     buffer->cursor++;
+    state->cur_undo.end = buffer->cursor;
     buffer_calculate_rows(buffer);
 }
 
@@ -456,9 +457,9 @@ int isword(char ch) {
 }
 
 void buffer_newline_indent(Buffer *buffer, State *state) {
-    buffer_insert_char(buffer, '\n');
+    buffer_insert_char(state, buffer, '\n');
     for(size_t i = 0; i < indent*state->num_of_braces; i++) {
-        buffer_insert_char(buffer, ' ');
+        buffer_insert_char(state, buffer, ' ');
     }
 }
 
@@ -680,18 +681,22 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
             mode = INSERT;
         } break;
         case 'o': {
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
             size_t row = buffer_get_row(buffer);
             size_t end = buffer->rows.data[row].end;
             buffer->cursor = end;
             buffer_newline_indent(buffer, state);
             mode = INSERT;
+            undo_push(state, &state->undo_stack, state->cur_undo);
         } break;
         case 'O': {
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
             size_t row = buffer_get_row(buffer);
             size_t start = buffer->rows.data[row].start;
             buffer->cursor = start;
             buffer_newline_indent(buffer, state);
             mode = INSERT;
+            undo_push(state, &state->undo_stack, state->cur_undo);
         } break;
         default: {
             return 0;
@@ -803,10 +808,12 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             mode = VISUAL;
             break;
         case ctrl('o'): {
-            buffer_insert_char(buffer, '\n');
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+            buffer_insert_char(state, buffer, '\n');
             for(size_t i = 0; i < indent*state->num_of_braces; i++) {
-                buffer_insert_char(buffer, ' ');
+                buffer_insert_char(state, buffer, ' ');
             }
+            undo_push(state, &state->undo_stack, state->cur_undo);
         } break;
         case 'n': {
             size_t index = search(buffer, state->command, state->command_s);
@@ -825,7 +832,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     state->cur_undo.end = undo.start + undo.data.count;
                     buffer->cursor = undo.start;
                     for(size_t i = 0; i < undo.data.count; i++) {
-                        buffer_insert_char(buffer, undo.data.data[i]);
+                        buffer_insert_char(state, buffer, undo.data.data[i]);
                     } 
                     break;
                 case DELETE_CHAR:
@@ -865,7 +872,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     state->cur_undo.end = redo.start + redo.data.count;
                     buffer->cursor = redo.start;
                     for(size_t i = 0; i < redo.data.count; i++) {
-                        buffer_insert_char(buffer, redo.data.data[i]);
+                        buffer_insert_char(state, buffer, redo.data.data[i]);
                     } 
                     break;
                 case DELETE_CHAR:
@@ -921,7 +928,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             if(state->clipboard.len == 0) break;
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
             for(size_t i = 0; i < state->clipboard.len-1; i++) {
-                buffer_insert_char(buffer, state->clipboard.str[i]);
+                buffer_insert_char(state, buffer, state->clipboard.str[i]);
             }
             state->cur_undo.end = buffer->cursor;
             undo_push(state, &state->undo_stack, state->cur_undo); 
@@ -991,7 +998,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             QUIT = 1;
         } break;
         case ESCAPE: // Switch to NORMAL mode
-            state->cur_undo.end = buffer->cursor;
+            //state->cur_undo.end = buffer->cursor;
             if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
             mode = NORMAL;
             break;
@@ -1024,17 +1031,19 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         } break;
         case KEY_TAB:
             for(size_t i = 0; (int)i < indent; i++) {
-                buffer_insert_char(buffer, ' ');
+                buffer_insert_char(state, buffer, ' ');
             }
             break;
         case KEY_ENTER:
         case ENTER: {
+            if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
             Brace brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
             buffer_newline_indent(buffer, state);
             if(brace.brace != '0' && brace.closing) {
-                buffer_insert_char(buffer, '\n');
+                buffer_insert_char(state, buffer, '\n');
                 for(size_t i = 0; i < indent*(state->num_of_braces-1); i++) {
-                    buffer_insert_char(buffer, ' ');
+                    buffer_insert_char(state, buffer, ' ');
                     buffer->cursor--;
                 }
                 buffer->cursor--;
@@ -1049,9 +1058,9 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             };
             Brace brace = find_opposite_brace(state->ch);
             // TODO: make quotes auto close
-            buffer_insert_char(buffer, state->ch);
+            buffer_insert_char(state, buffer, state->ch);
             if(brace.brace != '0' && !brace.closing) {
-                buffer_insert_char(buffer, brace.brace);
+                buffer_insert_char(state, buffer, brace.brace);
                 buffer->cursor--;
             }
         } break;
@@ -1227,7 +1236,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 buffer_calculate_rows(buffer);
                 buffer->cursor = buffer->rows.data[i].start;
                 for(size_t i = 0; (int)i < indent; i++) {
-                    buffer_insert_char(buffer, ' ');
+                    buffer_insert_char(state, buffer, ' ');
                 }
             }
             buffer->cursor = position;
