@@ -715,6 +715,44 @@ int check_keymaps(Buffer *buffer, State *state) {
     return 0;
 }
 
+void scan_files(Files *files, char *directory) {
+    DIR *dp = opendir(directory);
+    if(dp == NULL) {
+        WRITE_LOG("Failed to open directory: %s\n", directory);
+        CRASH("Failed to open directory");
+    }
+
+    struct dirent *dent;
+    while((dent = readdir(dp)) != NULL) {
+        // Do not ignore .. in order to navigate back to the last directory
+        if(strcmp(dent->d_name, ".") == 0) continue;
+        
+        char *path = calloc(256, sizeof(char));
+        strcpy(path, directory);
+        strcat(path, "/");
+        strcat(path, dent->d_name);
+        
+        char *name = calloc(256, sizeof(char));
+        strcpy(name, dent->d_name);
+
+        if(dent->d_type == DT_DIR) {
+            strcat(name, "/");
+            DA_APPEND(files, ((File){name, path, true}));
+        } else if(dent->d_type == DT_REG) {
+            DA_APPEND(files, ((File){name, path, false}));
+        }
+    }
+    closedir(dp);
+}
+
+void free_files(Files *files) {
+    for(size_t i = 0; i < files->count; ++i) {
+        free(files->data[i].name);
+        free(files->data[i].path);
+    }
+    free(files);
+}
+
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
     
@@ -907,8 +945,19 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                         }
                         break;
                     case ENTER: {
-                        if (!state->files->data[state->explore_cursor].is_directory) {
-                            state->buffer = load_buffer_from_file(state->files->data[state->explore_cursor].path);
+                        File f = state->files->data[state->explore_cursor];
+                        if (f.is_directory) {
+                            char str[256];
+                            strcpy(str, f.path);
+
+                            free_files(state->files);
+                            state->files = calloc(32, sizeof(File));
+                            scan_files(state->files, str);
+
+                            state->explore_cursor = 0;
+                        } else {
+                            // TODO: Load syntax highlighting right here
+                            state->buffer = load_buffer_from_file(f.path);
                             state->is_exploring = false;
                         }
                     } break;
@@ -1300,38 +1349,6 @@ void init_colors() {
     init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
 }
 
-void scan_files_recursive(Files *files, char *directory) {
-    DIR *dp = opendir(directory);
-    if(dp == NULL) {
-        WRITE_LOG("Failed to open directory: %s\n", directory);
-        CRASH("Failed to open directory");
-    }
-
-    struct dirent *dent;
-    while((dent = readdir(dp)) != NULL) {
-        if(strcmp(dent->d_name, ".") == 0 || strcmp(dent->d_name, "..") == 0) continue;
-        
-        char *next_dir = calloc(128, sizeof(char));
-        strcpy(next_dir, directory);
-        strcat(next_dir, "/");
-        strcat(next_dir, dent->d_name);
-        if(dent->d_type == DT_DIR) {
-            DA_APPEND(files, ((File){dent->d_name, next_dir, true}));
-            scan_files_recursive(files, next_dir);
-        } else if(dent->d_type == DT_REG) {
-            DA_APPEND(files, ((File){dent->d_name, next_dir, false}));
-        }
-    }
-    closedir(dp);
-}
-
-void free_files(Files *files) {
-    for(size_t i = 0; i < files->count; ++i) {
-        free(files->data[i].path);
-    }
-    free(files);
-}
-
 /* ------------------------- FUNCTIONS END ------------------------- */
 
 
@@ -1397,7 +1414,7 @@ int main(int argc, char **argv) {
     state.command = calloc(64, sizeof(char));
     state.key_func = key_func;
     state.files = calloc(32, sizeof(File));
-    scan_files_recursive(state.files, ".");
+    scan_files(state.files, ".");
 
     initscr();
     noecho();
@@ -1472,9 +1489,10 @@ int main(int argc, char **argv) {
             wattron(state.main_win, COLOR_PAIR(BLUE_COLOR));
             for(size_t i = row_render_start; i <= row_render_start+state.main_row; i++) {
                 if(i >= state.files->count) break;
-                // Directories could be filtered out right here but that would need extra work in the cursor
+
+                // TODO: All directories should be displayed first, afterwards files
                 size_t print_index_y = i - row_render_start;
-                mvwprintw(state.main_win, print_index_y, 0, "%s", state.files->data[i].path);
+                mvwprintw(state.main_win, print_index_y, 0, "%s", state.files->data[i].name);
             }
         } else {
             for(size_t i = row_render_start; i <= row_render_start+state.main_row; i++) {

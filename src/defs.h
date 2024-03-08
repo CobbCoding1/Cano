@@ -222,7 +222,7 @@ typedef struct {
 } Variables;
 
 typedef struct {
-    const char *name;
+    char *name;
     char *path;
     // Including directories may be useful for making the explorer prettier
     bool is_directory;
