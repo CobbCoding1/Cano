@@ -941,7 +941,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 switch(state->ch) {
                     case DOWN_ARROW:
                     case 'j': // Move down
-                        if (state->explore_cursor < state->files->count) {
+                        if (state->explore_cursor < state->files->count-1) {
                             state->explore_cursor++;
                         }
                         break;
