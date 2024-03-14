@@ -1,6 +1,6 @@
 
 # Contributing
-Cano is open to contributors. That does not mean that your pull request will be merged. \
+Cano is open to contributors! That does not mean that your pull request will be merged. \
 Please structure your pull request as something reasonably small, \
 so that it is possible to review in a reasonable amount of time. \
 For the style, try to keep it as close to the code written as possible. \
@@ -41,6 +41,9 @@ This pull request contains the following changes:
 ```
 
 7. Wait for the pull request to be reviewed and merged
+
+
+Written by [SchoolyB](https://github.com/SchoolyB)
 
 
 
