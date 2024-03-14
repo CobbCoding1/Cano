@@ -28,7 +28,7 @@ git checkout -b bug/unable-to-save-file-16
 
 4. Make your changes
 5. Commit and push your changes
-6. Create a pull request
+6. Create a pull request 
 When creating your pull request, add a brief description of the changes you made. If there is an issue associated with the changes, reference the issue in the pull request description. See example below.
 ```md
 This pull request contains the following changes:
