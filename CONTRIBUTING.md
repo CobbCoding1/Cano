@@ -16,6 +16,7 @@ git clone https://github.com/YourUserName/Cano.git
 ```
 
 3. Create a new branch
+
   Name the branch something that is relevant to the changes you are making.
   A good example would be to <b>prefix</b> the branch name with `feature/` or `bug/` depending on the changes you are making. Additionally if there is an issue associated with the changes, you can also use the issue number as a <b>suffix</b> in the branch name but this is <b>not</b> required. See examples below. 
 ```sh
@@ -29,6 +30,7 @@ git checkout -b bug/unable-to-save-file-16
 4. Make your changes
 5. Commit and push your changes
 6. Create a pull request 
+
   When creating your pull request, add a brief description of the changes you made. If there is an issue associated with the changes, reference the issue in the pull request description. See example below.
 ```md
 This pull request contains the following changes:
