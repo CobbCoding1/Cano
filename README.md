@@ -1,16 +1,31 @@
 # Cano
-Cano (kay-no) is a text editor written in C using the ncurses library.
-It is a modal-based editor, based heavily on VIM. 
+Cano (kay-no) is a VIM inspired modal-based text editor written in C using the [ncurses](https://opensource.apple.com/source/old_ncurses/old_ncurses-1/ncurses/test/ncurses.c.auto.html) library. 
 
 ![Cano icon](cano.png) \
-Icon from [LocalTexan](https://github.com/LocalTexan)
+Icon made by [LocalTexan](https://github.com/LocalTexan)
 
 ## Quick Start
-Dependencies: GCC, Make, ncurses
+Cano has the following dependencies:
+- [GCC](https://gcc.gnu.org/)
+- [Make](https://www.gnu.org/software/make/)
+- [ncurses](https://opensource.apple.com/source/old_ncurses/old_ncurses-1/ncurses/test/ncurses.c.auto.html)
+
+
+1. Navigate to the Cano directory
+```sh
+cd path/to/cano
+```
+
+2. Run the make command
 ```sh
 make -B
-./build/cano <file>
 ```
+
+3. Launch Cano with the file you want to edit
+```sh
+./build/cano <filename>
+```
+
 
 ## Modes
 Normal - For motions and deletion \
@@ -24,10 +39,10 @@ Command - For executing commands
 |------|----------------|-------------------------------------------------|
 |Global| Ctrl + Q       | Quit (regardless of mode)                       |
 |Global| Esc            | Enter Normal Mode                               |
-|Normal| h              | Move left                                       |
-|Normal| j              | Move down                                       |
-|Normal| k              | Move up                                         |
-|Normal| l              | Move right                                      |
+|Normal| h              | Move cursor left                                |
+|Normal| j              | Move cursor down                                |
+|Normal| k              | Move cursor up                                  |
+|Normal| l              | Move cursor right                               |
 |Normal| x              | Delete character                                |
 |Normal| g              | Go to first line                                |
 |Normal| G              | Go to last line                                 |
@@ -48,7 +63,7 @@ Command - For executing commands
 |Normal| V              | Enter visual mode by line                       |
 |Normal| u              | Undo                                            |
 |Normal| U              | Redo                                            |
-|Normal| /              | Enter search mode                               |
+|Normal| /              | Enter Search mode                               |
 |Normal| n              | Jump to next search                             |
 |Normal| Ctrl + S       | Save and exit                                   |
 |Normal| r              | Replace current char with next char inputted    |
@@ -57,7 +72,7 @@ Command - For executing commands
 |Normal| Ctrl + n       | Open file explorer                              |
 
 ## Visual
-Visual mode works the same as Normal mode, except works on the entire selection, instead of character by character.
+Visual mode works the same as Normal mode, except it works on the entire selection, instead of character by character.
 | Keybind        | Action                                          |
 |----------------|-------------------------------------------------|
 | >              | Indent current selection                        |
@@ -66,6 +81,8 @@ Visual mode works the same as Normal mode, except works on the entire selection,
 ## Search
 Search mode takes a string and finds it in the file.
 if prepended with 's/' then it will replace the first substring with the second.
+
+Example: Using the following command
 ```sh
 s/hello/goodbye
 ```
@@ -125,7 +142,7 @@ There's a bit to unpack here, basically the single characters represent the type
 k - Keyword
 t - Type
 w - Word
-The type is then followed by the RGB values, all comma separated without spaces. After the RGB values, there is the actual keywords. End each type with a dot '.' as seen above, to indicate to Cano that the list is finished. The words are meant to be left blank, as it will highlight any words not found in the keywords above with the chosen RGB color.
+The type is then followed by the RGB values, all comma separated <b>without</b> spaces. After the RGB values, there is the actual keywords. End each type with a dot '.' as seen above, to indicate to Cano that the list is finished. The words are meant to be left blank, as it will highlight any words not found in the keywords above with the chosen RGB color.
 If you wish to only set the color, you can provide no keywords to any, and it will fill in the keywords with C keywords by default.
 
 ## Config Variables
@@ -137,7 +154,7 @@ indent # set indent
 undo-size # size of undo history 
 ```
 
-# Installing
+# Installation
 
 ## Arch
 
@@ -158,12 +175,5 @@ you can run cano using the following command:
 nix run github:CobbCoding1/Cano
 ```
 
-A flake a provided within the repository, including the package and a devShell.
+A flake has been provided within the repository, including the package and a devShell.
 
-
-## Contributing
-Cano is open to contributors. That does not mean that your pull request will be merged. \
-Please structure your pull request as something reasonably small, \
-so that is is possible to look over in a reasonable amount of time. \
-For the style, try to keep it as close to the code written as possible. \
-A pull request will not be rejected for a style conflict.
