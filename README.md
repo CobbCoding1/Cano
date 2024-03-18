@@ -177,3 +177,9 @@ nix run github:CobbCoding1/Cano
 
 A flake has been provided within the repository, including the package and a devShell.
 
+# Debian/Ubuntu
+```sh
+sudo apt install libncurses-dev
+git clone https://github.com/CobbCoding1/Cano && cd Cano
+make
+```
