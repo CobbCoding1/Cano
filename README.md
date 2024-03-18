@@ -177,7 +177,10 @@ nix run github:CobbCoding1/Cano
 
 A flake has been provided within the repository, including the package and a devShell.
 
-# Debian/Ubuntu
+## Debian/Ubuntu
+
+You may build from source and install cano directly to `/usr/local/bin`. You must have a basic C compiler installed, as well as the ncurses library (install shown below).
+
 ```sh
 sudo apt install libncurses-dev
 git clone https://github.com/CobbCoding1/Cano && cd Cano
