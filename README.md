@@ -182,4 +182,5 @@ A flake has been provided within the repository, including the package and a dev
 sudo apt install libncurses-dev
 git clone https://github.com/CobbCoding1/Cano && cd Cano
 make
+sudo ./debian-install.sh
 ```
