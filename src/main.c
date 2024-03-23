@@ -236,6 +236,17 @@ size_t num_of_open_braces(Buffer *buffer) {
     if(count < 0) return 0;
     return count;
 }
+    
+size_t count_num_tabs(Buffer *buffer, size_t row) {
+    buffer_calculate_rows(buffer);
+    Row cur = buffer->rows.data[row];
+    size_t start = cur.start;
+    size_t count = 0;
+    for(size_t i = start; i < buffer->cursor; i++) {
+        if(buffer->data.data[i] == '\t') count++;   
+    }
+    return count;
+}
 
 void reset_command(char *command, size_t *command_s) {
     memset(command, 0, *command_s);
@@ -457,12 +468,22 @@ int isword(char ch) {
     if(isalnum(ch) || ch == '_') return 1;
     return 0;
 }
+    
+void buffer_create_indent(Buffer *buffer, State *state) {
+    if(indent > 0) {
+        for(size_t i = 0; i < indent*state->num_of_braces; i++) {
+            buffer_insert_char(state, buffer, ' ');
+        }
+    } else {
+        for(size_t i = 0; i < state->num_of_braces; i++) {
+            buffer_insert_char(state, buffer, '\t');
+        }    
+    }
+}
 
 void buffer_newline_indent(Buffer *buffer, State *state) {
     buffer_insert_char(state, buffer, '\n');
-    for(size_t i = 0; i < indent*state->num_of_braces; i++) {
-        buffer_insert_char(state, buffer, ' ');
-    }
+    buffer_create_indent(buffer, state);
 }
 
 int handle_motion_keys(Buffer *buffer, State *state, int ch, size_t *repeating_count) {
@@ -813,9 +834,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case ctrl('o'): {
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
             buffer_insert_char(state, buffer, '\n');
-            for(size_t i = 0; i < indent*state->num_of_braces; i++) {
-                buffer_insert_char(state, buffer, ' ');
-            }
+            buffer_create_indent(buffer, state);
             undo_push(state, &state->undo_stack, state->cur_undo);
         } break;
         case 'n': {
@@ -1033,8 +1052,12 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             resize_window(state);
         } break;
         case KEY_TAB:
-            for(size_t i = 0; (int)i < indent; i++) {
-                buffer_insert_char(state, buffer, ' ');
+            if(indent > 0) {
+                for(size_t i = 0; (int)i < indent; i++) {
+                    buffer_insert_char(state, buffer, ' ');
+                }
+            } else {
+                buffer_insert_char(state, buffer, '\t');
             }
             break;
         case KEY_ENTER:
@@ -1046,9 +1069,16 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             if(brace.brace != '0' && brace.closing) {
                 buffer_insert_char(state, buffer, '\n');
                 if(state->num_of_braces == 0) state->num_of_braces = 1;
-                for(size_t i = 0; i < indent*(state->num_of_braces-1); i++) {
-                    buffer_insert_char(state, buffer, ' ');
-                    buffer->cursor--;
+                if(indent > 0) {
+                    for(size_t i = 0; i < indent*(state->num_of_braces-1); i++) {
+                        buffer_insert_char(state, buffer, ' ');
+                        buffer->cursor--;
+                    }
+                } else {
+                    for(size_t i = 0; i < state->num_of_braces-1; i++) {
+                        buffer_insert_char(state, buffer, '\t');                            
+                        buffer->cursor--;
+                    }        
                 }
                 buffer->cursor--;
             }
@@ -1240,8 +1270,12 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             for(size_t i = row; i <= end_row; i++) {
                 buffer_calculate_rows(buffer);
                 buffer->cursor = buffer->rows.data[i].start;
-                for(size_t i = 0; (int)i < indent; i++) {
-                    buffer_insert_char(state, buffer, ' ');
+                if(indent > 0) {
+                    for(size_t i = 0; (int)i < indent; i++) {
+                        buffer_insert_char(state, buffer, ' ');
+                    }
+                } else {
+                     buffer_insert_char(state, buffer, '\t');                           
                 }
             }
             buffer->cursor = position;
@@ -1252,14 +1286,21 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             int cond = (buffer->visual.start > buffer->visual.end);
             size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
             size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
-            //size_t position = buffer->cursor;
             size_t row = index_get_row(buffer, start);
             size_t end_row = index_get_row(buffer, end);            
             size_t offset = 0;
             for(size_t i = row; i <= end_row; i++) {
                 buffer_calculate_rows(buffer);                
                 buffer->cursor = buffer->rows.data[i].start;
-                for(size_t i = 0; (int)i < indent; i++) {
+                if(indent > 0) {
+                    for(size_t j = 0; (int)j < indent; j++) {
+                        if(isspace(buffer->data.data[buffer->cursor])) {
+                            buffer_delete_char(buffer, state);
+                            offset++;
+                            buffer_calculate_rows(buffer);
+                        }
+                    }
+                } else {
                     if(isspace(buffer->data.data[buffer->cursor])) {
                         buffer_delete_char(buffer, state);
                         offset++;
@@ -1543,6 +1584,10 @@ int main(int argc, char **argv) {
                     if(j < state.buffer->rows.data[i].start+col_render_start || j > state.buffer->rows.data[i].end+col+state.main_col) continue;
                     size_t col = j-state.buffer->rows.data[i].start;
                     size_t print_index_x = col-col_render_start;
+                    
+                    for(size_t chr = state.buffer->rows.data[i].start; chr < j; chr++) {
+                        if(state.buffer->data.data[chr] == '\t') print_index_x += 3;
+                    }
 
                     size_t keyword_size = 0;
                     if(syntax && is_in_tokens_index(token_arr, token_s, col, &keyword_size, &color)) {
@@ -1557,13 +1602,14 @@ int main(int argc, char **argv) {
                         : is_between(state.buffer->visual.start, state.buffer->visual.end, state.buffer->rows.data[i].start+col);
                     if(mode == VISUAL && between) wattron(state.main_win, A_STANDOUT);
                     else wattroff(state.main_win, A_STANDOUT);
-
-                    mvwprintw(state.main_win, print_index_y, print_index_x, "%c", state.buffer->data.data[state.buffer->rows.data[i].start+col]);
+                    mvwprintw(state.main_win, print_index_y, print_index_x, "%c", state.buffer->data.data[state.buffer->rows.data[i].start+col]);       
                 }
                 free(token_arr);
             }
         }
-
+            
+        col += count_num_tabs(state.buffer, buffer_get_row(state.buffer))*3;                     
+            
         wrefresh(state.main_win);
         wrefresh(state.line_num_win);
         wrefresh(state.status_bar);
