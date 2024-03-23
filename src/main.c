@@ -1270,8 +1270,12 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             for(size_t i = row; i <= end_row; i++) {
                 buffer_calculate_rows(buffer);
                 buffer->cursor = buffer->rows.data[i].start;
-                for(size_t i = 0; (int)i < indent; i++) {
-                    buffer_insert_char(state, buffer, ' ');
+                if(indent > 0) {
+                    for(size_t i = 0; (int)i < indent; i++) {
+                        buffer_insert_char(state, buffer, ' ');
+                    }
+                } else {
+                     buffer_insert_char(state, buffer, '\t');                           
                 }
             }
             buffer->cursor = position;
@@ -1282,14 +1286,21 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             int cond = (buffer->visual.start > buffer->visual.end);
             size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
             size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
-            //size_t position = buffer->cursor;
             size_t row = index_get_row(buffer, start);
             size_t end_row = index_get_row(buffer, end);            
             size_t offset = 0;
             for(size_t i = row; i <= end_row; i++) {
                 buffer_calculate_rows(buffer);                
                 buffer->cursor = buffer->rows.data[i].start;
-                for(size_t i = 0; (int)i < indent; i++) {
+                if(indent > 0) {
+                    for(size_t j = 0; (int)j < indent; j++) {
+                        if(isspace(buffer->data.data[buffer->cursor])) {
+                            buffer_delete_char(buffer, state);
+                            offset++;
+                            buffer_calculate_rows(buffer);
+                        }
+                    }
+                } else {
                     if(isspace(buffer->data.data[buffer->cursor])) {
                         buffer_delete_char(buffer, state);
                         offset++;
