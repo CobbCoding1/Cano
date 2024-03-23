@@ -223,10 +223,12 @@ void find_and_replace(Buffer *buffer, State *state, char *old_str, char *new_str
 size_t num_of_open_braces(Buffer *buffer) {
     size_t index = buffer->cursor;
     int count = 0;
+    int in_str = 0;
     while(index > 0) {
         index--;
+        if(buffer->data.data[index] == '"' || buffer->data.data[index] == '\'') in_str = !in_str;
         Brace brace = find_opposite_brace(buffer->data.data[index]);
-        if(brace.brace != '0') {
+        if(brace.brace != '0' && !in_str) {
             if(!brace.closing) count++; 
             if(brace.closing) count--; 
         }
@@ -769,6 +771,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     } 
     
     if(!isdigit(state->ch) && state->num.count > 0) {
+        ASSERT(state->num.data, "num is not initialized");
         state->repeating.repeating_count = atoi(state->num.data);
         if(state->repeating.repeating_count == 0) return;
         state->num.count = 0;
@@ -1042,6 +1045,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             buffer_newline_indent(buffer, state);
             if(brace.brace != '0' && brace.closing) {
                 buffer_insert_char(state, buffer, '\n');
+                if(state->num_of_braces == 0) state->num_of_braces = 1;
                 for(size_t i = 0; i < indent*(state->num_of_braces-1); i++) {
                     buffer_insert_char(state, buffer, ' ');
                     buffer->cursor--;
@@ -1063,6 +1067,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 buffer_insert_char(state, buffer, brace.brace);
                 buffer->cursor--;
             }
+
         } break;
     }
 }
