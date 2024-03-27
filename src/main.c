@@ -1,9 +1,7 @@
 #include "main.h"
 
 int is_between(size_t a, size_t b, size_t c) {
-    if(a <= c && c <= b) {
-        return 1;
-    }
+    if(a <= c && c <= b) return 1;
     return 0;
 }
 
