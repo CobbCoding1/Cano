@@ -187,3 +187,7 @@ git clone https://github.com/CobbCoding1/Cano && cd Cano
 make
 sudo ./debian-install.sh
 ```
+
+## Canoon (Beta)
+The official Cano installer and manager, currently in Beta.
+[canoon](https://github.com/kul-sudo/canoon)
