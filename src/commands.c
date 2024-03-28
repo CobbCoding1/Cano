@@ -170,7 +170,7 @@ Command_Type get_token_type(String_View view) {
         return TT_SET_OUTPUT;
     } else if(view_cmp(view, LITERAL_CREATE("set-map"))) {
         return TT_SET_MAP;
-    } else {
+    } else { // TODO: Add help command
         for(size_t i = 0; i < CONFIG_VARS; i++) {
             if(view_cmp(view, vars[i].label)) {
                  return TT_CONFIG_IDENT;       

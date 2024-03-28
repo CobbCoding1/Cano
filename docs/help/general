@@ -1,0 +1,126 @@
+
+                                                   ((((((((((((((((((                       
+                                                (((((((((((    (((((((((((                   
+                                           ((((((((((                ((((((((((              
+                                          ((((((((                      ((((#%%%             
+                                          ((((((/         ((((((       (#%%%#%%%             
+                                          ((((((       ((((((((((((%%%%%%%%%#%%%             
+                                          (((((       (((((((((%%.#%  %%,.%%#%%%             
+                                          (((((       ((((%%%%%% %%# % %(#%%#%%%             
+                                          ((((((       %%%%%%%%%%%%/#%#%#%#%#%#%             
+                                          (((((((         %%%%%%        %%%%#%%%             
+                                          (((%%%%%                      %%%%%%%%             
+                                           #%%%%%%%%%                %%%%%%%%%(              
+                                                %%%%%%%%%%%/  /%%%%%%%%%%%                   
+     
+
+Cano (kay-no) is a VIM inspired modal-based text editor written in C using the ncurses library.
+
+_______________________________________________________________________________________________________________________________________
+                                                            Usage                                                                     |
+                                                                                                                                      |
+Opening files:                                                                                                                        |
+  $ cano <filename>                                                                                                                   |
+                                                                                                                                      |
+Getting help:                                                                                                                         |
+  $ cano --help <help-page>                                                                                                           |
+                                                                                                                                      |
+Help-pages:                                                                                                                           |
+- general                                                                                                                             |
+- keys                                                                                                                                |
+- cmds                                                                                                                                |
+                                                                                                                                      |
+The command:                                                                                                                          |
+  $ cano --help                                                                                                                       |
+is a shortcut to:                                                                                                                     |
+  $ cano --help general                                                                                                               |
+                                                                                                                                      |
+---------------------------------------------------------------------------------------------------------------------------------------
+
+_______________________________________________________________________________________________________________________________________
+                                                            Modes                                                                     |
+                                                                                                                                      |
+1. Normal - For motions and deletion                                                                                                  |
+2. Insert - For inserting text                                                                                                        |
+3. Visual - For selecting text and performing actions on them                                                                         |
+4. Search - For searching of text in the current buffer                                                                               |
+5. Command - For executing commands                                                                                                   |
+                                                                                                                                      |
+---------------------------------------------------------------------------------------------------------------------------------------
+
+_______________________________________________________________________________________________________________________________________
+                                                            Visual                                                                    |
+                                                                                                                                      |
+Visual mode works the same as Normal mode, except it works on the entire selection, instead of character by character.                |
+                                                                                                                                      |
+    Keybind     |           Action                                                                                                    |
+------------------------------------------------                                                                                      |
+       >        |   Indent current selection                                                                                          |
+------------------------------------------------                                                                                      |
+       <        |   Unindent current selection                                                                                        |
+                                                                                                                                      |
+---------------------------------------------------------------------------------------------------------------------------------------
+
+_______________________________________________________________________________________________________________________________________
+                                                            Search                                                                    |
+                                                                                                                                      |
+Search mode takes a string and finds it in the file. if prepended with 's/' then it will replace the first substring with the second. |
+                                                                                                                                      |
+This example command:                                                                                                                 |
+  's/hello/goodbye'                                                                                                                   |
+                                                                                                                                      |
+Will replace hello with goodbye.                                                                                                      |
+                                                                                                                                      |
+---------------------------------------------------------------------------------------------------------------------------------------
+
+_______________________________________________________________________________________________________________________________________
+                                                        Configuration                                                                 |
+                                                                                                                                      |
+The config file is stored in ~/.config/cano/config.cano by default, or can be set at runtime like so:                                 |
+  $ cano --config <config_file>                                                                                                       |
+                                                                                                                                      |
+The format of the file is the same as commands, it is line separated, which is important. Example:                                    |
+  set-var sytnax 1                                                                                                                    |
+  set-var indent 2                                                                                                                    |
+                                                                                                                                      |
+There is a secondary config file, which is for custom syntax highlighting. It is stored in the same folder as the regular config,     |
+but uses a different naming format. An example is ~/.config/cano/c.cyntax (spelled cyntax, with a c).                                 |
+The c can be replaced with whatever the file extension of your language is, such as go.cyntax for Golang.                             |
+Here is an example of a cyntax file:                                                                                                  |
+  k,170,68,68,                                                                                                                        |
+  auto,struct,break,else,switch,case,                                                                                                 |
+  enum,register,typedef,extern,return,                                                                                                |
+  union,continue,for,signed,void,do,                                                                                                  |
+  if,static,while,default,goto,sizeof,                                                                                                |
+  volatile,const,unsigned.                                                                                                            |
+  t,255,165,0,                                                                                                                        |
+  double,size_t,int,                                                                                                                  |
+  long,char,float,short.                                                                                                              |
+  w,128,160,255.                                                                                                                      |
+                                                                                                                                      |
+There's a bit to unpack here, basically the single characters represent the type of the keywords:                                     |
+  k - Keyword                                                                                                                         |
+  t - Type                                                                                                                            |
+  w - Word                                                                                                                            |
+The type is then followed by the RGB values, all comma separated without spaces. After the RGB values, there is the actual keywords.  |
+End each type with a dot '.' as seen above, to indicate to Cano that the list is finished.                                            |
+The words are meant to be left blank, as it will highlight any words not found in the keywords above with the chosen RGB color.       |
+If you wish to only set the color, you can provide no keywords to any, and it will fill in the keywords with C keywords by default.   |
+                                                                                                                                      |
+Config variables:                                                                                                                     |
+                                                                                                                                      |
+    Variable    |               Purpose                                                                                               |
+-------------------------------------------------------                                                                               |
+    relative    |   toggle relative line numbers                                                                                      |
+-------------------------------------------------------                                                                               |
+   auto-indent  |   toggle auto indentation on-off                                                                                    |
+-------------------------------------------------------                                                                               |
+     syntax     |   toggle syntax highlighting on-off                                                                                 |
+-------------------------------------------------------                                                                               |
+     indent     |   set indent                                                                                                        |
+-------------------------------------------------------                                                                               |
+    undo-size   |   size of undo history                                                                                              |
+                                                                                                                                      |
+---------------------------------------------------------------------------------------------------------------------------------------
+
+
