@@ -44,4 +44,12 @@ fclean:
 re: fclean
 	$(MAKE) all
 
+install: all
+	@ install -v -D -t ~/.local/share/cano/help/ ./docs/help/*
+	@ sudo install -v ./build/cano /usr/bin
+
+uninstall:
+	@ rm -rf ~/.local/share/cano
+	@ sudo rm -f /usr/bin/cano
+
 .PHONY: clean fclean re
