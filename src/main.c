@@ -1402,6 +1402,29 @@ void init_colors() {
     init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
 }
 
+void print_help_page(char *page) {
+    if (page == NULL) {
+        return;
+    }
+
+    char *env = getenv("HOME");
+    if(env == NULL) CRASH("could not get HOME");
+    char help_page[128];
+    snprintf(help_page, 128, "%s/.local/share/cano/help/%s", env, page);
+
+    FILE *page_file = fopen(help_page, "r");
+    if (page_file == NULL) {
+        fprintf(stderr, "Failed to open help page. Check for typos or if you installed cano properly.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    char str[256];
+    while (fgets(str, 256, page_file)) {
+        printf("%s", str);
+    }
+    fclose(page_file);
+}
+
 /* ------------------------- FUNCTIONS END ------------------------- */
 
 
@@ -1439,7 +1462,6 @@ int main(int argc, char **argv) {
                 WRITE_LOG("Error - pthread_create() return code: %d", process);
                 exit(EXIT_FAILURE);
             }
-
         }
 
         if(strcmp(flag, "--config") == 0) {
@@ -1449,11 +1471,18 @@ int main(int argc, char **argv) {
                 exit(1);
             }
             config_filename = flag;
+        } else if (strcmp(flag, "--help") == 0) {
             flag = *argv++;
+            if (flag == NULL) {
+                print_help_page("general");
+            } else {
+                print_help_page(flag);
+            }
+            exit(EXIT_SUCCESS);
         } else {
             filename = flag;
-            flag = *argv++;
         }
+        flag = *argv++;
     }
     (void)config_filename;
     (void)syntax_filename;
