@@ -1388,7 +1388,7 @@ void load_config_from_file(State *state, Buffer *buffer, char *config_filename, 
         Color_Arr color_arr = parse_syntax_file(syntax_filename);
         if(color_arr.arr != NULL) {
             for(size_t i = 0; i < color_arr.arr_s; i++) {
-                init_pair(color_arr.arr[i].custom_slot, color_arr.arr[i].custom_id, COLOR_BLACK);
+                init_pair(color_arr.arr[i].custom_slot, color_arr.arr[i].custom_id, background_color);
                 init_ncurses_color(color_arr.arr[i].custom_id, color_arr.arr[i].custom_r, 
                                    color_arr.arr[i].custom_g, color_arr.arr[i].custom_b);
             }
@@ -1404,12 +1404,15 @@ void init_colors() {
     }
 
     start_color();
-    init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
-    init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
-    init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
-    init_pair(MAGENTA_COLOR, COLOR_MAGENTA, COLOR_BLACK);
-    init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
+    if (background_color == -1){
+        use_default_colors();
+    }
+    init_pair(YELLOW_COLOR, COLOR_YELLOW, background_color);
+    init_pair(BLUE_COLOR, COLOR_BLUE, background_color);
+    init_pair(GREEN_COLOR, COLOR_GREEN, background_color);
+    init_pair(RED_COLOR, COLOR_RED, background_color);
+    init_pair(MAGENTA_COLOR, COLOR_MAGENTA, background_color);
+    init_pair(CYAN_COLOR, COLOR_CYAN, background_color);
 }
 
 void print_help_page(char *page) {
