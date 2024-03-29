@@ -1088,7 +1088,8 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             }
         } break;
         default: { // Handle other characters
-			ASSERT(buffer->data.count >= buffer->cursor && buffer->data.data != NULL, "check");
+			ASSERT(buffer->data.count >= buffer->cursor, "check");
+			ASSERT(buffer->data.data, "check2");
 			Brace brace = (Brace){0};
 			if(buffer->cursor > 0) {
 	            Brace cur_brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
@@ -1103,7 +1104,9 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             buffer_insert_char(state, buffer, state->ch);
             if(brace.brace != '0' && !brace.closing) {
                 buffer_insert_char(state, buffer, brace.brace);
+	            undo_push(state, &state->undo_stack, state->cur_undo);
                 buffer->cursor--;
+	            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);				
             }
 
         } break;
