@@ -1,7 +1,7 @@
 # Maintainer: CobbCoding 
 pkgname=cano-git
 _pkgname=cano
-pkgver=r309.0a6fb09
+pkgver=r311.af4a963
 pkgrel=1
 pkgdesc="Terminal-based modal text editor"
 arch=('x86_64')

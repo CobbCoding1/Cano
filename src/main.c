@@ -270,8 +270,9 @@ Buffer *load_buffer_from_file(char *filename) {
     size_t length = ftell(file);
     fseek(file, 0, SEEK_SET);
     buffer->data.count = length;
-    buffer->data.capacity = length*2;
-    buffer->data.data = calloc(buffer->data.capacity, sizeof(char));
+    buffer->data.capacity = (length+1)*2;
+    buffer->data.data = calloc(buffer->data.capacity+1, sizeof(char));
+	ASSERT(buffer->data.data != NULL, "buffer allocated properly");
     fread(buffer->data.data, length, 1, file);
     fclose(file);
     buffer_calculate_rows(buffer);
@@ -317,6 +318,8 @@ void buffer_calculate_rows(Buffer *buffer) {
 }
 
 void buffer_insert_char(State *state, Buffer *buffer, char ch) {
+	ASSERT(buffer != NULL, "buffer exists");
+	ASSERT(state != NULL, "state exists");		
     if(buffer->cursor > buffer->data.count) buffer->cursor = buffer->data.count;
     DA_APPEND(&buffer->data, ch);
     memmove(&buffer->data.data[buffer->cursor + 1], &buffer->data.data[buffer->cursor], buffer->data.count - 1 - buffer->cursor);
@@ -1004,6 +1007,9 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 
 void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
+	ASSERT(buffer, "buffer exists");
+	ASSERT(state, "state exists");
+	
     switch(state->ch) { 
         case '\b':
         case 127:
@@ -1082,13 +1088,17 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             }
         } break;
         default: { // Handle other characters
-            Brace cur_brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
-            if((cur_brace.brace != '0' && cur_brace.closing && 
-                state->ch == find_opposite_brace(cur_brace.brace).brace)) {
-                buffer->cursor++;
-                break;
-            };
-            Brace brace = find_opposite_brace(state->ch);
+			ASSERT(buffer->data.count >= buffer->cursor && buffer->data.data != NULL, "check");
+			Brace brace = (Brace){0};
+			if(buffer->cursor > 0) {
+	            Brace cur_brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
+	            if((cur_brace.brace != '0' && cur_brace.closing && 
+	                state->ch == find_opposite_brace(cur_brace.brace).brace)) {
+	                buffer->cursor++;
+	                break;
+	            };
+	            brace = find_opposite_brace(state->ch);
+			}
             // TODO: make quotes auto close
             buffer_insert_char(state, buffer, state->ch);
             if(brace.brace != '0' && !brace.closing) {

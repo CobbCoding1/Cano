@@ -37,7 +37,7 @@
 #define DA_APPEND(da, item) do {                                                       \
     if ((da)->count >= (da)->capacity) {                                               \
         (da)->capacity = (da)->capacity == 0 ? DATA_START_CAPACITY : (da)->capacity*2; \
-        (da)->data = realloc((da)->data, (da)->capacity*sizeof(*(da)->data));       \
+        (da)->data = realloc((da)->data, ((da)->capacity+1)*sizeof(*(da)->data));       \
         ASSERT((da)->data != NULL, "outta ram");                               \
     }                                                                                  \
     (da)->data[(da)->count++] = (item);                                               \
