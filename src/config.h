@@ -15,4 +15,7 @@ char *lang = " ";
 int QUIT = 0;
 Mode mode = NORMAL;
 
+// Colors
+int background_color = -1; // -1 for terminal background color.
+
 #endif
