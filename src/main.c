@@ -779,6 +779,54 @@ void free_files(Files *files) {
     free(files);
 }
 
+void load_config_from_file(State *state, Buffer *buffer, char *config_filename, char *syntax_filename) {
+    if(config_filename == NULL) {
+        char default_config_filename[128] = {0};
+        char config_dir[64] = {0};
+        char *env = getenv("HOME");
+        if(env == NULL) CRASH("could not get HOME");
+        sprintf(config_dir, "%s/.config/cano", env);
+        struct stat st = {0};
+        if(stat(config_dir, &st) == -1) {
+            mkdir(config_dir, 0755);
+        }
+        sprintf(default_config_filename, "%s/config.cano", config_dir);
+        config_filename = default_config_filename;
+
+        char *language = strip_off_dot(buffer->filename, strlen(buffer->filename));
+        if(language != NULL) {
+            syntax_filename = calloc(strlen(config_dir)+strlen(language)+sizeof(".cyntax")+1, sizeof(char));
+            sprintf(syntax_filename, "%s/%s.cyntax", config_dir, language);
+            free(language);
+        }
+    }
+    char **lines = calloc(2, sizeof(char*));
+    size_t lines_s = 0;
+    int err = read_file_by_lines(config_filename, &lines, &lines_s);
+    if(err == 0) {
+        for(size_t i = 0; i < lines_s; i++) {
+            size_t cmd_s = 0;
+            Command_Token *cmd = lex_command(view_create(lines[i], strlen(lines[i])), &cmd_s);
+            execute_command(buffer, state, cmd, cmd_s);
+            free(lines[i]);
+        }
+    }
+    free(lines);
+
+    if(syntax_filename != NULL) {
+        Color_Arr color_arr = parse_syntax_file(syntax_filename);
+        if(color_arr.arr != NULL) {
+            for(size_t i = 0; i < color_arr.arr_s; i++) {
+                init_pair(color_arr.arr[i].custom_slot, color_arr.arr[i].custom_id, COLOR_BLACK);
+                init_ncurses_color(color_arr.arr[i].custom_id, color_arr.arr[i].custom_r, 
+                                   color_arr.arr[i].custom_g, color_arr.arr[i].custom_b);
+            }
+
+            free(color_arr.arr);
+        }
+    }
+}
+
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
     
@@ -983,8 +1031,8 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 
                             state->explore_cursor = 0;
                         } else {
-                            // TODO: Load syntax highlighting right here
                             state->buffer = load_buffer_from_file(f.path);
+                            load_config_from_file(state, state->buffer, state->config_filename, state->syntax_filename);
                             state->is_exploring = false;
                         }
                     } break;
@@ -1340,54 +1388,6 @@ State init_state() {
     return state;
 }
 
-void load_config_from_file(State *state, Buffer *buffer, char *config_filename, char *syntax_filename) {
-    if(config_filename == NULL) {
-        char default_config_filename[128] = {0};
-        char config_dir[64] = {0};
-        char *env = getenv("HOME");
-        if(env == NULL) CRASH("could not get HOME");
-        sprintf(config_dir, "%s/.config/cano", env);
-        struct stat st = {0};
-        if(stat(config_dir, &st) == -1) {
-            mkdir(config_dir, 0755);
-        }
-        sprintf(default_config_filename, "%s/config.cano", config_dir);
-        config_filename = default_config_filename;
-
-        char *language = strip_off_dot(buffer->filename, strlen(buffer->filename));
-        if(language != NULL) {
-            syntax_filename = calloc(strlen(config_dir)+strlen(language)+sizeof(".cyntax")+1, sizeof(char));
-            sprintf(syntax_filename, "%s/%s.cyntax", config_dir, language);
-            free(language);
-        }
-    }
-    char **lines = calloc(2, sizeof(char*));
-    size_t lines_s = 0;
-    int err = read_file_by_lines(config_filename, &lines, &lines_s);
-    if(err == 0) {
-        for(size_t i = 0; i < lines_s; i++) {
-            size_t cmd_s = 0;
-            Command_Token *cmd = lex_command(view_create(lines[i], strlen(lines[i])), &cmd_s);
-            execute_command(buffer, state, cmd, cmd_s);
-            free(lines[i]);
-        }
-    }
-    free(lines);
-
-    if(syntax_filename != NULL) {
-        Color_Arr color_arr = parse_syntax_file(syntax_filename);
-        if(color_arr.arr != NULL) {
-            for(size_t i = 0; i < color_arr.arr_s; i++) {
-                init_pair(color_arr.arr[i].custom_slot, color_arr.arr[i].custom_id, COLOR_BLACK);
-                init_ncurses_color(color_arr.arr[i].custom_id, color_arr.arr[i].custom_r, 
-                                   color_arr.arr[i].custom_g, color_arr.arr[i].custom_b);
-            }
-
-            free(color_arr.arr);
-        }
-    }
-}
-
 void init_colors() {
     if(has_colors() == FALSE) {
         CRASH("your terminal does not support colors");
@@ -1440,7 +1440,7 @@ int main(int argc, char **argv) {
     char *filename = NULL;
     while(flag != NULL) {
         bool isC = 0;
-        if (!(filename == NULL)) {
+        if (filename != NULL) {
             isC = contains_c_extension(filename);
             if(isC) {
                 WRITE_LOG("C file detected");
@@ -1484,8 +1484,6 @@ int main(int argc, char **argv) {
         }
         flag = *argv++;
     }
-    (void)config_filename;
-    (void)syntax_filename;
 
     // define functions based on current mode
     void(*key_func[MODE_COUNT])(Buffer *buffer, Buffer **modify_buffer, struct State *state) = {
@@ -1494,9 +1492,22 @@ int main(int argc, char **argv) {
 
     State state = init_state();
     state.command = calloc(64, sizeof(char));
+    ASSERT(state.command, "Failed to allocate space for command.");
     state.key_func = key_func;
     state.files = calloc(32, sizeof(File));
+    ASSERT(state.files, "Failed to allocate space for file-explorer files.");
     scan_files(state.files, ".");
+    
+    if (config_filename != NULL) {
+        state.config_filename = calloc(512, sizeof(char));
+        ASSERT(state.config_filename, "Failed to allocate space for config_filename.");
+        strcpy(state.config_filename, config_filename);
+    }
+    if (syntax_filename != NULL) {
+        state.syntax_filename = calloc(512, sizeof(char));
+        ASSERT(state.syntax_filename, "Failed to allocate space for syntax_filename.");
+        strcpy(state.syntax_filename, syntax_filename);
+    }
 
     initscr();
     noecho();
@@ -1657,6 +1668,13 @@ int main(int argc, char **argv) {
     free_undo_stack(&state.undo_stack);
     free_undo_stack(&state.redo_stack);
     free_files(state.files);
+
+    if (state.config_filename != NULL) {
+        free(state.config_filename);
+    }
+    if (state.syntax_filename != NULL) {
+        free(state.config_filename);
+    }
 
     return 0;
 }

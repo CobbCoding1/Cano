@@ -261,10 +261,12 @@ typedef struct State {
 
     Sized_Str clipboard;
 
-    Files* files;
+    Files *files;
     bool is_exploring;
     size_t explore_cursor;
-    Buffer* buffer;
+    Buffer *buffer;
+    char *config_filename;
+    char *syntax_filename;
 
     // window sizes
     int grow;
