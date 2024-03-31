@@ -157,7 +157,7 @@ undo-size # size of undo history
 # Installation
 
 ## Arch
-
+[![Packaging status](https://repology.org/badge/vertical-allrepos/cano.svg)](https://repology.org/project/cano/versions) \
 A package is provided within this [AUR](https://aur.archlinux.org).
 You can install it using your preferred aur helper:
 
