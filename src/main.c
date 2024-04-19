@@ -1,3 +1,5 @@
+#include <locale.h>
+
 #include "main.h"
 
 int is_between(size_t a, size_t b, size_t c) {
@@ -744,6 +746,11 @@ int check_keymaps(Buffer *buffer, State *state) {
     return 0;
 }
 
+int compare_name(File const *leftp, File const *rightp)
+{
+    return strcoll(leftp->name, rightp->name);
+}
+
 void scan_files(Files *files, char *directory) {
     DIR *dp = opendir(directory);
     if(dp == NULL) {
@@ -772,6 +779,8 @@ void scan_files(Files *files, char *directory) {
         }
     }
     closedir(dp);
+    qsort(files->data, files->count,
+        sizeof *files->data, (__compar_fn_t)&compare_name);
 }
 
 void free_files(Files *files) {
@@ -1447,6 +1456,7 @@ void print_help_page(char *page) {
 int main(int argc, char **argv) {
 
     WRITE_LOG("starting (int main)");
+    setlocale(LC_ALL, "");
 
     (void)argc;
     char *program = *argv++;
