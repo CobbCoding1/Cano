@@ -4,6 +4,9 @@ Cano (kay-no) is a VIM inspired modal-based text editor written in C using the [
 ![Cano icon](cano.png) \
 Icon made by [LocalTexan](https://github.com/LocalTexan)
 
+# Demo
+[![asciicast](https://asciinema.org/a/655184.svg)](https://asciinema.org/a/655184)
+
 ## Quick Start
 Cano has the following dependencies:
 - [GCC](https://gcc.gnu.org/)
