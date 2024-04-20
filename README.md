@@ -193,4 +193,4 @@ sudo ./debian-install.sh
 
 ## Canoon (Beta)
 The official Cano installer and manager, currently in Beta.
-[canoon](https://github.com/kul-sudo/canoon)
+[canoon](https://github.com/kul-sudo/canoon
