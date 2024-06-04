@@ -327,7 +327,7 @@ int get_special_char(String_View view) {
     
 Bin_Expr *parse_bin_expr(State *state, Command_Token *command, size_t command_s) {
     if(command_s == 0) return NULL;
-    Bin_Expr *expr = calloc(0, sizeof(Bin_Expr));
+    Bin_Expr *expr = calloc(1, sizeof(Bin_Expr));
     expr->lvalue = (Expr){view_to_int(command[0].value)};
     if(command_s <= 2) return expr;
     expr->operator = get_operator(command[1]);        
