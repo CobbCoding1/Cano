@@ -653,7 +653,7 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
                         size_t offset = buffer->cursor - cur.start;
                         CREATE_UNDO(INSERT_CHARS, cur.start);
                         if(row == 0) {
-                            buffer_delete_selection(buffer, state, cur.start, cur.end-1);
+                            buffer_delete_selection(buffer, state, cur.start, cur.end);
                         } else {
                             state->cur_undo.start -= 1;
                             buffer_delete_selection(buffer, state, cur.start-1, cur.end-1);
