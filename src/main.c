@@ -10,6 +10,8 @@ int is_between(size_t a, size_t b, size_t c) {
 char *string_modes[MODE_COUNT] = {"NORMAL", "INSERT", "SEARCH", "COMMAND", "VISUAL"};
 _Static_assert(sizeof(string_modes)/sizeof(*string_modes) == MODE_COUNT, "Number of modes");
 
+void load_config_from_file(State *state, Buffer *buffer, char *config_filename, char *syntax_filename);
+
 Brace find_opposite_brace(char opening) {
     switch(opening) {
         case '(':
@@ -992,7 +994,9 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                             free_files(state->files);
                             state->files = calloc(32, sizeof(File));
                             scan_files(state->files, str);
-
+							char *config_filename = NULL;
+							char *syntax_filename = NULL;							
+						    load_config_from_file(state, state->buffer, config_filename, syntax_filename);			
                             state->explore_cursor = 0;
                         } else {
                             // TODO: Load syntax highlighting right here
@@ -1582,8 +1586,8 @@ int main(int argc, char **argv) {
 
         if (is_term_resized(state.line_num_row, state.line_num_col)) {
             getmaxyx(stdscr, state.grow, state.gcol);
+            getmaxyx(state.line_num_win, state.line_num_row, state.line_num_col);			
             mvwin(state.status_bar, state.grow-2, 0);
-			wclear(state.main_win);				
         }
             
         mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
