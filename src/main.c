@@ -994,13 +994,13 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                             free_files(state->files);
                             state->files = calloc(32, sizeof(File));
                             scan_files(state->files, str);
-							char *config_filename = NULL;
-							char *syntax_filename = NULL;							
-						    load_config_from_file(state, state->buffer, config_filename, syntax_filename);			
                             state->explore_cursor = 0;
                         } else {
                             // TODO: Load syntax highlighting right here
                             state->buffer = load_buffer_from_file(f.path);
+							char *config_filename = NULL;
+							char *syntax_filename = NULL;							
+						    load_config_from_file(state, state->buffer, config_filename, syntax_filename);			
                             state->is_exploring = false;
                         }
                     } break;
