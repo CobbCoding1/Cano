@@ -1100,7 +1100,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 			ASSERT(buffer->data.count >= buffer->cursor, "check");
 			ASSERT(buffer->data.data, "check2");
 			Brace brace = (Brace){0};
-			if(buffer->cursor > 0) {
+			if((int)buffer->cursor >= 0) {
 	            Brace cur_brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
 	            if((cur_brace.brace != '0' && cur_brace.closing && 
 	                state->ch == find_opposite_brace(cur_brace.brace).brace)) {
@@ -1117,7 +1117,6 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 buffer->cursor--;
 	            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);				
             }
-
         } break;
     }
 }
