@@ -1583,6 +1583,7 @@ int main(int argc, char **argv) {
         if (is_term_resized(state.line_num_row, state.line_num_col)) {
             getmaxyx(stdscr, state.grow, state.gcol);
             mvwin(state.status_bar, state.grow-2, 0);
+			wclear(state.main_win);				
         }
             
         mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
