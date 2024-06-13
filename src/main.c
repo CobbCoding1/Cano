@@ -1371,9 +1371,14 @@ void load_config_from_file(State *state, Buffer *buffer, char *config_filename, 
     if(config_filename == NULL) {
         char default_config_filename[128] = {0};
         char config_dir[64] = {0};
-        char *env = getenv("HOME");
-        if(env == NULL) CRASH("could not get HOME");
-        sprintf(config_dir, "%s/.config/cano", env);
+		if(!state->env) {
+			state->env = calloc(128, sizeof(char));
+	        char *env = getenv("HOME");			
+	        if(env == NULL) CRASH("could not get HOME");			
+			state->env = env;
+		}
+        sprintf(config_dir, "%s/.config/cano", state->env);
+		WRITE_LOG("env: %s", state->env);
         struct stat st = {0};
         if(stat(config_dir, &st) == -1) {
             mkdir(config_dir, 0755);

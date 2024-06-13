@@ -150,7 +150,7 @@ Color_Arr parse_syntax_file(char *filename) {
     char *cur = contents_view.data;
     for(size_t i = 0; i <= contents_view.len; i++) {
         cur_size++;
-        if(contents_view.data[i-1] == '.') {
+        if(i > 0 && contents_view.data[i-1] == '.') {
             lines[lines_s].data = cur;
             cur += cur_size;
             lines[lines_s++].len = cur_size;

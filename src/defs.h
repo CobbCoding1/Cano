@@ -240,6 +240,7 @@ typedef struct State {
     Undo cur_undo;
     size_t num_of_braces;
     int ch;
+	char *env;	
     
     char *command;
     size_t command_s;
