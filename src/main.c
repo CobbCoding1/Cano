@@ -32,8 +32,9 @@ Brace find_opposite_brace(char opening) {
         case ']':
             return (Brace){.brace = '[', .closing = 1};
             break;
+		default:
+		    return (Brace){.brace = '0'};		
     }
-    return (Brace){.brace = '0'};
 }
 
 void resize_window(State *state) {
@@ -1104,15 +1105,16 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 			ASSERT(buffer->data.count >= buffer->cursor, "check");
 			ASSERT(buffer->data.data, "check2");
 			Brace brace = (Brace){0};
-			if((int)buffer->cursor >= 0) {
-	            Brace cur_brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
-	            if((cur_brace.brace != '0' && cur_brace.closing && 
-	                state->ch == find_opposite_brace(cur_brace.brace).brace)) {
-	                buffer->cursor++;
-	                break;
-	            };
-	            brace = find_opposite_brace(state->ch);
-			}
+			Brace cur_brace;
+			if(buffer->cursor == 0) cur_brace = find_opposite_brace(buffer->data.data[0]);			
+			else cur_brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
+			
+            if((cur_brace.brace != '0' && cur_brace.closing && 
+                state->ch == find_opposite_brace(cur_brace.brace).brace)) {
+                buffer->cursor++;
+                break;
+            };
+            brace = find_opposite_brace(state->ch);
             // TODO: make quotes auto close
             buffer_insert_char(state, buffer, state->ch);
             if(brace.brace != '0' && !brace.closing) {
