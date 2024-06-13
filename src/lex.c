@@ -85,6 +85,7 @@ int read_file_by_lines(char *filename, char ***lines, size_t *lines_s);
 
 int is_keyword(char *word, size_t word_s) {
     for(size_t i = 0; i < keywords_s; i++) {
+		ASSERT(keywords[i] != NULL, "keywords were NOT generated properly");
         if(word_s < strlen(keywords[i])) continue;
         if(strcmp(word, keywords[i]) == 0) return 1;
     }
@@ -126,6 +127,10 @@ size_t read_file_to_str(char *filename, char **contents) {
 }
 
 Color_Arr parse_syntax_file(char *filename) {
+
+	keywords_s = 0;
+	types_s = 0;
+	
     char *contents = NULL;
     size_t contents_s = read_file_to_str(filename, &contents);
     if(contents_s == 0) {
@@ -272,10 +277,10 @@ int is_in_tokens_index(Token *token_arr, size_t token_s, size_t index, size_t *s
 
 Token generate_word(String_View *view, char *contents) {
     size_t index = view->data - contents;
-    char word[32] = {0};
+    char word[128] = {0};
     size_t word_s = 0;
     while(view->len > 0 && (isalpha(view->data[0]) || view->data[0] == '_')) {
-        if(word_s >= 32) break;
+        if(word_s >= 128) break;
         word[word_s++] = view->data[0]; 
         view->data++;
         view->len--;
