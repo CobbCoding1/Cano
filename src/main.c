@@ -690,7 +690,10 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
 int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
     switch(state->ch) {
         case 'i': {
-            mode = INSERT;
+			mode = INSERT;		
+			if(state->repeating.repeating_count) {
+				state->ch = getch();
+			}
         } break;
         case 'I': {
             size_t row = buffer_get_row(buffer);

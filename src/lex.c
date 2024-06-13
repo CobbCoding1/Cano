@@ -127,7 +127,6 @@ size_t read_file_to_str(char *filename, char **contents) {
 }
 
 Color_Arr parse_syntax_file(char *filename) {
-
 	keywords_s = 0;
 	types_s = 0;
 	
