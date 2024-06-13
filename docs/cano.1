@@ -1,0 +1,168 @@
+.TH cano 1 2024-1-24 LINUX
+
+.SH NAME
+cano - is a VIM inspired modal-based text editor written in C using the ncurses library.
+
+.SH SYNOPSIS
+.B cano
+[\fI--options\fR] [\fIfile\fR]
+
+.SH DESCRIPTION
+.B cano
+is a small text editor based on kilo that edits file.
+
+.SH OPTIONS
+.TP
+.BR \-v ", " \-\-version
+outputs version information and exits.
+
+.SH EDITING
+Editing a file is fairly easy; you start the editor and start typing the letters that you want.
+You can move around with the arrow keys and delete characters with backspace or delete key.
+
+.SH KEY BINDINGS
+.B Ctrl+Q
+.br
+Exit cano.
+.br
+.B Esc
+.br
+Enter Normal Mode
+.br
+.B h	
+.br
+Move cursor left
+.br
+.B j	
+.br
+Move cursor down
+.br
+.B k	
+.br
+Move cursor up
+.br
+.B l	
+.br
+Move Cursor right
+.br
+.B x
+.br
+Delete character
+.br
+.B g	
+.br
+Go to first line
+.br
+.B G	
+.br
+Go to last line
+.br
+.B 0	
+.br
+Go to beginning of line
+.br
+.B $	
+.br
+Go to end of line
+.br
+.B w	
+.br
+Go to next word
+.br
+.B b
+.br
+Go to last word
+.br
+.B e
+.br
+Go to end of word
+.br
+.B o
+.br
+Create line below current
+.br
+.B O
+.br
+Create line above current
+.br
+.B Ctrl+o
+.br
+Create line below current without changing mode
+.br
+.B %
+.br
+Move to corresponding brace
+.br
+.B i
+.br
+Enter insert mode
+.br
+.B I
+.br
+Go to beginning of line and enter insert mode
+.br
+.B a
+.br
+Insert mode on next char
+.br
+.B A
+.br
+Go to end of line and enter insert mode
+.br
+.B v
+.br
+Enter visual mode
+.br
+.B V
+.br
+Enter visual-line mode
+.br
+.B u
+.br
+Undo
+.br
+.B U
+.br
+Redo
+.br
+.B /
+.br
+Enter search mode
+.br
+.B n
+.br
+Jump to next
+.br
+.B Ctrl+s
+.br
+Save and exitr
+.br
+.B r
+.br
+Replace current char with next character
+.br
+.B (n) + motion
+.br
+Repeat next motion (n) times
+.br
+.B Ctrl+n
+.br
+Open file explorer
+.br
+
+.SH BUGS
+.TP
+You can report any bugs to \fIhttps://github.com/CobbCoding1/Cano/issues\fR.
+
+
+.SH AUTHOUR
+.TP
+Mainly developed by \fICobbCoding\fR. You can see other contributers in the github page \fIhttps://github.com/CobbCoding1/cano\fR.
+
+.SH COPYRIGHT
+.TP
+Apache-2.0 License
+
+.SH HOMEPAGE
+.TP
+.I https://github.com/CobbCoding1/cano
