@@ -16,6 +16,14 @@ is a small text editor based on kilo that edits file.
 .BR \-v ", " \-\-version
 outputs version information and exits.
 
+.TP
+.BR \-\-config " \fIconfig-file\fR
+uses the specified config-file instead of the default config.
+
+.TP
+.BR \-\-help " [\fIhelp-page\fR]
+prints the specified help page or the "general" page if no page was specified.
+
 .SH EDITING
 Editing a file is fairly easy; you start the editor and start typing the letters that you want.
 You can move around with the arrow keys and delete characters with backspace or delete key.
@@ -149,6 +157,15 @@ Repeat next motion (n) times
 .br
 Open file explorer
 .br
+
+.SH FILES
+.TP
+.BR ~/.config/cano/config.cano
+The default config file.
+
+.TP
+.BR ~/.local/share/cano/help
+The directory, where all help-pages are stored.
 
 .SH BUGS
 .TP
