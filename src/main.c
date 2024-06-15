@@ -1440,27 +1440,21 @@ void init_colors() {
     init_pair(CYAN_COLOR, COLOR_CYAN, background_color);
 }
 
-void print_help_page(char *page) {
-    if (page == NULL) {
-        return;
-    }
+char *get_help_page(char *page) {
+    if (page == NULL) return NULL;
 
     char *env = getenv("HOME");
     if(env == NULL) CRASH("could not get HOME");
-    char help_page[128];
+
+    char *help_page = calloc(128, sizeof(char));
+    if (help_page == NULL) CRASH("could not calloc memory for help page");
     snprintf(help_page, 128, "%s/.local/share/cano/help/%s", env, page);
 
-    FILE *page_file = fopen(help_page, "r");
-    if (page_file == NULL) {
-        fprintf(stderr, "Failed to open help page. Check for typos or if you installed cano properly.\n");
-        exit(EXIT_FAILURE);
-    }
+    // check if file exists
+    struct stat st;
+    if (stat(help_page, &st) != 0) return NULL;
 
-    char str[256];
-    while (fgets(str, 256, page_file)) {
-        printf("%s", str);
-    }
-    fclose(page_file);
+    return help_page;
 }
 
 /* ------------------------- FUNCTIONS END ------------------------- */
@@ -1477,6 +1471,7 @@ int main(int argc, char **argv) {
     char *config_filename = NULL;
     char *syntax_filename = NULL;
     char *filename = NULL;
+    char *help_filename = NULL;
     while(flag != NULL) {
         bool isC = 0;
         if (!(filename == NULL)) {
@@ -1513,11 +1508,15 @@ int main(int argc, char **argv) {
         } else if (strcmp(flag, "--help") == 0) {
             flag = *argv++;
             if (flag == NULL) {
-                print_help_page("general");
+                help_filename = get_help_page("general");
             } else {
-                print_help_page(flag);
+                help_filename = get_help_page(flag);
             }
-            exit(EXIT_SUCCESS);
+
+            if (help_filename == NULL) {
+                fprintf(stderr, "Failed to open help page. Check for typos or if you installed cano properly.\n");
+                exit(EXIT_FAILURE);
+            }
         } else {
             filename = flag;
         }
@@ -1558,7 +1557,13 @@ int main(int argc, char **argv) {
     keypad(main_win, TRUE);
 
     if(filename == NULL) filename = "out.txt";
-    state.buffer = load_buffer_from_file(filename);
+
+    if (help_filename != NULL) {
+        state.buffer = load_buffer_from_file(help_filename);
+        free(help_filename);
+    } else {
+        state.buffer = load_buffer_from_file(filename);
+    }
     
     load_config_from_file(&state, state.buffer, config_filename, syntax_filename);
 
