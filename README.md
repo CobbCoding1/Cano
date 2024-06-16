@@ -193,7 +193,7 @@ sudo apt install libncurses-dev autotools-dev
 git clone https://github.com/CobbCoding1/Cano && cd Cano
 chmod +x autogen.sh && ./autogen.sh
 make -C build
-make -C build install
+sudo make -C build install
 ```
 
 ## Canoon (Beta)
