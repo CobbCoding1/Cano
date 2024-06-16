@@ -2,7 +2,6 @@ AUTOMAKE_OPTIONS = subdir-objects
 
 bin_PROGRAMS = cano
 cano_SOURCES = src/colors.h \
-			   src/config.h \
 			   src/defs.h \
 			   src/lex.h \
 			   src/main.h \

@@ -1,4 +1,4 @@
-AC_INIT([cano], [0.1.0], [], [], [https://github.com/tim-tm/cano])
+AC_INIT([cano], [0.1.0], [], [], [https://github.com/CobbCoding1/Cano])
 AM_INIT_AUTOMAKE([-Wall -Wextra foreign])
 
 AC_PROG_CC
