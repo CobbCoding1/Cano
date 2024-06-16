@@ -1,4 +1,5 @@
 #ifndef MAIN_H
+#define MAIN_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,10 +14,10 @@
 #include <errno.h>
 #include <pthread.h>
 
+#include "defs.h"
 #include "colors.h"
-#include "config.h"
-#include "lex.c"
-#include "commands.c"
+#include "lex.h"
+#include "commands.h"
 
 #define CREATE_UNDO(t, p)    \
     Undo undo = {0};         \

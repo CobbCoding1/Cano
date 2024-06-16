@@ -1,3 +1,6 @@
+# --- The custom cano Makefile ---
+# Cano is switching to autotools, this Makefile will no longer
+# be maintained but left right here for backwards-compatibility.
 BUILD_DIR = build
 
 CC = gcc
@@ -7,6 +10,9 @@ CFLAGS += -pedantic -Wpedantic
 LDLIBS = -lncurses -lm
 
 VPATH += src
+SRC += commands.c
+SRC += lex.c
+SRC += view.c
 SRC += main.c
 
 OBJ := $(SRC:%.c=$(BUILD_DIR)/release-objs/%.o)
