@@ -1,6 +1,6 @@
-#include <locale.h>
-
 #include "main.h"
+
+#include <locale.h>
 
 int is_between(size_t a, size_t b, size_t c) {
     if(a <= c && c <= b) return 1;
@@ -476,8 +476,8 @@ int isword(char ch) {
 }
     
 void buffer_create_indent(Buffer *buffer, State *state) {
-    if(indent > 0) {
-        for(size_t i = 0; i < indent*state->num_of_braces; i++) {
+    if(state->config.indent > 0) {
+        for(size_t i = 0; i < state->config.indent*state->num_of_braces; i++) {
             buffer_insert_char(state, buffer, ' ');
         }
     } else {
@@ -690,7 +690,7 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
 int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
     switch(state->ch) {
         case 'i': {
-			mode = INSERT;		
+			state->config.mode = INSERT;		
 			if(state->repeating.repeating_count) {
 				state->ch = getch();
 			}
@@ -700,17 +700,17 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
             Row cur = buffer->rows.data[row];
             buffer->cursor = cur.start;            
             while(buffer->cursor < cur.end && isspace(buffer->data.data[buffer->cursor])) buffer->cursor++;
-            mode = INSERT;
+            state->config.mode = INSERT;
         } break;
         case 'a':
             if(buffer->cursor < buffer->data.count) buffer->cursor++;
-            mode = INSERT;
+            state->config.mode = INSERT;
             break;
         case 'A': {
             size_t row = buffer_get_row(buffer);
             size_t end = buffer->rows.data[row].end;
             buffer->cursor = end;
-            mode = INSERT;
+            state->config.mode = INSERT;
         } break;
         case 'o': {
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
@@ -718,7 +718,7 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
             size_t end = buffer->rows.data[row].end;
             buffer->cursor = end;
             buffer_newline_indent(buffer, state);
-            mode = INSERT;
+            state->config.mode = INSERT;
             undo_push(state, &state->undo_stack, state->cur_undo);
         } break;
         case 'O': {
@@ -727,7 +727,7 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
             size_t start = buffer->rows.data[row].start;
             buffer->cursor = start;
             buffer_newline_indent(buffer, state);
-            mode = INSERT;
+            state->config.mode = INSERT;
             undo_push(state, &state->undo_stack, state->cur_undo);
         } break;
         default: {
@@ -740,11 +740,11 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
     
 int check_keymaps(Buffer *buffer, State *state) {
     (void)buffer;
-    for(size_t i = 0; i < key_maps.count; i++) {
-        if(state->ch == key_maps.data[i].a) {
-            for(size_t j = 0; j < key_maps.data[i].b_s; j++) {
-                state->ch = key_maps.data[i].b[j];
-                state->key_func[mode](buffer, &buffer, state);   
+    for(size_t i = 0; i < state->config.key_maps.count; i++) {
+        if(state->ch == state->config.key_maps.data[i].a) {
+            for(size_t j = 0; j < state->config.key_maps.data[i].b_s; j++) {
+                state->ch = state->config.key_maps.data[i].b[j];
+                state->key_func[state->config.mode](buffer, &buffer, state);   
             }
             return 1;
         }
@@ -813,7 +813,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         if(state->repeating.repeating_count == 0) return;
         state->num.count = 0;
         for(size_t i = 0; i < state->repeating.repeating_count; i++) {
-            state->key_func[mode](buffer, modify_buffer, state);
+            state->key_func[state->config.mode](buffer, modify_buffer, state);
         }
         state->repeating.repeating_count = 0;
         memset(state->num.data, 0, state->num.capacity);
@@ -824,28 +824,28 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case ':':
             state->x = 1;
             wmove(state->status_bar, state->x, 1);
-            mode = COMMAND;
+            state->config.mode = COMMAND;
             break;
         case '/':
             if(state->is_exploring) break;
             reset_command(state->command, &state->command_s);        
             state->x = state->command_s+1;
             wmove(state->status_bar, state->x, 1);
-            mode = SEARCH;
+            state->config.mode = SEARCH;
             break;
         case 'v':
             if(state->is_exploring) break;
             buffer->visual.start = buffer->cursor;
             buffer->visual.end = buffer->cursor;
             buffer->visual.is_line = 0;
-            mode = VISUAL;
+            state->config.mode = VISUAL;
             break;
         case 'V':
             if(state->is_exploring) break;
             buffer->visual.start = buffer->rows.data[buffer_get_row(buffer)].start;
             buffer->visual.end = buffer->rows.data[buffer_get_row(buffer)].end;
             buffer->visual.is_line = 1;
-            mode = VISUAL;
+            state->config.mode = VISUAL;
             break;
         case ctrl('o'): {
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
@@ -938,12 +938,12 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         } break;
         case ctrl('s'): {
             handle_save(buffer);
-            QUIT = 1;
+            state->config.QUIT = 1;
         } break;
         case ESCAPE:
             state->repeating.repeating_count = 0;
             reset_command(state->command, &state->command_s);
-            mode = NORMAL;
+            state->config.mode = NORMAL;
             break;
         case KEY_RESIZE: {
             resize_window(state);
@@ -1038,12 +1038,12 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         } break;
         case ctrl('s'): {
             handle_save(buffer);
-            QUIT = 1;
+            state->config.QUIT = 1;
         } break;
         case ESCAPE: // Switch to NORMAL mode
             //state->cur_undo.end = buffer->cursor;
             if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
-            mode = NORMAL;
+            state->config.mode = NORMAL;
             break;
         case LEFT_ARROW: { // Move cursor left
             state->cur_undo.end = buffer->cursor;
@@ -1073,8 +1073,8 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             resize_window(state);
         } break;
         case KEY_TAB:
-            if(indent > 0) {
-                for(size_t i = 0; (int)i < indent; i++) {
+            if(state->config.indent > 0) {
+                for(size_t i = 0; (int)i < state->config.indent; i++) {
                     buffer_insert_char(state, buffer, ' ');
                 }
             } else {
@@ -1090,8 +1090,8 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             if(brace.brace != '0' && brace.closing) {
                 buffer_insert_char(state, buffer, '\n');
                 if(state->num_of_braces == 0) state->num_of_braces = 1;
-                if(indent > 0) {
-                    for(size_t i = 0; i < indent*(state->num_of_braces-1); i++) {
+                if(state->config.indent > 0) {
+                    for(size_t i = 0; i < state->config.indent*(state->num_of_braces-1); i++) {
                         buffer_insert_char(state, buffer, ' ');
                         buffer->cursor--;
                     }
@@ -1143,11 +1143,11 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         } break;
         case ESCAPE:
             reset_command(state->command, &state->command_s);
-            mode = NORMAL;
+            state->config.mode = NORMAL;
             break;
         case ctrl('s'): {
             handle_save(buffer);
-            QUIT = 1;
+            state->config.QUIT = 1;
         } break;
         case KEY_ENTER:
         case ENTER: {
@@ -1163,11 +1163,11 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 pclose(file);
             } else {
                 size_t command_s = 0;
-                Command_Token *command = lex_command(view_create(state->command, state->command_s), &command_s);
+                Command_Token *command = lex_command(state, view_create(state->command, state->command_s), &command_s);
                 execute_command(buffer, state, command, command_s);
             }
             reset_command(state->command, &state->command_s);
-            mode = NORMAL;
+            state->config.mode = NORMAL;
         } break;
         case LEFT_ARROW:
             if(state->x > 1) state->x--;
@@ -1203,7 +1203,7 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         } break;
         case ESCAPE:
             reset_command(state->command, &state->command_s);
-            mode = NORMAL;
+            state->config.mode = NORMAL;
             break;
         case ENTER: {
             size_t index = search(buffer, state->command, state->command_s);
@@ -1233,11 +1233,11 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 find_and_replace(buffer, state, args[0], args[1]);
             } 
             buffer->cursor = index;
-            mode = NORMAL;
+            state->config.mode = NORMAL;
         } break;
         case ctrl('s'): {
             handle_save(buffer);
-            QUIT = 1;
+            state->config.QUIT = 1;
         } break;
         case LEFT_ARROW:
             if(state->x > 1) state->x--;
@@ -1269,13 +1269,13 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         } break;
         case ESCAPE:
             curs_set(1);
-            mode = NORMAL;
+            state->config.mode = NORMAL;
             break;
         case ENTER: {
         } break;
         case ctrl('s'): {
             handle_save(buffer);
-            QUIT = 1;
+            state->config.QUIT = 1;
         } break;
         case 'd':
         case 'x': {
@@ -1285,21 +1285,21 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             CREATE_UNDO(INSERT_CHARS, start);
             buffer_delete_selection(buffer, state, start, end);
             undo_push(state, &state->undo_stack, state->cur_undo);
-            mode = NORMAL;
+            state->config.mode = NORMAL;
             curs_set(1);
         } break;
         case '>': {
             int cond = (buffer->visual.start > buffer->visual.end);
             size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
             size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
-            size_t position = buffer->cursor + indent;
+            size_t position = buffer->cursor + state->config.indent;
             size_t row = index_get_row(buffer, start);
             size_t end_row = index_get_row(buffer, end);
             for(size_t i = row; i <= end_row; i++) {
                 buffer_calculate_rows(buffer);
                 buffer->cursor = buffer->rows.data[i].start;
-                if(indent > 0) {
-                    for(size_t i = 0; (int)i < indent; i++) {
+                if(state->config.indent > 0) {
+                    for(size_t i = 0; (int)i < state->config.indent; i++) {
                         buffer_insert_char(state, buffer, ' ');
                     }
                 } else {
@@ -1307,7 +1307,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 }
             }
             buffer->cursor = position;
-            mode = NORMAL;
+            state->config.mode = NORMAL;
             curs_set(1);
         } break;
         case '<': {
@@ -1320,8 +1320,8 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             for(size_t i = row; i <= end_row; i++) {
                 buffer_calculate_rows(buffer);                
                 buffer->cursor = buffer->rows.data[i].start;
-                if(indent > 0) {
-                    for(size_t j = 0; (int)j < indent; j++) {
+                if(state->config.indent > 0) {
+                    for(size_t j = 0; (int)j < state->config.indent; j++) {
                         if(isspace(buffer->data.data[buffer->cursor])) {
                             buffer_delete_char(buffer, state);
                             offset++;
@@ -1336,7 +1336,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     }
                 }
             }
-            mode = NORMAL;
+            state->config.mode = NORMAL;
             curs_set(1);
         } break;
         case 'y': {
@@ -1346,7 +1346,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
             buffer_yank_selection(buffer, state, start, end);
             buffer->cursor = start;
-            mode = NORMAL;
+            state->config.mode = NORMAL;
             curs_set(1);
             break;
         }
@@ -1367,6 +1367,28 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     
 State init_state() {
     State state = {0};
+    state.config = (Config){0};
+    state.config.relative_nums = 1;
+    state.config.auto_indent = 1;
+    state.config.syntax = 1;
+    state.config.indent = 4;
+    state.config.undo_size = 16;
+    state.config.lang = " ";
+    // Control variables
+    state.config.QUIT = 0;
+    state.config.mode = NORMAL;
+    // Colors
+    state.config.background_color = -1; // -1 for terminal background color.
+    state.config.leaders[0] = ' ';
+    state.config.leaders[1] = 'r';
+    state.config.leaders[2] = 'd';
+    state.config.leaders[3] = 'y';
+    state.config.key_maps = (Maps){0};
+    state.config.vars[0] = (Config_Vars){{"syntax", sizeof("syntax")-1}, &state.config.syntax};
+    state.config.vars[1] = (Config_Vars){{"indent", sizeof("indent")-1}, &state.config.indent};
+    state.config.vars[2] = (Config_Vars){{"auto-indent", sizeof("auto-indent")-1}, &state.config.auto_indent};
+    state.config.vars[3] = (Config_Vars){{"undo-size", sizeof("undo-size")-1}, &state.config.undo_size};
+    state.config.vars[4] = (Config_Vars){{"relative", sizeof("relative")-1}, &state.config.relative_nums};
     return state;
 }
 
@@ -1402,7 +1424,7 @@ void load_config_from_file(State *state, Buffer *buffer, char *config_filename, 
     if(err == 0) {
         for(size_t i = 0; i < lines_s; i++) {
             size_t cmd_s = 0;
-            Command_Token *cmd = lex_command(view_create(lines[i], strlen(lines[i])), &cmd_s);
+            Command_Token *cmd = lex_command(state, view_create(lines[i], strlen(lines[i])), &cmd_s);
             execute_command(buffer, state, cmd, cmd_s);
             free(lines[i]);
         }
@@ -1413,7 +1435,7 @@ void load_config_from_file(State *state, Buffer *buffer, char *config_filename, 
         Color_Arr color_arr = parse_syntax_file(syntax_filename);
         if(color_arr.arr != NULL) {
             for(size_t i = 0; i < color_arr.arr_s; i++) {
-                init_pair(color_arr.arr[i].custom_slot, color_arr.arr[i].custom_id, background_color);
+                init_pair(color_arr.arr[i].custom_slot, color_arr.arr[i].custom_id, state->config.background_color);
                 init_ncurses_color(color_arr.arr[i].custom_id, color_arr.arr[i].custom_r, 
                                    color_arr.arr[i].custom_g, color_arr.arr[i].custom_b);
             }
@@ -1423,21 +1445,21 @@ void load_config_from_file(State *state, Buffer *buffer, char *config_filename, 
     }
 }
 
-void init_colors() {
+void init_colors(State *state) {
     if(has_colors() == FALSE) {
         CRASH("your terminal does not support colors");
     }
 
     start_color();
-    if (background_color == -1){
+    if (state->config.background_color == -1){
         use_default_colors();
     }
-    init_pair(YELLOW_COLOR, COLOR_YELLOW, background_color);
-    init_pair(BLUE_COLOR, COLOR_BLUE, background_color);
-    init_pair(GREEN_COLOR, COLOR_GREEN, background_color);
-    init_pair(RED_COLOR, COLOR_RED, background_color);
-    init_pair(MAGENTA_COLOR, COLOR_MAGENTA, background_color);
-    init_pair(CYAN_COLOR, COLOR_CYAN, background_color);
+    init_pair(YELLOW_COLOR, COLOR_YELLOW, state->config.background_color);
+    init_pair(BLUE_COLOR, COLOR_BLUE, state->config.background_color);
+    init_pair(GREEN_COLOR, COLOR_GREEN, state->config.background_color);
+    init_pair(RED_COLOR, COLOR_RED, state->config.background_color);
+    init_pair(MAGENTA_COLOR, COLOR_MAGENTA, state->config.background_color);
+    init_pair(CYAN_COLOR, COLOR_CYAN, state->config.background_color);
 }
 
 char *get_help_page(char *page) {
@@ -1472,6 +1494,7 @@ int main(int argc, char **argv) {
     char *syntax_filename = NULL;
     char *filename = NULL;
     char *help_filename = NULL;
+    char *lang;
     while(flag != NULL) {
         bool isC = 0;
         if (!(filename == NULL)) {
@@ -1534,13 +1557,14 @@ int main(int argc, char **argv) {
     state.command = calloc(64, sizeof(char));
     state.key_func = key_func;
     state.files = calloc(32, sizeof(File));
+    state.config.lang = lang;
     scan_files(state.files, ".");
 
     initscr();
     noecho();
     raw();
 
-    init_colors();
+    init_colors(&state);
 
     getmaxyx(stdscr, state.grow, state.gcol);
     int line_num_width = 5;
@@ -1574,7 +1598,7 @@ int main(int argc, char **argv) {
     size_t row_render_start = 0;
     size_t col_render_start = 0;
 
-    while(state.ch != ctrl('q') && QUIT != 1) {
+    while(state.ch != ctrl('q') && state.config.QUIT != 1) {
         werase(main_win);
         werase(status_bar);
         werase(line_num_win);
@@ -1606,11 +1630,11 @@ int main(int argc, char **argv) {
         }
             
         mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
-        mvwprintw(status_bar, 0, state.main_col-11, "%c", leaders[state.leader]);
-        mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[mode]);
+        mvwprintw(status_bar, 0, state.main_col-11, "%c", state.config.leaders[state.leader]);
+        mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[state.config.mode]);
         mvwprintw(state.status_bar, 0, state.main_col-5, "%.*s", (int)state.num.count, state.num.data);
         
-        if(mode == COMMAND || mode == SEARCH) mvwprintw(state.status_bar, 1, 0, ":%.*s", (int)state.command_s, state.command);
+        if(state.config.mode == COMMAND || state.config.mode == SEARCH) mvwprintw(state.status_bar, 1, 0, ":%.*s", (int)state.command_s, state.command);
 
         if(state.is_exploring) {
             wattron(state.main_win, COLOR_PAIR(BLUE_COLOR));
@@ -1627,7 +1651,7 @@ int main(int argc, char **argv) {
                 size_t print_index_y = i - row_render_start;
 
                 wattron(state.line_num_win, COLOR_PAIR(YELLOW_COLOR));
-                if(relative_nums) {
+                if(state.config.relative_nums) {
                     if(cur_row == i) {
                         mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
                     } else {
@@ -1643,7 +1667,7 @@ int main(int argc, char **argv) {
                 Token *token_arr = calloc(token_capacity, sizeof(Token));
                 size_t token_s = 0;
 
-                if(syntax) {
+                if(state.config.syntax) {
                     token_s = generate_tokens(state.buffer->data.data+state.buffer->rows.data[i].start, 
                                             state.buffer->rows.data[i].end-state.buffer->rows.data[i].start, 
                                             token_arr, &token_capacity);
@@ -1662,7 +1686,7 @@ int main(int argc, char **argv) {
                     }
 
                     size_t keyword_size = 0;
-                    if(syntax && is_in_tokens_index(token_arr, token_s, col, &keyword_size, &color)) {
+                    if(state.config.syntax && is_in_tokens_index(token_arr, token_s, col, &keyword_size, &color)) {
                         wattron(state.main_win, COLOR_PAIR(color));
                         off_at = col+keyword_size;
                     }
@@ -1672,7 +1696,7 @@ int main(int argc, char **argv) {
                     int between = (state.buffer->visual.start > state.buffer->visual.end) 
                         ? is_between(state.buffer->visual.end, state.buffer->visual.start, state.buffer->rows.data[i].start+col) 
                         : is_between(state.buffer->visual.start, state.buffer->visual.end, state.buffer->rows.data[i].start+col);
-                    if(mode == VISUAL && between) wattron(state.main_win, A_STANDOUT);
+                    if(state.config.mode == VISUAL && between) wattron(state.main_win, A_STANDOUT);
                     else wattroff(state.main_win, A_STANDOUT);
                     mvwprintw(state.main_win, print_index_y, print_index_x, "%c", state.buffer->data.data[state.buffer->rows.data[i].start+col]);       
                 }
@@ -1686,7 +1710,7 @@ int main(int argc, char **argv) {
         wrefresh(state.line_num_win);
         wrefresh(state.status_bar);
 
-        if(mode == COMMAND || mode == SEARCH) {
+        if(state.config.mode == COMMAND || state.config.mode == SEARCH) {
             wmove(state.status_bar, 1, state.x);
             wrefresh(state.status_bar);
         } else {
@@ -1694,7 +1718,7 @@ int main(int argc, char **argv) {
         }
 
         state.ch = wgetch(main_win);
-        state.key_func[mode](state.buffer, &state.buffer, &state);
+        state.key_func[state.config.mode](state.buffer, &state.buffer, &state);
     }
     endwin();
 

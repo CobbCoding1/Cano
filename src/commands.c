@@ -1,111 +1,42 @@
+#include "commands.h"
+
 #include <stdio.h>
 #include <stdlib.h>
-
-#define VIEW_IMPLEMENTATION
-#include "config.h"
-
-typedef enum {
-    TT_SET_VAR,
-    TT_SET_OUTPUT,
-    TT_SET_MAP,
-    TT_LET,
-    TT_PLUS,
-    TT_MINUS,
-    TT_MULT,
-    TT_DIV,
-    TT_ECHO,
-    TT_SAVE,
-    TT_EXIT,
-    TT_SAVE_EXIT,
-    TT_IDENT,
-    TT_SPECIAL_CHAR,
-    TT_STRING,
-    TT_CONFIG_IDENT,
-    TT_INT_LIT,
-    TT_FLOAT_LIT,
-    TT_COUNT,
-} Command_Type;
     
-char *tt_string[TT_COUNT] = {"set_var", "set_output", "set_map", "let", "plus", "minus", 
+static char *tt_string[TT_COUNT] = {"set_var", "set_output", "set_map", "let", "plus", "minus", 
     "mult", "div", "echo", "w", "e", "we", "ident", "special key", "string", "config var", "int", "float"};
 
-typedef struct {
-    Command_Type type;
-    String_View value;
-    size_t location;
-} Command_Token;
-
-typedef struct {
-    String_View label;
-    int *val;
-} Config_Vars;
-
-typedef struct {
-    String_View name;
-    int value;
-} Identifier;
-
-typedef struct {
-    String_View value;
-} Str_Literal;
-
-typedef struct {
-    int value;
-} Expr;
+static Ctrl_Key ctrl_keys[] = {
+    {"<ctrl-a>", ctrl('a')},
+    {"<ctrl-b>", ctrl('b')},    
+    {"<ctrl-c>", ctrl('c')},    
+    {"<ctrl-d>", ctrl('d')},
+    {"<ctrl-e>", ctrl('e')},    
+    {"<ctrl-f>", ctrl('f')},    
+    {"<ctrl-g>", ctrl('g')},
+    {"<ctrl-h>", ctrl('h')},    
+    {"<ctrl-i>", ctrl('i')},    
+    {"<ctrl-j>", ctrl('j')},
+    {"<ctrl-k>", ctrl('k')},    
+    {"<ctrl-l>", ctrl('l')},    
+    {"<ctrl-m>", ctrl('m')},
+    {"<ctrl-n>", ctrl('n')},    
+    {"<ctrl-o>", ctrl('o')},    
+    {"<ctrl-p>", ctrl('p')},
+    {"<ctrl-q>", ctrl('q')},    
+    {"<ctrl-r>", ctrl('r')},    
+    {"<ctrl-s>", ctrl('s')},
+    {"<ctrl-t>", ctrl('t')},    
+    {"<ctrl-u>", ctrl('u')},    
+    {"<ctrl-v>", ctrl('v')},
+    {"<ctrl-w>", ctrl('w')},    
+    {"<ctrl-x>", ctrl('x')},    
+    {"<ctrl-y>", ctrl('y')},
+    {"<ctrl-z>", ctrl('z')},    
+};
+#define NUM_OF_CTRL_KEYS sizeof(ctrl_keys)/sizeof(*ctrl_keys)
     
-typedef enum {
-    OP_NONE = 0,
-    OP_PLUS,
-    OP_MINUS,
-    OP_MULT,
-    OP_DIV,
-} Operator;
-
-typedef struct Bin_Expr {
-    Expr lvalue;
-    struct Bin_Expr *right;
-    Expr rvalue;
-    Operator operator;
-} Bin_Expr;
-    
-typedef union {
-    Expr as_expr;
-    Bin_Expr as_bin;   
-    Command_Type as_keyword;
-    Str_Literal as_str;
-    Identifier as_ident;
-    Config_Vars *as_config;
-    int as_int;
-} Node_Val;
-
-typedef enum {
-    NODE_EXPR,
-    NODE_BIN,
-    NODE_KEYWORD,
-    NODE_STR,
-    NODE_IDENT,
-    NODE_CONFIG,
-    NODE_INT,
-} Node_Type;
- 
-typedef struct Node {
-    Node_Val value;
-    Node_Type type;
-    struct Node *left;
-    struct Node *right;
-} Node;
-
-
-#define CONFIG_VARS 5
-Config_Vars vars[CONFIG_VARS] = {
-    {{"syntax", sizeof("syntax")-1}, &syntax},
-    {{"indent", sizeof("indent")-1}, &indent},
-    {{"auto-indent", sizeof("auto-indent")-1}, &auto_indent},
-    {{"undo-size", sizeof("undo-size")-1}, &undo_size},
-    {{"relative", sizeof("relative")-1}, &relative_nums},
-};    
-    
-String_View view_chop_left(String_View view, size_t amount) {
+static String_View view_chop_left(String_View view, size_t amount) {
     if(view.len < amount) {
         view.data += view.len;
         view.len = 0;
@@ -117,7 +48,7 @@ String_View view_chop_left(String_View view, size_t amount) {
     return view;
 }
     
-String_View view_chop_right(String_View view) {
+static String_View view_chop_right(String_View view) {
     if(view.len > 0) {
         view.len -= 1;
     }
@@ -125,13 +56,13 @@ String_View view_chop_right(String_View view) {
 }
 
     
-String_View view_string_internals(String_View view) {
+static String_View view_string_internals(String_View view) {
     view = view_chop_left(view, 1);
     view = view_chop_right(view);
     return view;
 }
-    
-Command_Type get_token_type(String_View view) {
+
+Command_Type get_token_type(State *state, String_View view) {
     if(isdigit(*view.data)) {
         for(size_t i = 0; i < view.len; i++) {
             if(view.data[i] == ' ') {
@@ -172,7 +103,7 @@ Command_Type get_token_type(String_View view) {
         return TT_SET_MAP;
     } else { // TODO: Add help command
         for(size_t i = 0; i < CONFIG_VARS; i++) {
-            if(view_cmp(view, vars[i].label)) {
+            if(view_cmp(view, state->config.vars[i].label)) {
                  return TT_CONFIG_IDENT;       
             }   
         }
@@ -180,7 +111,7 @@ Command_Type get_token_type(String_View view) {
     }
 }
 
-Command_Token create_token(String_View command) {
+Command_Token create_token(State *state, String_View command) {
     String_View starting = command;
     while(command.len > 0 && *command.data != ' ') {
         if(*command.data == '"') {
@@ -202,11 +133,11 @@ Command_Token create_token(String_View command) {
         .len = starting.len-command.len
     };    
     Command_Token token = {.value = result};
-    token.type = get_token_type(result);
+    token.type = get_token_type(state, result);
     return token;
 }
     
-Command_Token *lex_command(String_View command, size_t *token_s) {
+Command_Token *lex_command(State *state, String_View command, size_t *token_s) {
     size_t count = 0;
     for(size_t i = 0; i < command.len; i++) {
         if(command.data[i] == '"') {
@@ -226,7 +157,7 @@ Command_Token *lex_command(String_View command, size_t *token_s) {
     while(command.len > 0) {
         assert(result_s <= *token_s);
         size_t loc = command.data - starting.data;
-        Command_Token token = create_token(command);   
+        Command_Token token = create_token(state, command);   
         token.location = loc;
         command = view_chop_left(command, token.value.len+1);
         view_chop_left(command, 1);
@@ -271,41 +202,6 @@ Operator get_operator(Command_Token token) {
     }
 }
 
-typedef struct {
-    char *name;
-    int value;
-} Ctrl_Key;
-
-Ctrl_Key ctrl_keys[] = {
-    {"<ctrl-a>", ctrl('a')},
-    {"<ctrl-b>", ctrl('b')},    
-    {"<ctrl-c>", ctrl('c')},    
-    {"<ctrl-d>", ctrl('d')},
-    {"<ctrl-e>", ctrl('e')},    
-    {"<ctrl-f>", ctrl('f')},    
-    {"<ctrl-g>", ctrl('g')},
-    {"<ctrl-h>", ctrl('h')},    
-    {"<ctrl-i>", ctrl('i')},    
-    {"<ctrl-j>", ctrl('j')},
-    {"<ctrl-k>", ctrl('k')},    
-    {"<ctrl-l>", ctrl('l')},    
-    {"<ctrl-m>", ctrl('m')},
-    {"<ctrl-n>", ctrl('n')},    
-    {"<ctrl-o>", ctrl('o')},    
-    {"<ctrl-p>", ctrl('p')},
-    {"<ctrl-q>", ctrl('q')},    
-    {"<ctrl-r>", ctrl('r')},    
-    {"<ctrl-s>", ctrl('s')},
-    {"<ctrl-t>", ctrl('t')},    
-    {"<ctrl-u>", ctrl('u')},    
-    {"<ctrl-v>", ctrl('v')},
-    {"<ctrl-w>", ctrl('w')},    
-    {"<ctrl-x>", ctrl('x')},    
-    {"<ctrl-y>", ctrl('y')},
-    {"<ctrl-z>", ctrl('z')},    
-};
-#define NUM_OF_CTRL_KEYS sizeof(ctrl_keys)/sizeof(*ctrl_keys)
-    
 int get_special_char(String_View view) {
     if(view_cmp(view, LITERAL_CREATE("<space>"))) {
         return SPACE;
@@ -360,8 +256,8 @@ Node *parse_command(State *state, Command_Token *command, size_t command_s) {
             if(!expect_token(state, command[1], TT_CONFIG_IDENT) || !expect_token(state, command[2], TT_INT_LIT)) return NULL;
         
             for(size_t i = 0; i < CONFIG_VARS; i++) {
-                if(view_cmp(command[1].value, vars[i].label)) {
-                    val.as_config = &vars[i];
+                if(view_cmp(command[1].value, state->config.vars[i].label)) {
+                    val.as_config = &state->config.vars[i];
                 }
             }            
 
@@ -555,7 +451,7 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
                         } else {
                             map.a = root->left->value.as_int;
                         }
-                        DA_APPEND(&key_maps, map);
+                        DA_APPEND(&state->config.key_maps, map);
                 } break;
                 case TT_LET: {
                     Variable var = {0};
@@ -590,11 +486,11 @@ void interpret_command(Buffer *buffer, State *state, Node *root) {
                     handle_save(buffer);
                     break;
                 case TT_EXIT:
-                    QUIT = 1;
+                    state->config.QUIT = 1;
                     break;
                 case TT_SAVE_EXIT:
                     handle_save(buffer);
-                    QUIT = 1;
+                    state->config.QUIT = 1;
                     break;
                 default:
                     return;

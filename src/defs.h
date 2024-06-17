@@ -1,7 +1,7 @@
 #ifndef DEFS_H
+#define DEFS_H
 
-#include <curses.h>
-
+#include <ncurses.h>
 #include "view.h"
 
 #define DATA_START_CAPACITY 1024
@@ -89,8 +89,6 @@ typedef enum {
     UNKNOWN_COMMAND,
     INVALID_IDENT,
 } Command_Error;
-
-char leaders[LEADER_COUNT] = {' ', 'r', 'd', 'y'};
 
 typedef struct {
     const char* path_to_file;
@@ -194,8 +192,6 @@ typedef struct {
     size_t count;
     size_t capacity;
 } Maps;
-    
-Maps key_maps = {0};
 
 typedef union {
     int as_int;    
@@ -233,6 +229,35 @@ typedef struct {
     size_t count;
     size_t capacity;
 } Files;
+
+typedef struct {
+    String_View label;
+    int *val;
+} Config_Vars;
+
+#define CONFIG_VARS 5
+
+typedef struct _Config_ {
+    // Config variables
+    int relative_nums;
+    int auto_indent;
+    int syntax;
+    int indent;
+    int undo_size;
+    char *lang;
+
+    // Control variables
+    int QUIT;
+    Mode mode;
+
+    // Colors
+    int background_color; // -1 for terminal background color.
+
+    char leaders[LEADER_COUNT];
+    Maps key_maps;
+
+    Config_Vars vars[CONFIG_VARS];
+} Config;
 
 typedef struct State {
     Undo_Stack undo_stack;
@@ -281,6 +306,8 @@ typedef struct State {
     WINDOW *line_num_win;
     WINDOW *main_win;
     WINDOW *status_bar;
+
+    Config config;
 } State;
 
 typedef struct {

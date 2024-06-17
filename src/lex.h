@@ -1,10 +1,11 @@
 #ifndef LEX_H
+#define LEX_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ncurses.h>
 
-#define VIEW_IMPLEMENTATION
 #include "view.h"
 #include "colors.h"
 
@@ -23,56 +24,6 @@ typedef struct {
     size_t index;
     size_t size;
 } Token;
-
-char *types_old[] = {
-    "char",
-    "double",
-    "float",
-    "int",
-    "long",
-    "short",
-    "void",
-    "size_t",
-};
-
-char *keywords_old[] = {
-    "auto",
-    "break",
-    "case",
-    "const",
-    "continue",
-    "default",
-    "do",
-    "else",
-    "enum",
-    "extern",
-    "for",
-    "goto",
-    "if",
-    "register",
-    "return",
-    "signed",
-    "sizeof",
-    "static",
-    "struct",
-    "switch",
-    "typedef",
-    "union",
-    "unsigned",
-    "volatile",
-    "while",
-};
-
-char **keywords;
-size_t keywords_s = 0;
-
-char **types;
-size_t types_s = 0;
-
-char *comments = "//";
-
-#define NUM_KEYWORDS sizeof(keywords_old)/sizeof(*keywords_old)
-#define NUM_TYPES sizeof(types_old)/sizeof(*types_old)
 
 int is_keyword(char *word, size_t word_s);
 int is_type(char *word, size_t word_s);

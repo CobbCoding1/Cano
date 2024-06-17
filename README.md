@@ -12,23 +12,34 @@ Cano has the following dependencies:
 - [GCC](https://gcc.gnu.org/)
 - [Make](https://www.gnu.org/software/make/)
 - [ncurses](https://opensource.apple.com/source/old_ncurses/old_ncurses-1/ncurses/test/ncurses.c.auto.html)
-
+- [Autotools](https://en.wikipedia.org/wiki/GNU_Autotools)
 
 1. Navigate to the Cano directory
 ```sh
 cd path/to/cano
 ```
 
-2. Run the make command
+2. Make the generator script executable
 ```sh
-make -B
+chmod +x autogen.sh
 ```
 
-3. Launch Cano with the file you want to edit
+3. Run the generator script
 ```sh
-./build/cano <filename>
+./autogen.sh
 ```
 
+The build files will be stored at `path/to/cano/build`.
+
+4. Compile cano
+```sh
+make -C build
+```
+
+5. Run cano
+```sh
+./build/cano
+```
 
 ## Modes
 Normal - For motions and deletion \
@@ -171,24 +182,18 @@ yay -S cano-git
 
 ## Nix / NixOS
 
-If you are using NixOS or have installed the [nix package manager](https://nixos.org),
-you can run cano using the following command:
-
-```sh
-nix run github:CobbCoding1/Cano
-```
-
-A flake has been provided within the repository, including the package and a devShell.
+Cano's build system recently changed, Nix installation is not supported for now.
 
 ## Debian/Ubuntu
 
-You may build from source and install cano directly to `/usr/local/bin`. You must have a basic C compiler installed, as well as the ncurses library (install shown below).
+You may build from source and install cano directly to `/usr/local/bin`. You must have a basic C compiler, autotools and the ncurses library installed (install shown below).
 
 ```sh
-sudo apt install libncurses-dev
+sudo apt install libncurses-dev autotools-dev
 git clone https://github.com/CobbCoding1/Cano && cd Cano
-make
-sudo ./debian-install.sh
+chmod +x autogen.sh && ./autogen.sh
+make -C build
+sudo make -C build install
 ```
 
 ## Canoon (Beta)
