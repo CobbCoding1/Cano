@@ -1267,12 +1267,12 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case 127:
         case KEY_BACKSPACE: {
         } break;
-        case ESCAPE:
-            curs_set(1);
+        case ESCAPE: {
             state->config.mode = NORMAL;
-            break;
-        case ENTER: {
+            curs_set(1);        
+            state->buffer->visual = (Visual){0};        
         } break;
+        case ENTER: break;
         case ctrl('s'): {
             handle_save(buffer);
             state->config.QUIT = 1;
@@ -1720,6 +1720,7 @@ int main(int argc, char **argv) {
         state.ch = wgetch(main_win);
         state.key_func[state.config.mode](state.buffer, &state.buffer, &state);
     }
+    
     endwin();
 
     free_buffer(state.buffer);
