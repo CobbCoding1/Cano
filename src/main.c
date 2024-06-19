@@ -1483,23 +1483,128 @@ char *get_help_page(char *page) {
 
     return help_page;
 }
-
+    
+void state_render(State *state) {
+    size_t row_render_start = 0;
+    size_t col_render_start = 0;
+    werase(state->main_win);
+    werase(state->status_bar);
+    werase(state->line_num_win);
+    size_t cur_row = buffer_get_row(state->buffer);
+    if(state->is_exploring) cur_row = state->explore_cursor;
+    Row cur = state->buffer->rows.data[cur_row]; 
+    size_t col = state->buffer->cursor - cur.start;
+    if(state->is_exploring) col = 0;
+    if(cur_row <= row_render_start) row_render_start = cur_row;
+    if(cur_row >= row_render_start+state->main_row) row_render_start = cur_row-state->main_row+1;
+     if(col <= col_render_start) col_render_start = col;
+    if(col >= col_render_start+state->main_col) col_render_start = col-state->main_col+1;
+     state->num_of_braces = num_of_open_braces(state->buffer);
+    
+    if(state->is_print_msg) {
+        mvwprintw(state->status_bar, 1, 0, "%s", state->status_bar_msg);    
+        wrefresh(state->status_bar);
+        sleep(1);
+        wclear(state->status_bar);
+        state->is_print_msg = 0;
+    }
+     if (is_term_resized(state->line_num_row, state->line_num_col)) {
+        getmaxyx(stdscr, state->grow, state->gcol);
+        getmaxyx(state->line_num_win, state->line_num_row, state->line_num_col);			
+        mvwin(state->status_bar, state->grow-2, 0);
+    }
+        
+    mvwprintw(state->status_bar, 0, state->gcol/2, "%zu:%zu", cur_row+1, col+1);
+    mvwprintw(state->status_bar, 0, state->main_col-11, "%c", state->config.leaders[state->leader]);
+    mvwprintw(state->status_bar, 0, 0, "%.7s", string_modes[state->config.mode]);
+    mvwprintw(state->status_bar, 0, state->main_col-5, "%.*s", (int)state->num.count, state->num.data);
+    
+    if(state->config.mode == COMMAND || state->config.mode == SEARCH) mvwprintw(state->status_bar, 1, 0, ":%.*s", (int)state->command_s, state->command);
+     if(state->is_exploring) {
+        wattron(state->main_win, COLOR_PAIR(BLUE_COLOR));
+        for(size_t i = row_render_start; i <= row_render_start+state->main_row; i++) {
+            if(i >= state->files->count) break;
+             // TODO: All directories should be displayed first, afterwards files
+            size_t print_index_y = i - row_render_start;
+            mvwprintw(state->main_win, print_index_y, 0, "%s", state->files->data[i].name);
+        }
+    } else {
+        for(size_t i = row_render_start; i <= row_render_start+state->main_row; i++) {
+            if(i >= state->buffer->rows.count) break;
+            size_t print_index_y = i - row_render_start;
+             wattron(state->line_num_win, COLOR_PAIR(YELLOW_COLOR));
+            if(state->config.relative_nums) {
+                if(cur_row == i) {
+                    mvwprintw(state->line_num_win, print_index_y, 0, "%zu", i+1);
+                } else {
+                    mvwprintw(state->line_num_win, print_index_y, 0, "%zu", (size_t)abs((int)i-(int)cur_row));
+                }
+            } else {
+                mvwprintw(state->line_num_win, print_index_y, 0, "%zu", i+1);
+            }
+            wattroff(state->line_num_win, COLOR_PAIR(YELLOW_COLOR));
+             size_t off_at = 0;
+            size_t token_capacity = 32;
+            Token *token_arr = calloc(token_capacity, sizeof(Token));
+            size_t token_s = 0;
+             if(state->config.syntax) {
+                token_s = generate_tokens(state->buffer->data.data+state->buffer->rows.data[i].start, 
+                                        state->buffer->rows.data[i].end-state->buffer->rows.data[i].start, 
+                                        token_arr, &token_capacity);
+            }
+             Color_Pairs color = 0;
+              for(size_t j = state->buffer->rows.data[i].start; j < state->buffer->rows.data[i].end; j++) {
+                if(j < state->buffer->rows.data[i].start+col_render_start || j > state->buffer->rows.data[i].end+col+state->main_col) continue;
+                size_t col = j-state->buffer->rows.data[i].start;
+                size_t print_index_x = col-col_render_start;
+                
+                for(size_t chr = state->buffer->rows.data[i].start; chr < j; chr++) {
+                    if(state->buffer->data.data[chr] == '\t') print_index_x += 3;
+                }
+                 size_t keyword_size = 0;
+                if(state->config.syntax && is_in_tokens_index(token_arr, token_s, col, &keyword_size, &color)) {
+                    wattron(state->main_win, COLOR_PAIR(color));
+                    off_at = col+keyword_size;
+                }
+                if(col == off_at) wattroff(state->main_win, COLOR_PAIR(color));
+                 if(col > state->buffer->rows.data[i].end) break;
+                int between = (state->buffer->visual.start > state->buffer->visual.end) 
+                    ? is_between(state->buffer->visual.end, state->buffer->visual.start, state->buffer->rows.data[i].start+col) 
+                    : is_between(state->buffer->visual.start, state->buffer->visual.end, state->buffer->rows.data[i].start+col);
+                if(state->config.mode == VISUAL && between) wattron(state->main_win, A_STANDOUT);
+                else wattroff(state->main_win, A_STANDOUT);
+                mvwprintw(state->main_win, print_index_y, print_index_x, "%c", state->buffer->data.data[state->buffer->rows.data[i].start+col]);       
+            }
+            free(token_arr);
+        }
+    }
+        
+    col += count_num_tabs(state->buffer, buffer_get_row(state->buffer))*3;                     
+        
+    wrefresh(state->main_win);
+    wrefresh(state->line_num_win);
+    wrefresh(state->status_bar);
+     if(state->config.mode == COMMAND || state->config.mode == SEARCH) {
+        wmove(state->status_bar, 1, state->x);
+        wrefresh(state->status_bar);
+    } else {
+        wmove(state->main_win, cur_row-row_render_start, col-col_render_start);
+    }
+}
+    
 /* ------------------------- FUNCTIONS END ------------------------- */
-
-
 int main(int argc, char **argv) {
-    WRITE_LOG("starting (int main)");
-    setlocale(LC_ALL, "");
-
-    (void)argc;
-    char *program = *argv++;
-    char *flag = *argv++;
-    char *config_filename = NULL;
-    char *syntax_filename = NULL;
-    char *filename = NULL;
-    char *help_filename = NULL;
-    char *lang;
-    while(flag != NULL) {
+WRITE_LOG("starting (int main)");
+setlocale(LC_ALL, "");
+ (void)argc;
+char *program = *argv++;
+char *flag = *argv++;
+char *config_filename = NULL;
+char *syntax_filename = NULL;
+char *filename = NULL;
+char *help_filename = NULL;
+char *lang;
+while(flag != NULL) {
         bool isC = 0;
         if (!(filename == NULL)) {
             isC = contains_c_extension(filename);
@@ -1601,128 +1706,8 @@ int main(int argc, char **argv) {
     state.status_bar_msg = status_bar_msg;
     buffer_calculate_rows(state.buffer);
 
-    size_t row_render_start = 0;
-    size_t col_render_start = 0;
-
     while(state.ch != ctrl('q') && state.config.QUIT != 1) {
-        werase(main_win);
-        werase(status_bar);
-        werase(line_num_win);
-        size_t cur_row = buffer_get_row(state.buffer);
-        if(state.is_exploring) cur_row = state.explore_cursor;
-        Row cur = state.buffer->rows.data[cur_row]; 
-        size_t col = state.buffer->cursor - cur.start;
-        if(state.is_exploring) col = 0;
-        if(cur_row <= row_render_start) row_render_start = cur_row;
-        if(cur_row >= row_render_start+state.main_row) row_render_start = cur_row-state.main_row+1;
-
-        if(col <= col_render_start) col_render_start = col;
-        if(col >= col_render_start+state.main_col) col_render_start = col-state.main_col+1;
-
-        state.num_of_braces = num_of_open_braces(state.buffer);
-        
-        if(state.is_print_msg) {
-            mvwprintw(state.status_bar, 1, 0, "%s", state.status_bar_msg);    
-            wrefresh(state.status_bar);
-            sleep(1);
-            wclear(state.status_bar);
-            state.is_print_msg = 0;
-        }
-
-        if (is_term_resized(state.line_num_row, state.line_num_col)) {
-            getmaxyx(stdscr, state.grow, state.gcol);
-            getmaxyx(state.line_num_win, state.line_num_row, state.line_num_col);			
-            mvwin(state.status_bar, state.grow-2, 0);
-        }
-            
-        mvwprintw(status_bar, 0, state.gcol/2, "%zu:%zu", cur_row+1, col+1);
-        mvwprintw(status_bar, 0, state.main_col-11, "%c", state.config.leaders[state.leader]);
-        mvwprintw(state.status_bar, 0, 0, "%.7s", string_modes[state.config.mode]);
-        mvwprintw(state.status_bar, 0, state.main_col-5, "%.*s", (int)state.num.count, state.num.data);
-        
-        if(state.config.mode == COMMAND || state.config.mode == SEARCH) mvwprintw(state.status_bar, 1, 0, ":%.*s", (int)state.command_s, state.command);
-
-        if(state.is_exploring) {
-            wattron(state.main_win, COLOR_PAIR(BLUE_COLOR));
-            for(size_t i = row_render_start; i <= row_render_start+state.main_row; i++) {
-                if(i >= state.files->count) break;
-
-                // TODO: All directories should be displayed first, afterwards files
-                size_t print_index_y = i - row_render_start;
-                mvwprintw(state.main_win, print_index_y, 0, "%s", state.files->data[i].name);
-            }
-        } else {
-            for(size_t i = row_render_start; i <= row_render_start+state.main_row; i++) {
-                if(i >= state.buffer->rows.count) break;
-                size_t print_index_y = i - row_render_start;
-
-                wattron(state.line_num_win, COLOR_PAIR(YELLOW_COLOR));
-                if(state.config.relative_nums) {
-                    if(cur_row == i) {
-                        mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
-                    } else {
-                        mvwprintw(state.line_num_win, print_index_y, 0, "%zu", (size_t)abs((int)i-(int)cur_row));
-                    }
-                } else {
-                    mvwprintw(state.line_num_win, print_index_y, 0, "%zu", i+1);
-                }
-                wattroff(state.line_num_win, COLOR_PAIR(YELLOW_COLOR));
-
-                size_t off_at = 0;
-                size_t token_capacity = 32;
-                Token *token_arr = calloc(token_capacity, sizeof(Token));
-                size_t token_s = 0;
-
-                if(state.config.syntax) {
-                    token_s = generate_tokens(state.buffer->data.data+state.buffer->rows.data[i].start, 
-                                            state.buffer->rows.data[i].end-state.buffer->rows.data[i].start, 
-                                            token_arr, &token_capacity);
-                }
-
-                Color_Pairs color = 0;
-
-
-                for(size_t j = state.buffer->rows.data[i].start; j < state.buffer->rows.data[i].end; j++) {
-                    if(j < state.buffer->rows.data[i].start+col_render_start || j > state.buffer->rows.data[i].end+col+state.main_col) continue;
-                    size_t col = j-state.buffer->rows.data[i].start;
-                    size_t print_index_x = col-col_render_start;
-                    
-                    for(size_t chr = state.buffer->rows.data[i].start; chr < j; chr++) {
-                        if(state.buffer->data.data[chr] == '\t') print_index_x += 3;
-                    }
-
-                    size_t keyword_size = 0;
-                    if(state.config.syntax && is_in_tokens_index(token_arr, token_s, col, &keyword_size, &color)) {
-                        wattron(state.main_win, COLOR_PAIR(color));
-                        off_at = col+keyword_size;
-                    }
-                    if(col == off_at) wattroff(state.main_win, COLOR_PAIR(color));
-
-                    if(col > state.buffer->rows.data[i].end) break;
-                    int between = (state.buffer->visual.start > state.buffer->visual.end) 
-                        ? is_between(state.buffer->visual.end, state.buffer->visual.start, state.buffer->rows.data[i].start+col) 
-                        : is_between(state.buffer->visual.start, state.buffer->visual.end, state.buffer->rows.data[i].start+col);
-                    if(state.config.mode == VISUAL && between) wattron(state.main_win, A_STANDOUT);
-                    else wattroff(state.main_win, A_STANDOUT);
-                    mvwprintw(state.main_win, print_index_y, print_index_x, "%c", state.buffer->data.data[state.buffer->rows.data[i].start+col]);       
-                }
-                free(token_arr);
-            }
-        }
-            
-        col += count_num_tabs(state.buffer, buffer_get_row(state.buffer))*3;                     
-            
-        wrefresh(state.main_win);
-        wrefresh(state.line_num_win);
-        wrefresh(state.status_bar);
-
-        if(state.config.mode == COMMAND || state.config.mode == SEARCH) {
-            wmove(state.status_bar, 1, state.x);
-            wrefresh(state.status_bar);
-        } else {
-            wmove(state.main_win, cur_row-row_render_start, col-col_render_start);
-        }
-
+        state_render(&state);
         state.ch = wgetch(main_win);
         state.key_func[state.config.mode](state.buffer, &state.buffer, &state);
     }
