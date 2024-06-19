@@ -1,6 +1,7 @@
 #include "main.h"
 
 #include <locale.h>
+#include <getopt.h>
 
 int is_between(size_t a, size_t b, size_t c) {
     if(a <= c && c <= b) return 1;
@@ -1591,71 +1592,59 @@ void state_render(State *state) {
         wmove(state->main_win, cur_row-row_render_start, col-col_render_start);
     }
 }
-    
+
 /* ------------------------- FUNCTIONS END ------------------------- */
 int main(int argc, char **argv) {
-WRITE_LOG("starting (int main)");
-setlocale(LC_ALL, "");
- (void)argc;
-char *program = *argv++;
-char *flag = *argv++;
-char *config_filename = NULL;
-char *syntax_filename = NULL;
-char *filename = NULL;
-char *help_filename = NULL;
-char *lang;
-while(flag != NULL) {
-        bool isC = 0;
-        if (!(filename == NULL)) {
-            isC = contains_c_extension(filename);
-            if(isC) {
-                WRITE_LOG("C file detected");
-                lang = "C";
-            }
-        }
-
-        if (strcmp(lang, "C") == 0) {
-            pthread_t thread1;
-            int process;
-
-            ThreadArgs args = {
-                .path_to_file = filename,
-                .lang = "C"
-            };
-
-            process = pthread_create(&thread1, NULL, check_for_errors, &args);
-            if(process) {
-                WRITE_LOG("Error - pthread_create() return code: %d", process);
+    WRITE_LOG("starting (int main)");
+    setlocale(LC_ALL, "");
+    //char *flag = *argv++;
+    char *program = argv[0];
+    char *flag = NULL;
+    char *config_filename = NULL;
+    char *syntax_filename = NULL;
+    char *filename = NULL;
+    char *help_filename = NULL;
+    char opt;
+    
+    static struct option longopts[] = {
+        {"help", no_argument, NULL, 'h'},
+        {"config", optional_argument, NULL, 'c'},
+    };
+        
+    opt = getopt_long(argc, argv, "", longopts, NULL);
+    
+    while(true) {
+        WRITE_LOG("opt = %d\n", opt);
+        if(opt == -1) break;
+        switch(opt) {
+            case 'c':
+                flag = optarg;
+                if(flag == NULL) {
+                    fprintf(stderr, "usage: %s --config <config.cano> <filename>\n", program);
+                    exit(EXIT_FAILURE);
+                }
+                config_filename = flag;
+                break;           
+            case 'h':
+                flag = optarg;
+                if (flag == NULL) {
+                    help_filename = get_help_page("general");
+                } else {
+                    help_filename = get_help_page(flag);
+                }
+    
+                if (help_filename == NULL) {
+                    fprintf(stderr, "Failed to open help page. Check for typos or if you installed cano properly.\n");
+                    exit(EXIT_FAILURE);
+                }
+                break;
+            default:
+                fprintf(stderr, "Unexpected flag");
                 exit(EXIT_FAILURE);
-            }
-        }
-
-        if(strcmp(flag, "--config") == 0) {
-            flag = *argv++;
-            if(flag == NULL) {
-                fprintf(stderr, "usage: %s --config <config.cano> <filename>\n", program);
-                exit(1);
-            }
-            config_filename = flag;
-        } else if (strcmp(flag, "--help") == 0) {
-            flag = *argv++;
-            if (flag == NULL) {
-                help_filename = get_help_page("general");
-            } else {
-                help_filename = get_help_page(flag);
-            }
-
-            if (help_filename == NULL) {
-                fprintf(stderr, "Failed to open help page. Check for typos or if you installed cano properly.\n");
-                exit(EXIT_FAILURE);
-            }
-        } else {
-            filename = flag;
-        }
-        flag = *argv++;
+       }
+       opt = getopt_long(argc, argv, "", longopts, NULL);            
     }
-    (void)config_filename;
-    (void)syntax_filename;
+    filename = argv[optind];
 
     // define functions based on current mode
     void(*key_func[MODE_COUNT])(Buffer *buffer, Buffer **modify_buffer, struct State *state) = {
@@ -1666,7 +1655,7 @@ while(flag != NULL) {
     state.command = calloc(64, sizeof(char));
     state.key_func = key_func;
     state.files = calloc(32, sizeof(File));
-    state.config.lang = lang;
+    state.config.lang = "UNUSED";
     scan_files(state.files, ".");
 
     initscr();
