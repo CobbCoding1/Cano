@@ -940,6 +940,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             handle_save(buffer);
             state->config.QUIT = 1;
         } break;
+        case ctrl('c'):
         case ESCAPE:
             state->repeating.repeating_count = 0;
             reset_command(state->command, &state->command_s);
@@ -1040,6 +1041,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             handle_save(buffer);
             state->config.QUIT = 1;
         } break;
+        case ctrl('c'):        
         case ESCAPE: // Switch to NORMAL mode
             //state->cur_undo.end = buffer->cursor;
             if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
@@ -1141,6 +1143,7 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 wmove(state->status_bar, 1, state->x);
             }
         } break;
+        case ctrl('c'):        
         case ESCAPE:
             reset_command(state->command, &state->command_s);
             state->config.mode = NORMAL;
@@ -1201,6 +1204,7 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 wmove(state->status_bar, 1, state->x);
             }
         } break;
+        case ctrl('c'):        
         case ESCAPE:
             reset_command(state->command, &state->command_s);
             state->config.mode = NORMAL;
@@ -1267,6 +1271,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case 127:
         case KEY_BACKSPACE: {
         } break;
+        case ctrl('c'):        
         case ESCAPE: {
             state->config.mode = NORMAL;
             curs_set(1);        
@@ -1483,7 +1488,6 @@ char *get_help_page(char *page) {
 
 
 int main(int argc, char **argv) {
-
     WRITE_LOG("starting (int main)");
     setlocale(LC_ALL, "");
 
@@ -1579,6 +1583,8 @@ int main(int argc, char **argv) {
 
     keypad(status_bar, TRUE);
     keypad(main_win, TRUE);
+    
+    set_escdelay(0);
 
     if(filename == NULL) filename = "out.txt";
 
