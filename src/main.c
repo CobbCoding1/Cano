@@ -1597,21 +1597,19 @@ void state_render(State *state) {
 int main(int argc, char **argv) {
     WRITE_LOG("starting (int main)");
     setlocale(LC_ALL, "");
-    //char *flag = *argv++;
     char *program = argv[0];
     char *flag = NULL;
     char *config_filename = NULL;
     char *syntax_filename = NULL;
     char *filename = NULL;
     char *help_filename = NULL;
-    char opt;
     
     static struct option longopts[] = {
         {"help", no_argument, NULL, 'h'},
         {"config", optional_argument, NULL, 'c'},
     };
         
-    opt = getopt_long(argc, argv, "", longopts, NULL);
+    char opt = getopt_long(argc, argv, "", longopts, NULL);
     
     while(true) {
         WRITE_LOG("opt = %d\n", opt);
