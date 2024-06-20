@@ -13,3 +13,5 @@ cano_SOURCES = src/colors.h \
 			   src/view.c
 cano_CFLAGS = @NCURSES_CFLAGS@
 cano_LDADD = @NCURSES_LIBS@ -lm -lpthread
+
+man1_MANS = docs/cano.1
