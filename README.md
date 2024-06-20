@@ -186,14 +186,15 @@ Cano's build system recently changed, Nix installation is not supported for now.
 
 ## Debian/Ubuntu
 
-You may build from source and install cano directly to `/usr/local/bin`. You must have a basic C compiler, autotools and the ncurses library installed (install shown below).
+You may build from source and install cano directly to `/usr/local/bin`. You must have a basic C compiler, autotools, pkg-config and the ncurses library installed (install shown below).
 
 ```sh
-sudo apt install libncurses-dev autotools-dev
+sudo apt install gcc autoconf automake libtool pkg-config make libncurses-dev
 git clone https://github.com/CobbCoding1/Cano && cd Cano
 chmod +x autogen.sh && ./autogen.sh
-make -C build
-sudo make -C build install
+cd build
+make
+sudo make install
 ```
 
 ## Canoon (Beta)

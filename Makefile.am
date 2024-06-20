@@ -11,5 +11,5 @@ cano_SOURCES = src/colors.h \
 			   src/lex.c \
 			   src/main.c \
 			   src/view.c
-cano_CPPFLAGS = @NCURSES_CFLAGS@
-cano_LDFLAGS = @NCURSES_LIBS@ -lm -lpthread
+cano_CFLAGS = @NCURSES_CFLAGS@
+cano_LDADD = @NCURSES_LIBS@ -lm -lpthread
