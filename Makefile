@@ -14,6 +14,8 @@ SRC += commands.c
 SRC += lex.c
 SRC += view.c
 SRC += main.c
+SRC += cgetopt.c
+SRC += frontend.c
 
 OBJ := $(SRC:%.c=$(BUILD_DIR)/release-objs/%.o)
 OBJ_DEBUG :=$(SRC:%.c=$(BUILD_DIR)/debug-objs/%.o)

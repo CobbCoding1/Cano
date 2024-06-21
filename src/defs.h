@@ -326,6 +326,8 @@ typedef struct {
     size_t col;
     size_t size;
 } Syntax_Highlighting;
+    
+extern char *string_modes[MODE_COUNT];
 
 void handle_save(Buffer *buffer);
 

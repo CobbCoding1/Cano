@@ -18,6 +18,7 @@
 #include "colors.h"
 #include "lex.h"
 #include "commands.h"
+#include "frontend.h"
 
 #define CREATE_UNDO(t, p)    \
     Undo undo = {0};         \

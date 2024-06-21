@@ -7,10 +7,15 @@ cano_SOURCES = src/colors.h \
 			   src/main.h \
 			   src/view.h \
 			   src/commands.h \
+			   src/cgetopt.h \
+			   src/frontend.h \
 			   src/commands.c \
 			   src/lex.c \
 			   src/main.c \
-			   src/view.c
+			   src/view.c \
+			   src/frontend.c \
+			   src/cgetopt.c
+
 cano_CFLAGS = @NCURSES_CFLAGS@
 cano_LDADD = @NCURSES_LIBS@ -lm -lpthread
 
