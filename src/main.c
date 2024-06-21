@@ -402,6 +402,7 @@ void buffer_yank_selection(Buffer *buffer, State *state, size_t start, size_t en
 
 void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t end) {
     int count = end - start;
+    buffer_yank_selection(buffer, state, start, end);
     buffer->cursor = start;
     while(count >= 0) {
         buffer_delete_char(buffer, state);
