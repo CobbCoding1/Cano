@@ -17,5 +17,6 @@ void frontend_resize_window(State *state);
 int frontend_getch(WINDOW *window);
 void frontend_move_cursor(WINDOW *window, size_t pos_x, size_t pos_y);
 void frontend_cursor_visible(int value);
+void frontend_end();
 
 #endif // FRONTEND_H

@@ -6,6 +6,7 @@
 #include <string.h>
 #include <ncurses.h>
 
+#include "frontend.h"
 #include "view.h"
 #include "colors.h"
 

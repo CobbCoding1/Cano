@@ -1514,7 +1514,7 @@ int main(int argc, char **argv) {
         state.key_func[state.config.mode](state.buffer, &state.buffer, &state);
     }
     
-    endwin();
+    frontend_end();
 
     free_buffer(state.buffer);
     free_undo_stack(&state.undo_stack);

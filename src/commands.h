@@ -1,6 +1,7 @@
 #ifndef COMMANDS_H
 #define COMMANDS_H
 
+#include "frontend.h"
 #include "defs.h"
 
 typedef enum {

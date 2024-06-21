@@ -202,3 +202,7 @@ void frontend_resize_window(State *state) {
     mvwin(state->main_win, 0, state->line_num_col);
     wrefresh(state->main_win);
 }
+
+void frontend_end() {
+    endwin();
+}

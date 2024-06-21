@@ -8,7 +8,7 @@
 
 #define CRASH(str)                    \
         do {                          \
-            endwin();                 \
+            frontend_end();                 \
             fprintf(stderr, str"\n"); \
             exit(1);                  \
         } while(0) 
@@ -16,7 +16,7 @@
 #define ASSERT(cond, ...) \
     do { \
         if (!(cond)) { \
-            endwin();   \
+            frontend_end();   \
             fprintf(stderr, "%s:%d: ASSERTION FAILED: ", __FILE__, __LINE__); \
             fprintf(stderr, __VA_ARGS__); \
             fprintf(stderr, "\n"); \
