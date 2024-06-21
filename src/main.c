@@ -1486,8 +1486,8 @@ char *get_help_page(char *page) {
 }
     
 void state_render(State *state) {
-    size_t row_render_start = 0;
-    size_t col_render_start = 0;
+    static size_t row_render_start = 0;
+    static size_t col_render_start = 0;
     werase(state->main_win);
     werase(state->status_bar);
     werase(state->line_num_win);
