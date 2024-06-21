@@ -218,7 +218,6 @@ void reset_command(char *command, size_t *command_s) {
 
 void handle_save(Buffer *buffer) {
     FILE *file = fopen(buffer->filename, "w"); 
-    WRITE_LOG("SAVED!");
     fwrite(buffer->data.data, buffer->data.count, sizeof(char), file);
     fclose(file);
 }
@@ -1226,10 +1225,6 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
     frontend_cursor_visible(0);
     switch(state->ch) {
-        case '\b':
-        case 127:
-        case KEY_BACKSPACE: {
-        } break;
         case ctrl('c'):        
         case ESCAPE: {
             state->config.mode = NORMAL;
@@ -1367,7 +1362,6 @@ void load_config_from_file(State *state, Buffer *buffer, char *config_filename, 
 			state->env = env;
 		}
         sprintf(config_dir, "%s/.config/cano", state->env);
-		WRITE_LOG("env: %s", state->env);
         struct stat st = {0};
         if(stat(config_dir, &st) == -1) {
             mkdir(config_dir, 0755);
@@ -1437,7 +1431,6 @@ void handle_flags(char *program, char **argv, int argc, char **config_filename, 
     char opt = cgetopt_long(argc, argv, "", longopts, NULL);
     
     while(true) {
-        WRITE_LOG("opt = %d\n", opt);
         if(opt == -1) break;
         switch(opt) {
             case 'c':
@@ -1470,6 +1463,7 @@ void handle_flags(char *program, char **argv, int argc, char **config_filename, 
 }
 
 /* ------------------------- FUNCTIONS END ------------------------- */
+
 int main(int argc, char **argv) {
     WRITE_LOG("starting (int main)");
     setlocale(LC_ALL, "");
