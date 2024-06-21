@@ -3,6 +3,7 @@
 #include <locale.h>
 #include <getopt.h>
 
+int frontend_getch(WINDOW *window);
 void frontend_move_cursor(WINDOW *window, size_t pos_x, size_t pos_y);
 void frontend_cursor_visible(int value);
 
@@ -680,7 +681,7 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
         case 'r': {
             CREATE_UNDO(REPLACE_CHAR, buffer->cursor);
             DA_APPEND(&state->cur_undo.data, buffer->data.data[buffer->cursor]);
-            state->ch = wgetch(state->main_win); 
+            state->ch = frontend_getch(state->main_win); 
             buffer->data.data[buffer->cursor] = state->ch;
             undo_push(state, &state->undo_stack, state->cur_undo);
         } break;
@@ -696,7 +697,7 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
         case 'i': {
 			state->config.mode = INSERT;		
 			if(state->repeating.repeating_count) {
-				state->ch = getch();
+				state->ch = frontend_getch(state->main_win);
 			}
         } break;
         case 'I': {
@@ -1629,6 +1630,10 @@ void frontend_move_cursor(WINDOW *window, size_t x_pos, size_t y_pos) {
 void frontend_cursor_visible(int value) {
     curs_set(value);
 }
+
+int frontend_getch(WINDOW *window) {
+    return wgetch(window);
+}
     
 // END RENDER FUNCTIONS
     
@@ -1716,7 +1721,7 @@ int main(int argc, char **argv) {
 
     while(state.ch != ctrl('q') && state.config.QUIT != 1) {
         state_render(&state);
-        state.ch = wgetch(state.main_win);
+        state.ch = frontend_getch(state.main_win);
         state.key_func[state.config.mode](state.buffer, &state.buffer, &state);
     }
     
