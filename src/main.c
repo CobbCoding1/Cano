@@ -3,6 +3,9 @@
 #include <locale.h>
 #include <getopt.h>
 
+void frontend_move_cursor(WINDOW *window, size_t pos_x, size_t pos_y);
+void frontend_cursor_visible(int value);
+
 int is_between(size_t a, size_t b, size_t c) {
     if(a <= c && c <= b) return 1;
     return 0;
@@ -824,14 +827,14 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     switch(state->ch) {
         case ':':
             state->x = 1;
-            wmove(state->status_bar, state->x, 1);
+            frontend_move_cursor(state->status_bar, state->x, 1);
             state->config.mode = COMMAND;
             break;
         case '/':
             if(state->is_exploring) break;
             reset_command(state->command, &state->command_s);        
             state->x = state->command_s+1;
-            wmove(state->status_bar, state->x, 1);
+            frontend_move_cursor(state->status_bar, state->x, 1);        
             state->config.mode = SEARCH;
             break;
         case 'v':
@@ -1141,7 +1144,7 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case KEY_BACKSPACE: {
             if(state->x != 1) {
                 shift_str_left(state->command, &state->command_s, --state->x);
-                wmove(state->status_bar, 1, state->x);
+                frontend_move_cursor(state->status_bar, 1, state->x);
             }
         } break;
         case ctrl('c'):        
@@ -1202,7 +1205,7 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case KEY_BACKSPACE: {
             if(state->x != 1) {
                 shift_str_left(state->command, &state->command_s, --state->x);
-                wmove(state->status_bar, 1, state->x);
+                frontend_move_cursor(state->status_bar, 1, state->x);
             }
         } break;
         case ctrl('c'):        
@@ -1266,7 +1269,7 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 
 void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
-    curs_set(0);
+    frontend_cursor_visible(0);
     switch(state->ch) {
         case '\b':
         case 127:
@@ -1275,7 +1278,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case ctrl('c'):        
         case ESCAPE: {
             state->config.mode = NORMAL;
-            curs_set(1);        
+            frontend_cursor_visible(1);        
             state->buffer->visual = (Visual){0};        
         } break;
         case ENTER: break;
@@ -1292,7 +1295,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             buffer_delete_selection(buffer, state, start, end);
             undo_push(state, &state->undo_stack, state->cur_undo);
             state->config.mode = NORMAL;
-            curs_set(1);
+            frontend_cursor_visible(1);
         } break;
         case '>': {
             int cond = (buffer->visual.start > buffer->visual.end);
@@ -1314,7 +1317,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             }
             buffer->cursor = position;
             state->config.mode = NORMAL;
-            curs_set(1);
+            frontend_cursor_visible(1);                    
         } break;
         case '<': {
             int cond = (buffer->visual.start > buffer->visual.end);
@@ -1343,7 +1346,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 }
             }
             state->config.mode = NORMAL;
-            curs_set(1);
+            frontend_cursor_visible(1);                                
         } break;
         case 'y': {
             reset_command(state->clipboard.str, &state->clipboard.len);
@@ -1353,7 +1356,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             buffer_yank_selection(buffer, state, start, end);
             buffer->cursor = start;
             state->config.mode = NORMAL;
-            curs_set(1);
+            frontend_cursor_visible(1);                                            
             break;
         }
         default: {
@@ -1485,6 +1488,8 @@ char *get_help_page(char *page) {
     return help_page;
 }
     
+// FRONTEND RENDER FUNCTIONS
+
 void state_render(State *state) {
     static size_t row_render_start = 0;
     static size_t col_render_start = 0;
@@ -1586,25 +1591,51 @@ void state_render(State *state) {
     wrefresh(state->line_num_win);
     wrefresh(state->status_bar);
      if(state->config.mode == COMMAND || state->config.mode == SEARCH) {
-        wmove(state->status_bar, 1, state->x);
+        frontend_move_cursor(state->status_bar, 1, state->x);
         wrefresh(state->status_bar);
     } else {
-        wmove(state->main_win, cur_row-row_render_start, col-col_render_start);
+        frontend_move_cursor(state->main_win, cur_row-row_render_start, col-col_render_start);
     }
 }
-
-/* ------------------------- FUNCTIONS END ------------------------- */
-int main(int argc, char **argv) {
-    WRITE_LOG("starting (int main)");
-    setlocale(LC_ALL, "");
-    char *program = argv[0];
-    char *flag = NULL;
-    char *config_filename = NULL;
-    char *syntax_filename = NULL;
-    char *filename = NULL;
-    char *help_filename = NULL;
     
-    static struct option longopts[] = {
+void frontend_init(State *state) {
+    initscr();
+    noecho();
+    raw();
+
+    init_colors(state);
+
+    getmaxyx(stdscr, state->grow, state->gcol);
+    int line_num_width = 5;
+    WINDOW *main_win = newwin(state->grow-2, state->gcol-line_num_width, 0, line_num_width);
+    WINDOW *status_bar = newwin(2, state->gcol, state->grow-2, 0);
+    WINDOW *line_num_win = newwin(state->grow-2, line_num_width, 0, 0);
+    state->main_win = main_win;
+    state->status_bar = status_bar;
+    state->line_num_win = line_num_win;
+    getmaxyx(main_win, state->main_row, state->main_col);
+    getmaxyx(line_num_win, state->line_num_row, state->line_num_col);
+
+    keypad(status_bar, TRUE);
+    keypad(main_win, TRUE);
+    
+    set_escdelay(0);
+}
+    
+void frontend_move_cursor(WINDOW *window, size_t x_pos, size_t y_pos) {
+    wmove(window, x_pos, y_pos);
+}
+    
+void frontend_cursor_visible(int value) {
+    curs_set(value);
+}
+    
+// END RENDER FUNCTIONS
+    
+void handle_flags(char *program, char **argv, int argc, char **config_filename, char **help_filename) {
+    char *flag = NULL;
+    
+    struct option longopts[] = {
         {"help", no_argument, NULL, 'h'},
         {"config", optional_argument, NULL, 'c'},
     };
@@ -1621,17 +1652,17 @@ int main(int argc, char **argv) {
                     fprintf(stderr, "usage: %s --config <config.cano> <filename>\n", program);
                     exit(EXIT_FAILURE);
                 }
-                config_filename = flag;
+                *config_filename = flag;
                 break;           
             case 'h':
                 flag = optarg;
                 if (flag == NULL) {
-                    help_filename = get_help_page("general");
+                    *help_filename = get_help_page("general");
                 } else {
-                    help_filename = get_help_page(flag);
+                    *help_filename = get_help_page(flag);
                 }
     
-                if (help_filename == NULL) {
+                if (*help_filename == NULL) {
                     fprintf(stderr, "Failed to open help page. Check for typos or if you installed cano properly.\n");
                     exit(EXIT_FAILURE);
                 }
@@ -1642,7 +1673,17 @@ int main(int argc, char **argv) {
        }
        opt = getopt_long(argc, argv, "", longopts, NULL);            
     }
-    filename = argv[optind];
+}
+
+/* ------------------------- FUNCTIONS END ------------------------- */
+int main(int argc, char **argv) {
+    WRITE_LOG("starting (int main)");
+    setlocale(LC_ALL, "");
+    char *program = argv[0];        
+    char *config_filename = NULL, *syntax_filename = NULL, *help_filename = NULL;
+    handle_flags(program, argv, argc, &config_filename, &help_filename);
+    
+    char *filename = argv[optind];
 
     // define functions based on current mode
     void(*key_func[MODE_COUNT])(Buffer *buffer, Buffer **modify_buffer, struct State *state) = {
@@ -1656,27 +1697,7 @@ int main(int argc, char **argv) {
     state.config.lang = "UNUSED";
     scan_files(state.files, ".");
 
-    initscr();
-    noecho();
-    raw();
-
-    init_colors(&state);
-
-    getmaxyx(stdscr, state.grow, state.gcol);
-    int line_num_width = 5;
-    WINDOW *main_win = newwin(state.grow-2, state.gcol-line_num_width, 0, line_num_width);
-    WINDOW *status_bar = newwin(2, state.gcol, state.grow-2, 0);
-    WINDOW *line_num_win = newwin(state.grow-2, line_num_width, 0, 0);
-    state.main_win = main_win;
-    state.status_bar = status_bar;
-    state.line_num_win = line_num_win;
-    getmaxyx(main_win, state.main_row, state.main_col);
-    getmaxyx(line_num_win, state.line_num_row, state.line_num_col);
-
-    keypad(status_bar, TRUE);
-    keypad(main_win, TRUE);
-    
-    set_escdelay(0);
+    frontend_init(&state);
 
     if(filename == NULL) filename = "out.txt";
 
@@ -1688,14 +1709,14 @@ int main(int argc, char **argv) {
     }
     
     load_config_from_file(&state, state.buffer, config_filename, syntax_filename);
-
+    
     char status_bar_msg[128] = {0};
     state.status_bar_msg = status_bar_msg;
     buffer_calculate_rows(state.buffer);
 
     while(state.ch != ctrl('q') && state.config.QUIT != 1) {
         state_render(&state);
-        state.ch = wgetch(main_win);
+        state.ch = wgetch(state.main_win);
         state.key_func[state.config.mode](state.buffer, &state.buffer, &state);
     }
     
