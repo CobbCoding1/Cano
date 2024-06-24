@@ -16,6 +16,9 @@ SRC += view.c
 SRC += main.c
 SRC += cgetopt.c
 SRC += frontend.c
+SRC += keys.c
+SRC += buffer.c
+SRC += tools.c
 
 OBJ := $(SRC:%.c=$(BUILD_DIR)/release-objs/%.o)
 OBJ_DEBUG :=$(SRC:%.c=$(BUILD_DIR)/debug-objs/%.o)

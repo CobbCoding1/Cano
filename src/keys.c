@@ -1,0 +1,862 @@
+#include "keys.h"
+
+
+size_t search(Buffer *buffer, char *command, size_t command_s) {
+    for(size_t i = buffer->cursor+1; i < buffer->data.count+buffer->cursor; i++) {
+        size_t pos = i % buffer->data.count;
+        if(strncmp(buffer->data.data+pos, command, command_s) == 0) {
+            // result found and will return the location of the word.
+            return pos;
+        }
+    }
+    return buffer->cursor;
+}
+
+void replace(Buffer *buffer, State *state, char *new_str, size_t old_str_s, size_t new_str_s) { 
+    if (buffer == NULL || new_str == NULL) {
+        WRITE_LOG("Error: null pointer");
+        return;
+    }
+
+    for(size_t i = 0; i < old_str_s; i++) {
+        buffer_delete_char(buffer, state);
+    }
+
+    for(size_t i = 0; i < new_str_s; i++) {
+        buffer_insert_char(state, buffer, new_str[i]);
+    }
+}
+
+
+void find_and_replace(Buffer *buffer, State *state, char *old_str, char *new_str) { 
+    size_t old_str_s = strlen(old_str);
+    size_t new_str_s = strlen(new_str);
+
+    // Search for the old string in the buffer
+    size_t position = search(buffer, old_str, old_str_s);
+    if (position != (buffer->cursor)) {
+        buffer->cursor = position;
+        // If the old string is found, replace it with the new string
+        replace(buffer, state, new_str, old_str_s, new_str_s);
+    }
+}
+    
+void reset_command(char *command, size_t *command_s) {
+    memset(command, 0, *command_s);
+    *command_s = 0;
+}
+
+int handle_motion_keys(Buffer *buffer, State *state, int ch, size_t *repeating_count) {
+    (void)repeating_count;
+    switch(ch) {
+        case 'g': { // Move to the start of the file or to the line specified by repeating_count
+            size_t row = buffer_get_row(buffer);            
+            if(state->repeating.repeating_count >= buffer->rows.count) state->repeating.repeating_count = buffer->rows.count;
+            if(state->repeating.repeating_count == 0) state->repeating.repeating_count = 1;                
+            buffer->cursor = buffer->rows.data[state->repeating.repeating_count-1].start;
+            state->repeating.repeating_count = 0;
+            if(state->leader != LEADER_D) break;
+            // TODO: this doens't work with row jumps
+            size_t end = buffer->rows.data[row].end;
+            size_t start = buffer->cursor;
+            CREATE_UNDO(INSERT_CHARS, start);
+            buffer_delete_selection(buffer, state, start, end);
+            undo_push(state, &state->undo_stack, state->cur_undo);
+        } break;
+        case 'G': { // Move to the end of the file or to the line specified by repeating_count
+            size_t row = buffer_get_row(buffer);
+            size_t start = buffer->rows.data[row].start;
+            if(state->repeating.repeating_count > 0) {
+                if(state->repeating.repeating_count >= buffer->rows.count) state->repeating.repeating_count = buffer->rows.count;
+                buffer->cursor = buffer->rows.data[state->repeating.repeating_count-1].start;
+                state->repeating.repeating_count = 0;                
+            } else {
+                buffer->cursor = buffer->data.count;   
+            }
+            if(state->leader != LEADER_D) break;
+            // TODO: this doesn't work with row jumps
+            size_t end = buffer->cursor;
+            CREATE_UNDO(INSERT_CHARS, start);
+            buffer_delete_selection(buffer, state, start, end);
+            undo_push(state, &state->undo_stack, state->cur_undo);
+        } break;
+        case '0': { // Move to the start of the line
+            size_t row = buffer_get_row(buffer);
+            size_t end = buffer->cursor;
+            buffer->cursor = buffer->rows.data[row].start;
+            if(state->leader != LEADER_D) break;
+            size_t start = buffer->cursor;
+            CREATE_UNDO(INSERT_CHARS, start);
+            buffer_delete_selection(buffer, state, start, end);
+            undo_push(state, &state->undo_stack, state->cur_undo);
+        } break;
+        case '$': { // Move to the end of the line
+            size_t row = buffer_get_row(buffer);
+            size_t start = buffer->cursor;
+            buffer->cursor = buffer->rows.data[row].end;
+            if(state->leader != LEADER_D) break;
+            size_t end = buffer->cursor;
+            CREATE_UNDO(INSERT_CHARS, start);
+            buffer_delete_selection(buffer, state, start, end-1);
+            undo_push(state, &state->undo_stack, state->cur_undo);
+        } break;
+        case 'e': { // Move to the end of the next word
+            size_t start = buffer->cursor;
+            if(buffer->cursor+1 < buffer->data.count && !isword(buffer->data.data[buffer->cursor+1])) buffer->cursor++;
+            while(buffer->cursor+1 < buffer->data.count && 
+                (isword(buffer->data.data[buffer->cursor+1]) || isspace(buffer->data.data[buffer->cursor]))
+            ) {
+                buffer->cursor++;
+            }
+            if(state->leader != LEADER_D) break;
+            size_t end = buffer->cursor;
+            CREATE_UNDO(INSERT_CHARS, start);
+            buffer_delete_selection(buffer, state, start, end);
+            undo_push(state, &state->undo_stack, state->cur_undo);
+        } break;
+        case 'b': { // Move to the start of the previous word
+            if(buffer->cursor == 0) break;
+            size_t end = buffer->cursor;
+            if(buffer->cursor-1 > 0 && !isword(buffer->data.data[buffer->cursor-1])) buffer->cursor--;
+            while(buffer->cursor-1 > 0 && 
+                (isword(buffer->data.data[buffer->cursor-1]) || isspace(buffer->data.data[buffer->cursor+1]))
+            ) {
+                buffer->cursor--;
+            }
+            if(buffer->cursor-1 == 0) buffer->cursor--;
+            if(state->leader != LEADER_D) break;
+            size_t start = buffer->cursor;
+            CREATE_UNDO(INSERT_CHARS, start);
+            buffer_delete_selection(buffer, state, start, end);
+            undo_push(state, &state->undo_stack, state->cur_undo);
+        } break;
+        case 'w': { // Move to the start of the next word
+            size_t start = buffer->cursor;
+            while(buffer->cursor < buffer->data.count && 
+                (isword(buffer->data.data[buffer->cursor]) || isspace(buffer->data.data[buffer->cursor+1]))
+            ) {
+                buffer->cursor++;
+            }
+            if(buffer->cursor < buffer->data.count) buffer->cursor++;
+            if(state->leader != LEADER_D) break;
+            size_t end = buffer->cursor-1;
+            CREATE_UNDO(INSERT_CHARS, start);
+            buffer_delete_selection(buffer, state, start, end-1);
+            undo_push(state, &state->undo_stack, state->cur_undo);
+        } break;
+        case LEFT_ARROW:
+        case 'h': // Move left
+            buffer_move_left(buffer);
+            break;
+        case DOWN_ARROW:
+        case 'j': // Move down
+            buffer_move_down(buffer);
+            break;
+        case UP_ARROW:
+        case 'k': // Move up
+            buffer_move_up(buffer);
+            break;
+        case RIGHT_ARROW:
+        case 'l': // Move right
+            buffer_move_right(buffer);
+            break;
+        case '%': { // Move to the matching brace
+            buffer_next_brace(buffer);
+            break;
+        }
+        default: { // If the key is not a motion key, return 0
+            return 0;
+        } 
+    }
+    return 1; // If the key is a motion key, return 1
+}
+    
+int handle_leader_keys(State *state) {
+    switch(state->ch) {
+        case 'd':
+            state->leader = LEADER_D;
+            break;
+        case 'y':
+            state->leader = LEADER_Y;
+            break;
+        default:
+            return 0;
+    }    
+    return 1;
+}
+
+int handle_modifying_keys(Buffer *buffer, State *state) {
+    switch(state->ch) {
+        case 'x': {
+            CREATE_UNDO(INSERT_CHARS, buffer->cursor);
+            reset_command(state->clipboard.str, &state->clipboard.len);
+            buffer_yank_char(buffer, state);
+            buffer_delete_char(buffer, state);
+            undo_push(state, &state->undo_stack, state->cur_undo);
+        } break;
+        case 'd': {
+            switch(state->leader) {
+                case LEADER_D: {
+                    size_t repeat = state->repeating.repeating_count;
+                    if(repeat == 0) repeat = 1;
+                    if(repeat > buffer->rows.count - buffer_get_row(buffer)) repeat = buffer->rows.count - buffer_get_row(buffer);
+                    for(size_t i = 0; i < repeat; i++) {
+                        reset_command(state->clipboard.str, &state->clipboard.len);
+                        buffer_yank_line(buffer, state, 0);
+                        size_t row = buffer_get_row(buffer);
+                        Row cur = buffer->rows.data[row];
+                        size_t offset = buffer->cursor - cur.start;
+                        CREATE_UNDO(INSERT_CHARS, cur.start);
+                        if(row == 0) {
+                            buffer_delete_selection(buffer, state, cur.start, cur.end);
+                        } else {
+                            state->cur_undo.start -= 1;
+                            buffer_delete_selection(buffer, state, cur.start-1, cur.end-1);
+                        }
+                        undo_push(state, &state->undo_stack, state->cur_undo);
+                        buffer_calculate_rows(buffer);
+                        if(row >= buffer->rows.count) row = buffer->rows.count-1;
+                        cur = buffer->rows.data[row];
+                        size_t pos = cur.start + offset;
+                        if(pos > cur.end) pos = cur.end;
+                        buffer->cursor = pos;
+                    }
+                    state->repeating.repeating_count = 0;
+                } break;
+                default:
+                    break;
+            }
+        } break;
+        case 'r': {
+            CREATE_UNDO(REPLACE_CHAR, buffer->cursor);
+            DA_APPEND(&state->cur_undo.data, buffer->data.data[buffer->cursor]);
+            state->ch = frontend_getch(state->main_win); 
+            buffer->data.data[buffer->cursor] = state->ch;
+            undo_push(state, &state->undo_stack, state->cur_undo);
+        } break;
+        default: {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
+    switch(state->ch) {
+        case 'i': {
+			state->config.mode = INSERT;		
+			if(state->repeating.repeating_count) {
+				state->ch = frontend_getch(state->main_win);
+			}
+        } break;
+        case 'I': {
+            size_t row = buffer_get_row(buffer);
+            Row cur = buffer->rows.data[row];
+            buffer->cursor = cur.start;            
+            while(buffer->cursor < cur.end && isspace(buffer->data.data[buffer->cursor])) buffer->cursor++;
+            state->config.mode = INSERT;
+        } break;
+        case 'a':
+            if(buffer->cursor < buffer->data.count) buffer->cursor++;
+            state->config.mode = INSERT;
+            break;
+        case 'A': {
+            size_t row = buffer_get_row(buffer);
+            size_t end = buffer->rows.data[row].end;
+            buffer->cursor = end;
+            state->config.mode = INSERT;
+        } break;
+        case 'o': {
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+            size_t row = buffer_get_row(buffer);
+            size_t end = buffer->rows.data[row].end;
+            buffer->cursor = end;
+            buffer_newline_indent(buffer, state);
+            state->config.mode = INSERT;
+            undo_push(state, &state->undo_stack, state->cur_undo);
+        } break;
+        case 'O': {
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+            size_t row = buffer_get_row(buffer);
+            size_t start = buffer->rows.data[row].start;
+            buffer->cursor = start;
+            buffer_newline_indent(buffer, state);
+            state->config.mode = INSERT;
+            undo_push(state, &state->undo_stack, state->cur_undo);
+        } break;
+        default: {
+            return 0;
+        }
+    }
+    CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+    return 1;
+}
+
+void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
+    (void)modify_buffer;
+    
+    if(check_keymaps(buffer, state)) return;
+    if(state->leader == LEADER_NONE && handle_leader_keys(state)) return;   
+    if(isdigit(state->ch) && !(state->ch == '0' && state->num.count == 0)) {
+        DA_APPEND(&state->num, state->ch);
+        return;
+    } 
+    
+    if(!isdigit(state->ch) && state->num.count > 0) {
+        ASSERT(state->num.data, "num is not initialized");
+        state->repeating.repeating_count = atoi(state->num.data);
+        if(state->repeating.repeating_count == 0) return;
+        state->num.count = 0;
+        for(size_t i = 0; i < state->repeating.repeating_count; i++) {
+            state->key_func[state->config.mode](buffer, modify_buffer, state);
+        }
+        state->repeating.repeating_count = 0;
+        memset(state->num.data, 0, state->num.capacity);
+        return;
+    }
+
+    switch(state->ch) {
+        case ':':
+            state->x = 1;
+            frontend_move_cursor(state->status_bar, state->x, 1);
+            state->config.mode = COMMAND;
+            break;
+        case '/':
+            if(state->is_exploring) break;
+            reset_command(state->command, &state->command_s);        
+            state->x = state->command_s+1;
+            frontend_move_cursor(state->status_bar, state->x, 1);        
+            state->config.mode = SEARCH;
+            break;
+        case 'v':
+            if(state->is_exploring) break;
+            buffer->visual.start = buffer->cursor;
+            buffer->visual.end = buffer->cursor;
+            buffer->visual.is_line = 0;
+            state->config.mode = VISUAL;
+            break;
+        case 'V':
+            if(state->is_exploring) break;
+            buffer->visual.start = buffer->rows.data[buffer_get_row(buffer)].start;
+            buffer->visual.end = buffer->rows.data[buffer_get_row(buffer)].end;
+            buffer->visual.is_line = 1;
+            state->config.mode = VISUAL;
+            break;
+        case ctrl('o'): {
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+            buffer_insert_char(state, buffer, '\n');
+            buffer_create_indent(buffer, state);
+            undo_push(state, &state->undo_stack, state->cur_undo);
+        } break;
+        case 'n': {
+            size_t index = search(buffer, state->command, state->command_s);
+            buffer->cursor = index;
+        } break;
+        case 'u': {
+            Undo undo = undo_pop(&state->undo_stack); 
+            Undo redo = {0};
+            redo.start = undo.start;
+            state->cur_undo = redo;
+            switch(undo.type) {
+                case NONE:
+                    break;
+                case INSERT_CHARS:
+                    state->cur_undo.type = (undo.data.count > 1) ? DELETE_MULT_CHAR : DELETE_CHAR;
+                    state->cur_undo.end = undo.start + undo.data.count;
+                    buffer->cursor = undo.start;
+                    for(size_t i = 0; i < undo.data.count; i++) {
+                        buffer_insert_char(state, buffer, undo.data.data[i]);
+                    } 
+                    break;
+                case DELETE_CHAR:
+                    state->cur_undo.type = INSERT_CHARS;
+                    buffer->cursor = undo.start;
+                    buffer_delete_char(buffer, state);
+                    break;
+                case DELETE_MULT_CHAR:
+                    state->cur_undo.type = INSERT_CHARS;
+                    state->cur_undo.end = undo.end;
+                    buffer->cursor = undo.start;
+                    for(size_t i = undo.start; i < undo.end; i++) {
+                        buffer_delete_char(buffer, state);
+                    }
+                    break;
+                case REPLACE_CHAR:
+                    state->cur_undo.type = REPLACE_CHAR;
+                    buffer->cursor = undo.start;
+                    DA_APPEND(&undo.data, buffer->data.data[buffer->cursor]);
+                    buffer->data.data[buffer->cursor] = undo.data.data[0]; 
+                    break;
+            }
+            undo_push(state, &state->redo_stack, state->cur_undo);
+            free_undo(&undo);
+        } break;
+        case 'U': {
+            Undo redo = undo_pop(&state->redo_stack); 
+            Undo undo = {0};
+            undo.start = redo.start;
+            state->cur_undo = undo;
+            switch(redo.type) {
+                case NONE:
+                    return;
+                    break;
+                case INSERT_CHARS:
+                    state->cur_undo.type = (redo.data.count > 1) ? DELETE_MULT_CHAR : DELETE_CHAR;
+                    state->cur_undo.end = redo.start + redo.data.count;
+                    buffer->cursor = redo.start;
+                    for(size_t i = 0; i < redo.data.count; i++) {
+                        buffer_insert_char(state, buffer, redo.data.data[i]);
+                    } 
+                    break;
+                case DELETE_CHAR:
+                    state->cur_undo.type = INSERT_CHARS;
+                    buffer->cursor = redo.start;
+                    buffer_delete_char(buffer, state);
+                    break;
+                case DELETE_MULT_CHAR:
+                    state->cur_undo.type = INSERT_CHARS;
+                    state->cur_undo.end = redo.end;
+                    buffer->cursor = undo.start;
+                    for(size_t i = redo.start; i < redo.end; i++) {
+                        buffer_delete_char(buffer, state);
+                    }
+                    break;
+                case REPLACE_CHAR:
+                    state->cur_undo.type = REPLACE_CHAR;
+                    buffer->cursor = redo.start;
+                    DA_APPEND(&redo.data, buffer->data.data[buffer->cursor]);
+                    buffer->data.data[buffer->cursor] = redo.data.data[0]; 
+                    break;
+            }
+            undo_push(state, &state->undo_stack, state->cur_undo);
+            free_undo(&redo);
+        } break;
+        case ctrl('s'): {
+            handle_save(buffer);
+            state->config.QUIT = 1;
+        } break;
+        case ctrl('c'):
+        case ESCAPE:
+            state->repeating.repeating_count = 0;
+            reset_command(state->command, &state->command_s);
+            state->config.mode = NORMAL;
+            break;
+        case KEY_RESIZE: {
+            frontend_resize_window(state);
+        } break;
+        case 'y': {
+            switch(state->leader) {
+                case LEADER_Y: {
+                    if(state->repeating.repeating_count == 0) state->repeating.repeating_count = 1;
+                    reset_command(state->clipboard.str, &state->clipboard.len);
+                    for(size_t i = 0; i < state->repeating.repeating_count; i++) {
+                        buffer_yank_line(buffer, state, i);
+                    }
+                    state->repeating.repeating_count = 0;
+                } break;
+                default:
+                    break;
+            }
+        } break;
+        case 'p': {
+            if(state->clipboard.len == 0) break;
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+            for(size_t i = 0; i < state->clipboard.len-1; i++) {
+                buffer_insert_char(state, buffer, state->clipboard.str[i]);
+            }
+            state->cur_undo.end = buffer->cursor;
+            undo_push(state, &state->undo_stack, state->cur_undo); 
+        } break;
+        case ctrl('n'): {
+            state->is_exploring = !state->is_exploring;
+        } break;
+        default: {
+            if(state->is_exploring) {
+                switch(state->ch) {
+                    case DOWN_ARROW:
+                    case 'j': // Move down
+                        if (state->explore_cursor < state->files->count-1) {
+                            state->explore_cursor++;
+                        }
+                        break;
+                    case UP_ARROW:
+                    case 'k': // Move up
+                        if (state->explore_cursor > 0) {
+                            state->explore_cursor--;
+                        }
+                        break;
+                    case ENTER: {
+                        File f = state->files->data[state->explore_cursor];
+                        if (f.is_directory) {
+                            char str[256];
+                            strcpy(str, f.path);
+
+                            free_files(state->files);
+                            state->files = calloc(32, sizeof(File));
+                            scan_files(state->files, str);
+                            state->explore_cursor = 0;
+                        } else {
+                            // TODO: Load syntax highlighting right here
+                            state->buffer = load_buffer_from_file(f.path);
+							char *config_filename = NULL;
+							char *syntax_filename = NULL;							
+						    load_config_from_file(state, state->buffer, config_filename, syntax_filename);			
+                            state->is_exploring = false;
+                        }
+                    } break;
+                }
+                break;
+            }
+
+            if(handle_modifying_keys(buffer, state)) break;
+            if(handle_motion_keys(buffer, state, state->ch, &state->repeating.repeating_count)) break;
+            if(handle_normal_to_insert_keys(buffer, state)) break;
+        } break;
+    }
+    if(state->repeating.repeating_count == 0) {
+        state->leader = LEADER_NONE;
+    }
+}
+
+void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
+    (void)modify_buffer;
+	ASSERT(buffer, "buffer exists");
+	ASSERT(state, "state exists");
+	
+    switch(state->ch) { 
+        case '\b':
+        case 127:
+        case KEY_BACKSPACE: { 
+            if(buffer->cursor > 0) {
+                buffer->cursor--;
+                buffer_delete_char(buffer, state);
+            }
+        } break;
+        case ctrl('s'): {
+            handle_save(buffer);
+            state->config.QUIT = 1;
+        } break;
+        case ctrl('c'):        
+        case ESCAPE: // Switch to NORMAL mode
+            //state->cur_undo.end = buffer->cursor;
+            if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
+            state->config.mode = NORMAL;
+            break;
+        case LEFT_ARROW: { // Move cursor left
+            state->cur_undo.end = buffer->cursor;
+            if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
+            buffer_move_left(buffer);
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+        } break;
+        case DOWN_ARROW: { // Move cursor down
+            state->cur_undo.end = buffer->cursor;
+            if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
+            buffer_move_down(buffer);
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+        } break;
+        case UP_ARROW: {   // Move cursor up
+            state->cur_undo.end = buffer->cursor;
+            if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
+            buffer_move_up(buffer);
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+        } break;
+        case RIGHT_ARROW: { // Move cursor right
+            state->cur_undo.end = buffer->cursor;
+            if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
+            buffer_move_right(buffer);
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+        } break;
+        case KEY_RESIZE: {
+            frontend_resize_window(state);
+        } break;
+        case KEY_TAB:
+            if(state->config.indent > 0) {
+                for(size_t i = 0; (int)i < state->config.indent; i++) {
+                    buffer_insert_char(state, buffer, ' ');
+                }
+            } else {
+                buffer_insert_char(state, buffer, '\t');
+            }
+            break;
+        case KEY_ENTER:
+        case ENTER: {
+            if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+            Brace brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
+            buffer_newline_indent(buffer, state);
+            if(brace.brace != '0' && brace.closing) {
+                buffer_insert_char(state, buffer, '\n');
+                if(state->num_of_braces == 0) state->num_of_braces = 1;
+                if(state->config.indent > 0) {
+                    for(size_t i = 0; i < state->config.indent*(state->num_of_braces-1); i++) {
+                        buffer_insert_char(state, buffer, ' ');
+                        buffer->cursor--;
+                    }
+                } else {
+                    for(size_t i = 0; i < state->num_of_braces-1; i++) {
+                        buffer_insert_char(state, buffer, '\t');                            
+                        buffer->cursor--;
+                    }        
+                }
+                buffer->cursor--;
+            }
+        } break;
+        default: { // Handle other characters
+			ASSERT(buffer->data.count >= buffer->cursor, "check");
+			ASSERT(buffer->data.data, "check2");
+			Brace brace = (Brace){0};
+			Brace cur_brace;
+			if(buffer->cursor == 0) cur_brace = find_opposite_brace(buffer->data.data[0]);			
+			else cur_brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
+			
+            if((cur_brace.brace != '0' && cur_brace.closing && 
+                state->ch == find_opposite_brace(cur_brace.brace).brace)) {
+                buffer->cursor++;
+                break;
+            };
+            brace = find_opposite_brace(state->ch);
+            // TODO: make quotes auto close
+            buffer_insert_char(state, buffer, state->ch);
+            if(brace.brace != '0' && !brace.closing) {
+                buffer_insert_char(state, buffer, brace.brace);
+	            undo_push(state, &state->undo_stack, state->cur_undo);
+                buffer->cursor--;
+	            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);				
+            }
+        } break;
+    }
+}
+
+void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
+    (void)modify_buffer;
+    switch(state->ch) {
+        case '\b':
+        case 127:
+        case KEY_BACKSPACE: {
+            if(state->x != 1) {
+                shift_str_left(state->command, &state->command_s, --state->x);
+                frontend_move_cursor(state->status_bar, 1, state->x);
+            }
+        } break;
+        case ctrl('c'):        
+        case ESCAPE:
+            reset_command(state->command, &state->command_s);
+            state->config.mode = NORMAL;
+            break;
+        case ctrl('s'): {
+            handle_save(buffer);
+            state->config.QUIT = 1;
+        } break;
+        case KEY_ENTER:
+        case ENTER: {
+            if(state->command[0] == '!') {
+                shift_str_left(state->command, &state->command_s, 0);
+                FILE *file = popen(state->command, "r");
+                if(file == NULL) {
+                    CRASH("could not run command");
+                }
+                while(fgets(state->status_bar_msg, sizeof(state->status_bar_msg), file) != NULL) {
+                    state->is_print_msg = 1;
+                }
+                pclose(file);
+            } else {
+                size_t command_s = 0;
+                Command_Token *command = lex_command(state, view_create(state->command, state->command_s), &command_s);
+                execute_command(buffer, state, command, command_s);
+            }
+            reset_command(state->command, &state->command_s);
+            state->config.mode = NORMAL;
+        } break;
+        case LEFT_ARROW:
+            if(state->x > 1) state->x--;
+            break;
+        case DOWN_ARROW:
+            break;
+        case UP_ARROW:
+            break;
+        case RIGHT_ARROW:
+            if(state->x < state->command_s) state->x++;
+            break;
+        case KEY_RESIZE:
+            frontend_resize_window(state);
+            break;
+        default: {
+            shift_str_right(state->command, &state->command_s, state->x);
+            state->command[(state->x++)-1] = state->ch;
+        } break;
+    }
+}
+
+void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
+    (void)modify_buffer;
+    (void)buffer;
+    switch(state->ch) {
+        case '\b':
+        case 127:
+        case KEY_BACKSPACE: {
+            if(state->x != 1) {
+                shift_str_left(state->command, &state->command_s, --state->x);
+                frontend_move_cursor(state->status_bar, 1, state->x);
+            }
+        } break;
+        case ctrl('c'):        
+        case ESCAPE:
+            reset_command(state->command, &state->command_s);
+            state->config.mode = NORMAL;
+            break;
+        case ENTER: {
+            size_t index = search(buffer, state->command, state->command_s);
+            if(state->command_s > 2 && strncmp(state->command, "s/", 2) == 0) {
+                char str[128]; // replace with the maximum length of your command
+                strncpy(str, state->command+2, state->command_s-2);
+                str[state->command_s-2] = '\0'; // ensure null termination
+
+                char *token = strtok(str, "/");
+                int count = 0;
+                char args[2][100];
+
+                while (token != NULL) {
+                    char temp_buffer[100];
+                    strcpy(temp_buffer, token);
+                    if(count == 0) {
+                        strcpy(args[0], temp_buffer);
+                    } else if(count == 1) {
+                        strcpy(args[1], temp_buffer);
+                    }
+                    count++;
+
+                    // log for args.
+                    token = strtok(NULL, "/");
+                }
+                index = search(buffer, args[0], strlen(args[0]));
+                find_and_replace(buffer, state, args[0], args[1]);
+            } 
+            buffer->cursor = index;
+            state->config.mode = NORMAL;
+        } break;
+        case ctrl('s'): {
+            handle_save(buffer);
+            state->config.QUIT = 1;
+        } break;
+        case LEFT_ARROW:
+            if(state->x > 1) state->x--;
+            break;
+        case DOWN_ARROW:
+            break;
+        case UP_ARROW:
+            break;
+        case RIGHT_ARROW:
+            if(state->x < state->command_s) state->x++;
+            break;
+        case KEY_RESIZE:
+            frontend_resize_window(state);
+            break;
+        default: {
+            shift_str_right(state->command, &state->command_s, state->x);
+            state->command[(state->x++)-1] = state->ch;
+        } break;
+    }
+}
+
+void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
+    (void)modify_buffer;
+    frontend_cursor_visible(0);
+    switch(state->ch) {
+        case ctrl('c'):        
+        case ESCAPE: {
+            state->config.mode = NORMAL;
+            frontend_cursor_visible(1);        
+            state->buffer->visual = (Visual){0};        
+        } break;
+        case ENTER: break;
+        case ctrl('s'): {
+            handle_save(buffer);
+            state->config.QUIT = 1;
+        } break;
+        case 'd':
+        case 'x': {
+            int cond = (buffer->visual.start > buffer->visual.end);
+            size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
+            size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
+            CREATE_UNDO(INSERT_CHARS, start);
+            buffer_delete_selection(buffer, state, start, end);
+            undo_push(state, &state->undo_stack, state->cur_undo);
+            state->config.mode = NORMAL;
+            frontend_cursor_visible(1);
+        } break;
+        case '>': {
+            int cond = (buffer->visual.start > buffer->visual.end);
+            size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
+            size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
+            size_t position = buffer->cursor + state->config.indent;
+            size_t row = index_get_row(buffer, start);
+            size_t end_row = index_get_row(buffer, end);
+            for(size_t i = row; i <= end_row; i++) {
+                buffer_calculate_rows(buffer);
+                buffer->cursor = buffer->rows.data[i].start;
+                if(state->config.indent > 0) {
+                    for(size_t i = 0; (int)i < state->config.indent; i++) {
+                        buffer_insert_char(state, buffer, ' ');
+                    }
+                } else {
+                     buffer_insert_char(state, buffer, '\t');                           
+                }
+            }
+            buffer->cursor = position;
+            state->config.mode = NORMAL;
+            frontend_cursor_visible(1);                    
+        } break;
+        case '<': {
+            int cond = (buffer->visual.start > buffer->visual.end);
+            size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
+            size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
+            size_t row = index_get_row(buffer, start);
+            size_t end_row = index_get_row(buffer, end);            
+            size_t offset = 0;
+            for(size_t i = row; i <= end_row; i++) {
+                buffer_calculate_rows(buffer);                
+                buffer->cursor = buffer->rows.data[i].start;
+                if(state->config.indent > 0) {
+                    for(size_t j = 0; (int)j < state->config.indent; j++) {
+                        if(isspace(buffer->data.data[buffer->cursor])) {
+                            buffer_delete_char(buffer, state);
+                            offset++;
+                            buffer_calculate_rows(buffer);
+                        }
+                    }
+                } else {
+                    if(isspace(buffer->data.data[buffer->cursor])) {
+                        buffer_delete_char(buffer, state);
+                        offset++;
+                        buffer_calculate_rows(buffer);
+                    }
+                }
+            }
+            state->config.mode = NORMAL;
+            frontend_cursor_visible(1);                                
+        } break;
+        case 'y': {
+            reset_command(state->clipboard.str, &state->clipboard.len);
+            int cond = (buffer->visual.start > buffer->visual.end);
+            size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
+            size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
+            buffer_yank_selection(buffer, state, start, end);
+            buffer->cursor = start;
+            state->config.mode = NORMAL;
+            frontend_cursor_visible(1);                                            
+            break;
+        }
+        default: {
+            handle_motion_keys(buffer, state, state->ch, &state->repeating.repeating_count);
+            if(buffer->visual.is_line) {
+                buffer->visual.end = buffer->rows.data[buffer_get_row(buffer)].end;
+                if(buffer->visual.start >= buffer->visual.end) {
+                    buffer->visual.end = buffer->rows.data[buffer_get_row(buffer)].start;
+                    buffer->visual.start = buffer->rows.data[index_get_row(buffer, buffer->visual.start)].end;
+                }
+            } else {
+                buffer->visual.end = buffer->cursor;
+            }
+        } break;
+    }
+}

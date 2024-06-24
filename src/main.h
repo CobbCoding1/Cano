@@ -19,6 +19,9 @@
 #include "lex.h"
 #include "commands.h"
 #include "frontend.h"
+#include "keys.h"
+#include "tools.h"
+#include "buffer.h"
 
 #define CREATE_UNDO(t, p)    \
     Undo undo = {0};         \
