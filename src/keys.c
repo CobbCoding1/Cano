@@ -1,6 +1,5 @@
 #include "keys.h"
 
-
 size_t search(Buffer *buffer, char *command, size_t command_s) {
     for(size_t i = buffer->cursor+1; i < buffer->data.count+buffer->cursor; i++) {
         size_t pos = i % buffer->data.count;

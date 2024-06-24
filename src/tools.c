@@ -1,5 +1,7 @@
 #include "tools.h"
 
+typedef int(* __compar_fn_t) (const void *, const void *);
+
 void free_buffer(Buffer *buffer) {
     free(buffer->data.data);
     free(buffer->rows.data);
