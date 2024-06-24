@@ -41,11 +41,6 @@ void find_and_replace(Buffer *buffer, State *state, char *old_str, char *new_str
     }
 }
     
-void reset_command(char *command, size_t *command_s) {
-    memset(command, 0, *command_s);
-    *command_s = 0;
-}
-
 int handle_motion_keys(Buffer *buffer, State *state, int ch, size_t *repeating_count) {
     (void)repeating_count;
     switch(ch) {

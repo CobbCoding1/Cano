@@ -107,18 +107,19 @@ typedef struct {
     int blue;
 } Color;
 
-
 typedef struct {
     size_t x;
     size_t y;
 } Point;
 
+// Visual selection range
 typedef struct {
     size_t start;
     size_t end;
     int is_line;
 } Visual;
 
+// Index in buffer which indicate the start and end of a row
 typedef struct {
     size_t start;
     size_t end;
@@ -130,6 +131,7 @@ typedef struct {
     size_t capacity;
 } Rows;
 
+// Data is the actual buffer which stores the text
 typedef struct {
     char *data;
     size_t count;
@@ -172,7 +174,7 @@ typedef struct {
 } Undo_Stack;
     
 typedef struct {
-    int repeating;
+    bool repeating;
     size_t repeating_count;
 } Repeating;
 
@@ -181,6 +183,7 @@ typedef struct {
     size_t len;
 } Sized_Str;
 
+// For mapping keys
 typedef struct {
     int a;
     char *b;
@@ -263,33 +266,38 @@ typedef struct State {
     Undo_Stack undo_stack;
     Undo_Stack redo_stack;
     Undo cur_undo;
-    size_t num_of_braces;
-    int ch;
-	char *env;	
+    size_t num_of_braces; // braces that preceed the cursor
+    int ch;               // current character
+	char *env;	        // home folder
     
-    char *command;
-    size_t command_s;
+    char *command;        // most recent command entered by user
+    size_t command_s;     // size of command
     
     Variables variables;
     
     Repeating repeating;
     Data num;
-    Leader leader;
+    Leader leader;        // current leader key
 
-    int is_print_msg;
+    bool is_print_msg;
     char *status_bar_msg;
 
+    // rendering positions
     size_t x;
     size_t y;
     size_t normal_pos;
 
+    // key functions to be called on each keypress
     void(**key_func)(Buffer *buffer, Buffer **modify_buffer, struct State *state);
 
     Sized_Str clipboard;
 
+    // files for file explorer (ctrl+n)
     Files* files;
     bool is_exploring;
     size_t explore_cursor;
+    
+    // text buffer
     Buffer* buffer;
 
     // window sizes
@@ -321,6 +329,7 @@ typedef struct {
     int b;
 } Ncurses_Color;
 
+// positions for syntax highlighting
 typedef struct {
     size_t row;
     size_t col;
@@ -329,6 +338,4 @@ typedef struct {
     
 extern char *string_modes[MODE_COUNT];
 
-void handle_save(Buffer *buffer);
-
-#endif
+#endif // DEFS_H

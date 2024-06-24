@@ -23,5 +23,6 @@ int contains_c_extension(const char *str);
 void *check_for_errors(void *args);
 Ncurses_Color rgb_to_ncurses(int r, int g, int b);
 void init_ncurses_color(int id, int r, int g, int b);
+void reset_command(char *command, size_t *command_s);
 
-#endif
+#endif // TOOLS_H

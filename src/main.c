@@ -1,8 +1,5 @@
 #include "main.h"
 
-#include <locale.h>
-#include "cgetopt.h"
-
 char *string_modes[MODE_COUNT] = {"NORMAL", "INSERT", "SEARCH", "COMMAND", "VISUAL"};
 _Static_assert(sizeof(string_modes)/sizeof(*string_modes) == MODE_COUNT, "Number of modes");
 

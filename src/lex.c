@@ -46,8 +46,6 @@ static size_t keywords_s = 0;
 static char **types;
 static size_t types_s = 0;
 
-static char *comments = "//";
-
 #define NUM_KEYWORDS sizeof(keywords_old)/sizeof(*keywords_old)
 #define NUM_TYPES sizeof(types_old)/sizeof(*types_old)
 

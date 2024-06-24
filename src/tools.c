@@ -13,6 +13,11 @@ void free_buffer(Buffer *buffer) {
 void free_undo(Undo *undo) {
     free(undo->data.data);
 }
+    
+void reset_command(char *command, size_t *command_s) {
+    memset(command, 0, *command_s);
+    *command_s = 0;
+}
 
 void free_undo_stack(Undo_Stack *undo) {
     for(size_t i = 0; i < undo->count; i++) {

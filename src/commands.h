@@ -107,4 +107,4 @@ void interpret_command(Buffer *buffer, State *state, Node *root);
 void print_tree(Node *node, size_t depth);
 int execute_command(Buffer *buffer, State *state, Command_Token *command, size_t command_s);
 
-#endif
+#endif // COMMANDS_H

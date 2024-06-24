@@ -35,4 +35,4 @@ size_t view_find(String_View haystack, String_View needle);
 int view_to_int(String_View view);
 float view_to_float(String_View view);
 
-#endif
+#endif // VIEW_H

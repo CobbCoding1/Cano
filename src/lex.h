@@ -36,4 +36,4 @@ Token generate_word(String_View *view, char *contents);
 size_t generate_tokens(char *line, size_t line_s, Token *token_arr, size_t *token_arr_capacity);
 int read_file_by_lines(char *filename, char ***lines, size_t *lines_s);
 
-#endif
+#endif // LEX_H

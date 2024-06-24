@@ -26,4 +26,4 @@ typedef struct {
     size_t arr_s;
 } Color_Arr;
 
-#endif /* COLORS_H */
+#endif // COLORS_H
