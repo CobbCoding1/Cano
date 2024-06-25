@@ -201,11 +201,11 @@ int handle_motion_keys(Buffer *buffer, State *state, int ch, size_t *repeating_c
     
 int handle_leader_keys(State *state) {
     switch(state->ch) {
-        case 'd':
+        case 'd': 
             state->leader = LEADER_D;
             break;
-        case 'y':
-            state->leader = LEADER_Y;
+        case 'y': 
+            state->leader = LEADER_Y; 
             break;
         default:
             return 0;
