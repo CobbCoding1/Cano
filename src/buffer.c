@@ -87,13 +87,49 @@ void buffer_yank_selection(Buffer *buffer, State *state, size_t start, size_t en
 }
 
 void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t end) {
-    int count = end - start;
     buffer_yank_selection(buffer, state, start, end);
+    
     buffer->cursor = start;
-    while(count >= 0) {
-        buffer_delete_char(buffer, state);
-        count--;
+        
+    // +1 to delete the last character as well
+    size_t size = end-start+1;
+    // constrain size to be within the buffer
+    if(size >= buffer->data.count) size = buffer->data.count;
+        
+    // resize undo as necessary
+    if(state->cur_undo.data.capacity < size) {
+        state->cur_undo.data.capacity = size;
+        state->cur_undo.data.data = realloc(state->cur_undo.data.data, sizeof(char)*size);
+        ASSERT(state->cur_undo.data.data != NULL, "could not alloc");
     }
+    strncpy(state->cur_undo.data.data, &buffer->data.data[buffer->cursor], size);
+    state->cur_undo.data.count = size;
+    
+    memmove(&buffer->data.data[buffer->cursor], 
+        &buffer->data.data[buffer->cursor+size], 
+        buffer->data.count - (end));
+    buffer->data.count -= size;
+    buffer_calculate_rows(buffer);
+}
+    
+void buffer_insert_selection(Buffer *buffer, Data *selection, size_t start) {
+    buffer->cursor = start;
+        
+    size_t size = selection->count;
+        
+    // resize buffer as necessary
+    if(buffer->data.capacity <= size) {
+        buffer->data.capacity += size;
+        buffer->data.data = realloc(buffer->data.data, sizeof(char)*buffer->data.capacity);
+        ASSERT(buffer->data.data != NULL, "could not alloc");
+    }
+    memmove(&buffer->data.data[buffer->cursor+size], 
+        &buffer->data.data[buffer->cursor], 
+        buffer->data.count - buffer->cursor);
+    strncpy(&buffer->data.data[buffer->cursor], selection->data, size);
+    
+    buffer->data.count += size;
+    buffer_calculate_rows(buffer);
 }
 
 void buffer_move_up(Buffer *buffer) {

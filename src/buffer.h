@@ -14,6 +14,7 @@ void buffer_yank_line(Buffer *buffer, State *state, size_t offset);
 void buffer_yank_char(Buffer *buffer, State *state);
 void buffer_yank_selection(Buffer *buffer, State *state, size_t start, size_t end);
 void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t end);
+void buffer_insert_selection(Buffer *buffer, Data *selection, size_t start);
 void buffer_move_up(Buffer *buffer);
 void buffer_move_down(Buffer *buffer);
 void buffer_move_right(Buffer *buffer);

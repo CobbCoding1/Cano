@@ -390,11 +390,9 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     break;
                 case INSERT_CHARS:
                     state->cur_undo.type = (undo.data.count > 1) ? DELETE_MULT_CHAR : DELETE_CHAR;
-                    state->cur_undo.end = undo.start + undo.data.count;
+                    state->cur_undo.end = undo.start + undo.data.count-1;
                     buffer->cursor = undo.start;
-                    for(size_t i = 0; i < undo.data.count; i++) {
-                        buffer_insert_char(state, buffer, undo.data.data[i]);
-                    } 
+                    buffer_insert_selection(buffer, &undo.data, undo.start);
                     break;
                 case DELETE_CHAR:
                     state->cur_undo.type = INSERT_CHARS;
@@ -405,9 +403,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     state->cur_undo.type = INSERT_CHARS;
                     state->cur_undo.end = undo.end;
                     buffer->cursor = undo.start;
-                    for(size_t i = undo.start; i < undo.end; i++) {
-                        buffer_delete_char(buffer, state);
-                    }
+                    buffer_delete_selection(buffer, state, undo.start, undo.end);
                     break;
                 case REPLACE_CHAR:
                     state->cur_undo.type = REPLACE_CHAR;
@@ -432,9 +428,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     state->cur_undo.type = (redo.data.count > 1) ? DELETE_MULT_CHAR : DELETE_CHAR;
                     state->cur_undo.end = redo.start + redo.data.count;
                     buffer->cursor = redo.start;
-                    for(size_t i = 0; i < redo.data.count; i++) {
-                        buffer_insert_char(state, buffer, redo.data.data[i]);
-                    } 
+                    buffer_insert_selection(buffer, &redo.data, redo.start);
                     break;
                 case DELETE_CHAR:
                     state->cur_undo.type = INSERT_CHARS;
@@ -444,10 +438,8 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 case DELETE_MULT_CHAR:
                     state->cur_undo.type = INSERT_CHARS;
                     state->cur_undo.end = redo.end;
-                    buffer->cursor = undo.start;
-                    for(size_t i = redo.start; i < redo.end; i++) {
-                        buffer_delete_char(buffer, state);
-                    }
+                    buffer->cursor = redo.start;
+                    buffer_delete_selection(buffer, state, redo.start, redo.end);
                     break;
                 case REPLACE_CHAR:
                     state->cur_undo.type = REPLACE_CHAR;
