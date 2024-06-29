@@ -481,9 +481,8 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case 'p': {
             if(state->clipboard.len == 0) break;
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
-            for(size_t i = 0; i < state->clipboard.len-1; i++) {
-                buffer_insert_char(state, buffer, state->clipboard.str[i]);
-            }
+            Data data = dynstr_to_data(state->clipboard);
+            buffer_insert_selection(buffer, &data, buffer->cursor);
             state->cur_undo.end = buffer->cursor;
             undo_push(state, &state->undo_stack, state->cur_undo); 
         } break;

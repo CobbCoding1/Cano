@@ -2,6 +2,14 @@
 
 typedef int(* __compar_fn_t) (const void *, const void *);
 
+Data dynstr_to_data(Sized_Str str) {
+    return (Data){
+        .data = str.str,
+        .count = str.len,
+        .capacity = str.len,
+    };
+}
+
 void free_buffer(Buffer *buffer) {
     free(buffer->data.data);
     free(buffer->rows.data);

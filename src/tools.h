@@ -5,6 +5,7 @@
 #include "colors.h"
 #include "lex.h"
 
+Data dynstr_to_data(Sized_Str str);
 void free_buffer(Buffer *buffer);
 void free_undo(Undo *undo);
 void free_undo_stack(Undo_Stack *undo);

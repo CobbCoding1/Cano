@@ -118,9 +118,9 @@ void buffer_insert_selection(Buffer *buffer, Data *selection, size_t start) {
     size_t size = selection->count;
         
     // resize buffer as necessary
-    if(buffer->data.capacity <= size) {
-        buffer->data.capacity += size;
-        buffer->data.data = realloc(buffer->data.data, sizeof(char)*buffer->data.capacity);
+    if(size >= buffer->data.capacity) {
+        buffer->data.capacity += size*2;
+        buffer->data.data = realloc(buffer->data.data, sizeof(char)*buffer->data.capacity+1);
         ASSERT(buffer->data.data != NULL, "could not alloc");
     }
     memmove(&buffer->data.data[buffer->cursor+size], 
