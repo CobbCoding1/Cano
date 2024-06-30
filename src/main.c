@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
     state.key_func = key_func;
     state.files = calloc(32, sizeof(File));
     state.config.lang = "UNUSED";
-    scan_files(state.files, ".");
+    scan_files(&state, ".");
 
     frontend_init(&state);
 
@@ -114,6 +114,11 @@ int main(int argc, char **argv) {
     free_undo_stack(&state.undo_stack);
     free_undo_stack(&state.redo_stack);
     free_files(state.files);
+    free(state.files);
+
+    free(state.command);
+    free(syntax_filename);
+    free(config_filename);
 
     return 0;
 }

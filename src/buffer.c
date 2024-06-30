@@ -79,7 +79,7 @@ void buffer_yank_char(Buffer *buffer, State *state) {
 }
 
 void buffer_yank_selection(Buffer *buffer, State *state, size_t start, size_t end) {
-    state->clipboard.len = end-start+2;
+    state->clipboard.len = end-start+1;
     state->clipboard.str = realloc(state->clipboard.str, 
                                    state->clipboard.len*sizeof(char));
     if(state->clipboard.str == NULL) CRASH("null");
@@ -118,7 +118,7 @@ void buffer_insert_selection(Buffer *buffer, Data *selection, size_t start) {
     size_t size = selection->count;
         
     // resize buffer as necessary
-    if(size >= buffer->data.capacity) {
+    if(buffer->data.count + size >= buffer->data.capacity) {
         buffer->data.capacity += size*2;
         buffer->data.data = realloc(buffer->data.data, sizeof(char)*buffer->data.capacity+1);
         ASSERT(buffer->data.data != NULL, "could not alloc");

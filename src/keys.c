@@ -482,6 +482,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             if(state->clipboard.len == 0) break;
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
             Data data = dynstr_to_data(state->clipboard);
+            WRITE_LOG("%.*s\n", (int)state->clipboard.len, state->clipboard.str);
             buffer_insert_selection(buffer, &data, buffer->cursor);
             state->cur_undo.end = buffer->cursor;
             undo_push(state, &state->undo_stack, state->cur_undo); 
@@ -512,10 +513,11 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 
                             free_files(state->files);
                             state->files = calloc(32, sizeof(File));
-                            scan_files(state->files, str);
+                            scan_files(state, str);
                             state->explore_cursor = 0;
                         } else {
                             // TODO: Load syntax highlighting right here
+                            free_buffer(state->buffer);
                             state->buffer = load_buffer_from_file(f.path);
 							char *config_filename = NULL;
 							char *syntax_filename = NULL;							
@@ -624,7 +626,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 			ASSERT(buffer->data.count >= buffer->cursor, "check");
 			ASSERT(buffer->data.data, "check2");
 			Brace brace = (Brace){0};
-			Brace cur_brace;
+			Brace cur_brace = {0};
 			if(buffer->cursor == 0) cur_brace = find_opposite_brace(buffer->data.data[0]);			
 			else cur_brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
 			

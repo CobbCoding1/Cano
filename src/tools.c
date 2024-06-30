@@ -133,7 +133,7 @@ int compare_name(File const *leftp, File const *rightp)
     return strcoll(leftp->name, rightp->name);
 }
 
-void scan_files(Files *files, char *directory) {
+void scan_files(State *state, char *directory) {
     DIR *dp = opendir(directory);
     if(dp == NULL) {
         WRITE_LOG("Failed to open directory: %s\n", directory);
@@ -155,14 +155,14 @@ void scan_files(Files *files, char *directory) {
 
         if(dent->d_type == DT_DIR) {
             strcat(name, "/");
-            DA_APPEND(files, ((File){name, path, true}));
+            DA_APPEND(state->files, ((File){name, path, true}));
         } else if(dent->d_type == DT_REG) {
-            DA_APPEND(files, ((File){name, path, false}));
+            DA_APPEND(state->files, ((File){name, path, false}));
         }
     }
     closedir(dp);
-    qsort(files->data, files->count,
-        sizeof *files->data, (__compar_fn_t)&compare_name);
+    qsort(state->files->data, state->files->count,
+        sizeof *state->files->data, (__compar_fn_t)&compare_name);
 }
 
 void free_files(Files *files) {
@@ -170,7 +170,7 @@ void free_files(Files *files) {
         free(files->data[i].name);
         free(files->data[i].path);
     }
-    free(files);
+    //free(files);
 }
     
 void load_config_from_file(State *state, Buffer *buffer, char *config_filename, char *syntax_filename) {
