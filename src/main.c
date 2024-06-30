@@ -116,8 +116,8 @@ int main(int argc, char **argv) {
     free_files(&state.files);
 
     free(state.command);
-    //free(syntax_filename);
-    //free(config_filename);
+    if(syntax_filename) free(syntax_filename);
+    if(config_filename) free(config_filename);
 
     return 0;
 }
