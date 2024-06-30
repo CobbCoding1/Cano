@@ -372,9 +372,12 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             break;
         case ctrl('o'): {
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
-            buffer_insert_char(state, buffer, '\n');
-            buffer_create_indent(buffer, state);
+            size_t row = buffer_get_row(buffer);
+            size_t end = buffer->rows.data[row].end;
+            buffer->cursor = end;
+            buffer_newline_indent(buffer, state);
             undo_push(state, &state->undo_stack, state->cur_undo);
+            break;
         } break;
         case 'n': {
             size_t index = search(buffer, state->command, state->command_s);
@@ -511,7 +514,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                             char str[256];
                             strcpy(str, f.path);
 
-                            free_files(state->files);
+                            free_files(&state->files);
                             state->files = calloc(32, sizeof(File));
                             scan_files(state, str);
                             state->explore_cursor = 0;
