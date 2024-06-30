@@ -18,7 +18,7 @@ Undo undo_pop(Undo_Stack *stack);
 Brace find_opposite_brace(char opening);
 int check_keymaps(Buffer *buffer, State *state);
 void scan_files(State *state, char *directory);
-void free_files(Files *files);
+void free_files(Files **files);
 void load_config_from_file(State *state, Buffer *buffer, char *config_filename, char *syntax_filename);
 int contains_c_extension(const char *str);
 void *check_for_errors(void *args);

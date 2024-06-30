@@ -165,12 +165,13 @@ void scan_files(State *state, char *directory) {
         sizeof *state->files->data, (__compar_fn_t)&compare_name);
 }
 
-void free_files(Files *files) {
-    for(size_t i = 0; i < files->count; ++i) {
-        free(files->data[i].name);
-        free(files->data[i].path);
+void free_files(Files **files) {
+    for(size_t i = 0; i < (*files)->count; ++i) {
+        free((*files)->data[i].name);
+        free((*files)->data[i].path);
     }
-    //free(files);
+    free((*files)->data);        
+    free(*files);
 }
     
 void load_config_from_file(State *state, Buffer *buffer, char *config_filename, char *syntax_filename) {

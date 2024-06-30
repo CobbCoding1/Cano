@@ -113,8 +113,7 @@ int main(int argc, char **argv) {
     free_buffer(state.buffer);
     free_undo_stack(&state.undo_stack);
     free_undo_stack(&state.redo_stack);
-    free_files(state.files);
-    free(state.files);
+    free_files(&state.files);
 
     free(state.command);
     free(syntax_filename);
