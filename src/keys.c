@@ -645,7 +645,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 buffer_insert_char(state, buffer, brace.brace);
 	            undo_push(state, &state->undo_stack, state->cur_undo);
                 buffer->cursor--;
-	            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);				
+	            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);				                                
             }
         } break;
     }

@@ -1,5 +1,6 @@
 #include "buffer.h"
 
+// updates the rows to be consistent with the buffer data
 void buffer_calculate_rows(Buffer *buffer) {
     buffer->rows.count = 0;
     size_t start = 0;
@@ -16,11 +17,13 @@ void buffer_calculate_rows(Buffer *buffer) {
 void buffer_insert_char(State *state, Buffer *buffer, char ch) {
 	ASSERT(buffer != NULL, "buffer exists");
 	ASSERT(state != NULL, "state exists");		
+    // constrain the cursor
     if(buffer->cursor > buffer->data.count) buffer->cursor = buffer->data.count;
     DA_APPEND(&buffer->data, ch);
+    // shift the data over one
     memmove(&buffer->data.data[buffer->cursor + 1], &buffer->data.data[buffer->cursor], buffer->data.count - 1 - buffer->cursor);
-    buffer->data.data[buffer->cursor] = ch;
-    buffer->cursor++;
+    buffer->data.data[buffer->cursor++] = ch;
+    // shift the end of the current undo
     state->cur_undo.end = buffer->cursor;
     buffer_calculate_rows(buffer);
 }
@@ -64,7 +67,7 @@ void buffer_yank_line(Buffer *buffer, State *state, size_t offset) {
     state->clipboard.len = cur.end - cur.start + 1; // account for new line
     state->clipboard.str = realloc(state->clipboard.str, 
                                    initial_s+state->clipboard.len*sizeof(char));
-    if(state->clipboard.str == NULL) CRASH("null");
+    ASSERT(state->clipboard.str != NULL, "clipboard was null");
     strncpy(state->clipboard.str+initial_s, buffer->data.data+cur.start, state->clipboard.len);
     state->clipboard.len += initial_s;
 }
@@ -74,7 +77,7 @@ void buffer_yank_char(Buffer *buffer, State *state) {
     state->clipboard.len = 2; 
     state->clipboard.str = realloc(state->clipboard.str, 
                                    state->clipboard.len*sizeof(char));
-    if(state->clipboard.str == NULL) CRASH("null");
+    ASSERT(state->clipboard.str != NULL, "clipboard was null");    
     strncpy(state->clipboard.str, buffer->data.data+buffer->cursor, state->clipboard.len);
 }
 
@@ -82,7 +85,8 @@ void buffer_yank_selection(Buffer *buffer, State *state, size_t start, size_t en
     state->clipboard.len = end-start+1;
     state->clipboard.str = realloc(state->clipboard.str, 
                                    state->clipboard.len*sizeof(char));
-    if(state->clipboard.str == NULL) CRASH("null");
+    WRITE_LOG("len: %zu, end: %zu, start: %zu\n", state->clipboard.len, end, start);
+    ASSERT(state->clipboard.str != NULL, "clipboard was null");            
     strncpy(state->clipboard.str, buffer->data.data+start, state->clipboard.len);
 }
 
@@ -92,7 +96,7 @@ void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t 
     buffer->cursor = start;
         
     // +1 to delete the last character as well
-    size_t size = end-start+1;
+    size_t size = end-start;
     // constrain size to be within the buffer
     if(size >= buffer->data.count) size = buffer->data.count;
         
@@ -108,7 +112,7 @@ void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t 
     memmove(&buffer->data.data[buffer->cursor], 
         &buffer->data.data[buffer->cursor+size], 
         buffer->data.count - (end));
-    buffer->data.count -= size;
+    buffer->data.count -= (size);
     buffer_calculate_rows(buffer);
 }
     
