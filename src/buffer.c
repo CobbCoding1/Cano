@@ -29,14 +29,16 @@ void buffer_insert_char(State *state, Buffer *buffer, char ch) {
 }
 
 void buffer_delete_char(Buffer *buffer, State *state) {
+    (void)state;
     if(buffer->cursor < buffer->data.count) {
-        DA_APPEND(&state->cur_undo.data, buffer->data.data[buffer->cursor]);
+        // shift data left by 1
         memmove(&buffer->data.data[buffer->cursor], &buffer->data.data[buffer->cursor+1], buffer->data.count - buffer->cursor - 1);
         buffer->data.count--;
         buffer_calculate_rows(buffer);
     }
 }
 
+// get current row information based on cursor
 size_t buffer_get_row(const Buffer *buffer) {
     ASSERT(buffer->cursor <= buffer->data.count, "cursor: %zu", buffer->cursor);
     ASSERT(buffer->rows.count >= 1, "there must be at least one line");
@@ -48,6 +50,7 @@ size_t buffer_get_row(const Buffer *buffer) {
     return 0;
 }
 
+// get current row information based on index
 size_t index_get_row(Buffer *buffer, size_t index) {
     ASSERT(index <= buffer->data.count, "index: %zu", index);
     ASSERT(buffer->rows.count >= 1, "there must be at least one line");
@@ -61,10 +64,12 @@ size_t index_get_row(Buffer *buffer, size_t index) {
 
 void buffer_yank_line(Buffer *buffer, State *state, size_t offset) {
     size_t row = buffer_get_row(buffer);
+    // check boundaries
     if(offset > index_get_row(buffer, buffer->data.count)) return;
     Row cur = buffer->rows.data[row+offset];
     size_t initial_s = state->clipboard.len;
     state->clipboard.len = cur.end - cur.start + 1; // account for new line
+    // resize the clipboard as necessary
     state->clipboard.str = realloc(state->clipboard.str, 
                                    initial_s+state->clipboard.len*sizeof(char));
     ASSERT(state->clipboard.str != NULL, "clipboard was null");
@@ -75,6 +80,7 @@ void buffer_yank_line(Buffer *buffer, State *state, size_t offset) {
 void buffer_yank_char(Buffer *buffer, State *state) {
     reset_command(state->clipboard.str, &state->clipboard.len);
     state->clipboard.len = 2; 
+    // resize the clipboard as necessary    
     state->clipboard.str = realloc(state->clipboard.str, 
                                    state->clipboard.len*sizeof(char));
     ASSERT(state->clipboard.str != NULL, "clipboard was null");    
@@ -84,8 +90,7 @@ void buffer_yank_char(Buffer *buffer, State *state) {
 void buffer_yank_selection(Buffer *buffer, State *state, size_t start, size_t end) {
     state->clipboard.len = end-start+1;
     state->clipboard.str = realloc(state->clipboard.str, 
-                                   state->clipboard.len*sizeof(char));
-    WRITE_LOG("len: %zu, end: %zu, start: %zu\n", state->clipboard.len, end, start);
+                                   state->clipboard.len*sizeof(char)+1);
     ASSERT(state->clipboard.str != NULL, "clipboard was null");            
     strncpy(state->clipboard.str, buffer->data.data+start, state->clipboard.len);
 }
@@ -140,7 +145,9 @@ void buffer_move_up(Buffer *buffer) {
     size_t row = buffer_get_row(buffer);
     size_t col = buffer->cursor - buffer->rows.data[row].start;
     if(row > 0) {
+        // set to previous row on current column
         buffer->cursor = buffer->rows.data[row-1].start + col;
+        // clamp the cursor position to the end of the row
         if(buffer->cursor > buffer->rows.data[row-1].end) {
             buffer->cursor = buffer->rows.data[row-1].end;
         }
@@ -151,7 +158,9 @@ void buffer_move_down(Buffer *buffer) {
     size_t row = buffer_get_row(buffer);
     size_t col = buffer->cursor - buffer->rows.data[row].start;
     if(row < buffer->rows.count - 1) {
+        // set to next row on current column        
         buffer->cursor = buffer->rows.data[row+1].start + col;
+        // clamp the cursor position to the end of the row        
         if(buffer->cursor > buffer->rows.data[row+1].end) {
             buffer->cursor = buffer->rows.data[row+1].end;
         }
@@ -167,8 +176,11 @@ void buffer_move_left(Buffer *buffer) {
 }
 
 int skip_to_char(Buffer *buffer, int cur_pos, int direction, char c) {
+    // check if currently on c 
     if(buffer->data.data[cur_pos] == c) {
+        // increment by the direciton, can be positive or negative
         cur_pos += direction;
+        // search for the next instance of c
         while(cur_pos > 0 && cur_pos <= (int)buffer->data.count && buffer->data.data[cur_pos] != c) {
             if(cur_pos > 1 && cur_pos < (int)buffer->data.count && buffer->data.data[cur_pos] == '\\') {
                 cur_pos += direction;
@@ -183,18 +195,23 @@ void buffer_next_brace(Buffer *buffer) {
     int cur_pos = buffer->cursor;
     Brace initial_brace = find_opposite_brace(buffer->data.data[cur_pos]);
     size_t brace_stack = 0;
+    // if not currently on a brace, exit
     if(initial_brace.brace == '0') return;
+    // check if going forward or backward
     int direction = (initial_brace.closing) ? -1 : 1;
     while(cur_pos >= 0 && cur_pos <= (int)buffer->data.count) {
         cur_pos += direction;
+        // skip over quotes if necessary to avoid strings containing braces
         cur_pos = skip_to_char(buffer, cur_pos, direction, '"');
         cur_pos = skip_to_char(buffer, cur_pos, direction, '\'');
         Brace cur_brace = find_opposite_brace(buffer->data.data[cur_pos]);
+        // if not currently on a brace, continue        
         if(cur_brace.brace == '0') continue;
         if((cur_brace.closing && direction == -1) || (!cur_brace.closing && direction == 1)) {
             brace_stack++;
         } else {
             if(brace_stack-- == 0 && cur_brace.brace == find_opposite_brace(initial_brace.brace).brace) {
+                // set cursor to brace if found
                 buffer->cursor = cur_pos;
                 break;
             }
@@ -208,6 +225,7 @@ int isword(char ch) {
 }
     
 void buffer_create_indent(Buffer *buffer, State *state) {
+    // if indent is 0, then use tabs, otherwise spaces
     if(state->config.indent > 0) {
         for(size_t i = 0; i < state->config.indent*state->num_of_braces; i++) {
             buffer_insert_char(state, buffer, ' ');
@@ -219,6 +237,7 @@ void buffer_create_indent(Buffer *buffer, State *state) {
     }
 }
 
+// insert newline, then indent
 void buffer_newline_indent(Buffer *buffer, State *state) {
     buffer_insert_char(state, buffer, '\n');
     buffer_create_indent(buffer, state);
