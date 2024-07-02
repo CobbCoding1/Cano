@@ -37,10 +37,13 @@
 #define DA_APPEND(da, item) do {                                                       \
     if ((da)->count >= (da)->capacity) {                                               \
         (da)->capacity = (da)->capacity == 0 ? DATA_START_CAPACITY : (da)->capacity*2; \
-        (da)->data = realloc((da)->data, ((da)->capacity+1)*sizeof(*(da)->data));      \
-        ASSERT((da)->data != NULL, "outta ram");                               \
+        void *new= calloc(((da)->capacity+1), sizeof(*(da)->data));                    \
+        ASSERT(new,"outta ram");                                                       \
+        memcpy(new, (da)->data, (da)->count);                                          \
+        free((da)->data);                                                              \
+        (da)->data = new;                                                              \
     }                                                                                  \
-    (da)->data[(da)->count++] = (item);                                               \
+    (da)->data[(da)->count++] = (item);                                                \
 } while (0)
 
 #define ctrl(x) ((x) & 0x1f)
