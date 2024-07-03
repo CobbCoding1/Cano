@@ -55,6 +55,7 @@ void handle_flags(char *program, char **argv, int argc, char **config_filename, 
                 }
                 break;
             default:
+                break;
                 fprintf(stderr, "Unexpected flag");
                 exit(EXIT_FAILURE);
        }
