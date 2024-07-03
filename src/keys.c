@@ -604,10 +604,10 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             break;
         case KEY_ENTER:
         case ENTER: {
-            Brace brace = find_opposite_brace(buffer->data.data[buffer->cursor]);        
             if(state->cur_undo.end != state->cur_undo.start) {
                 undo_push(state, &state->undo_stack, state->cur_undo);
             }
+            Brace brace = find_opposite_brace(buffer->data.data[buffer->cursor]);                    
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
             buffer_newline_indent(buffer, state);
             if(brace.brace != '0' && brace.closing) {
