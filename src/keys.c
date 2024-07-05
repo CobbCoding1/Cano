@@ -485,7 +485,12 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             if(state->clipboard.len == 0) break;
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
             Data data = dynstr_to_data(state->clipboard);
-            WRITE_LOG("%.*s\n", (int)state->clipboard.len, state->clipboard.str);
+            if(state->clipboard.len > 0 && state->clipboard.str[0] == '\n') {
+                WRITE_LOG("newline");
+                size_t row = buffer_get_row(buffer);
+                size_t end = buffer->rows.data[row].end;
+                buffer->cursor = end;
+            }
             buffer_insert_selection(buffer, &data, buffer->cursor);
             state->cur_undo.end = buffer->cursor;
             undo_push(state, &state->undo_stack, state->cur_undo); 

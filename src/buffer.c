@@ -67,13 +67,20 @@ void buffer_yank_line(Buffer *buffer, State *state, size_t offset) {
     // check boundaries
     if(offset > index_get_row(buffer, buffer->data.count)) return;
     Row cur = buffer->rows.data[row+offset];
-    size_t initial_s = state->clipboard.len;
+    int line_offset = 0;
+    size_t initial_s = state->clipboard.len;    
     state->clipboard.len = cur.end - cur.start + 1; // account for new line
     // resize the clipboard as necessary
     state->clipboard.str = realloc(state->clipboard.str, 
                                    initial_s+state->clipboard.len*sizeof(char));
+    if(row > 0) line_offset = -1;
+    else {
+        state->clipboard.len--;
+        initial_s++;
+        state->clipboard.str[0] = '\n';
+    }
     ASSERT(state->clipboard.str != NULL, "clipboard was null");
-    strncpy(state->clipboard.str+initial_s, buffer->data.data+cur.start, state->clipboard.len);
+    strncpy(state->clipboard.str+initial_s, buffer->data.data+cur.start+line_offset, state->clipboard.len);
     state->clipboard.len += initial_s;
 }
 
