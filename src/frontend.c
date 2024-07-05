@@ -204,5 +204,7 @@ void frontend_resize_window(State *state) {
 }
 
 void frontend_end() {
+    printf("\x1b[\x30 q");
+    wrefresh(stdscr);
     endwin();
 }

@@ -103,6 +103,7 @@ int main(int argc, char **argv) {
     buffer_calculate_rows(state.buffer);
 
     while(state.ch != ctrl('q') && state.config.QUIT != 1) {
+        handle_cursor_shape(&state);
         state_render(&state);
         state.ch = frontend_getch(state.main_win);
         state.key_func[state.config.mode](state.buffer, &state.buffer, &state);

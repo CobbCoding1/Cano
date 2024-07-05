@@ -6,6 +6,7 @@
 #include "lex.h"
 
 Data dynstr_to_data(Sized_Str str);
+void handle_cursor_shape(State *state);
 void free_buffer(Buffer *buffer);
 void free_undo(Undo *undo);
 void free_undo_stack(Undo_Stack *undo);

@@ -9,6 +9,25 @@ Data dynstr_to_data(Sized_Str str) {
         .capacity = str.len,
     };
 }
+    
+void handle_cursor_shape(State *state) {
+    switch(state->config.mode) {
+        case NORMAL:
+        case VISUAL:
+        case COMMAND:
+        case SEARCH:
+            system("echo -e -n \"\x1b[\x30 q\"");
+            wrefresh(stdscr);    
+            break;
+        case INSERT:
+            system("echo -e -n \"\x1b[\x35 q\"");
+            wrefresh(stdscr);    
+            break;
+        case MODE_COUNT:
+        default:
+            ASSERT(false, "unreachable");    
+    }
+}
 
 void free_buffer(Buffer *buffer) {
     free(buffer->data.data);
