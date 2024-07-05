@@ -605,7 +605,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case KEY_ENTER:
         case ENTER: {
             if(state->cur_undo.end != state->cur_undo.start) {
-                //undo_push(state, &state->undo_stack, state->cur_undo);
+                undo_push(state, &state->undo_stack, state->cur_undo);
             }
             
             Brace brace = find_opposite_brace(buffer->data.data[buffer->cursor]);                    
