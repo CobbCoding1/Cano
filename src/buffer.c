@@ -250,7 +250,7 @@ State init_state() {
     state.config.relative_nums = 1;
     state.config.auto_indent = 1;
     state.config.syntax = 1;
-    state.config.indent = 4;
+    state.config.indent = 0;
     state.config.undo_size = 16;
     state.config.lang = " ";
     // Control variables
