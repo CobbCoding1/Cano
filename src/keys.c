@@ -494,6 +494,8 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             buffer_insert_selection(buffer, &data, buffer->cursor);
             state->cur_undo.end = buffer->cursor;
             undo_push(state, &state->undo_stack, state->cur_undo); 
+            if(state->clipboard.len > 0 && state->clipboard.str[0] == '\n' && buffer->cursor < buffer->data.count) 
+                    buffer->cursor++;
         } break;
         case ctrl('n'): {
             state->is_exploring = !state->is_exploring;
