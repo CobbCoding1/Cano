@@ -8,6 +8,9 @@
 void buffer_calculate_rows(Buffer *buffer);
 void buffer_insert_char(State *state, Buffer *buffer, char ch);
 void buffer_delete_char(Buffer *buffer, State *state);
+void buffer_delete_ch(Buffer *buffer, State *state);
+void buffer_replace_ch(Buffer *buffer, State *state);
+void buffer_delete_row(Buffer *buffer, State *state);
 size_t buffer_get_row(const Buffer *buffer);
 size_t index_get_row(Buffer *buffer, size_t index);
 void buffer_yank_line(Buffer *buffer, State *state, size_t offset);

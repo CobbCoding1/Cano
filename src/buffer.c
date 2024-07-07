@@ -37,6 +37,51 @@ void buffer_delete_char(Buffer *buffer, State *state) {
         buffer_calculate_rows(buffer);
     }
 }
+    
+void buffer_delete_ch(Buffer *buffer, State *state) {
+    CREATE_UNDO(INSERT_CHARS, buffer->cursor);
+    reset_command(state->clipboard.str, &state->clipboard.len);
+    buffer_yank_char(buffer, state);
+    buffer_delete_char(buffer, state);
+    undo_push(state, &state->undo_stack, state->cur_undo);
+}
+    
+void buffer_delete_row(Buffer *buffer, State *state) {
+    size_t repeat = state->repeating.repeating_count;
+    if(repeat == 0) repeat = 1;
+    if(repeat > buffer->rows.count - buffer_get_row(buffer)) repeat = buffer->rows.count - buffer_get_row(buffer);
+    for(size_t i = 0; i < repeat; i++) {
+        reset_command(state->clipboard.str, &state->clipboard.len);
+        buffer_yank_line(buffer, state, 0);
+        size_t row = buffer_get_row(buffer);
+        Row cur = buffer->rows.data[row];
+        size_t offset = buffer->cursor - cur.start;
+        CREATE_UNDO(INSERT_CHARS, cur.start);
+        if(row == 0) {
+            size_t end = (buffer->rows.count > 1) ? cur.end+1 : cur.end;
+            buffer_delete_selection(buffer, state, cur.start, end);
+        } else {
+            state->cur_undo.start -= 1;
+            buffer_delete_selection(buffer, state, cur.start-1, cur.end);
+        }
+        undo_push(state, &state->undo_stack, state->cur_undo);
+        buffer_calculate_rows(buffer);
+        if(row >= buffer->rows.count) row = buffer->rows.count-1;
+        cur = buffer->rows.data[row];
+        size_t pos = cur.start + offset;
+        if(pos > cur.end) pos = cur.end;
+        buffer->cursor = pos;
+    }
+    state->repeating.repeating_count = 0;
+}
+    
+void buffer_replace_ch(Buffer *buffer, State *state) {
+    CREATE_UNDO(REPLACE_CHAR, buffer->cursor);
+    DA_APPEND(&state->cur_undo.data, buffer->data.data[buffer->cursor]);
+    state->ch = frontend_getch(state->main_win); 
+    buffer->data.data[buffer->cursor] = state->ch;
+    undo_push(state, &state->undo_stack, state->cur_undo);
+}
 
 // get current row information based on cursor
 size_t buffer_get_row(const Buffer *buffer) {
