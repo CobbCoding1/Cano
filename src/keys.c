@@ -236,10 +236,11 @@ int handle_modifying_keys(Buffer *buffer, State *state) {
                         size_t offset = buffer->cursor - cur.start;
                         CREATE_UNDO(INSERT_CHARS, cur.start);
                         if(row == 0) {
-                            buffer_delete_selection(buffer, state, cur.start, cur.end);
+                            size_t end = (buffer->rows.count > 1) ? cur.end+1 : cur.end;
+                            buffer_delete_selection(buffer, state, cur.start, end);
                         } else {
                             state->cur_undo.start -= 1;
-                            buffer_delete_selection(buffer, state, cur.start-1, cur.end-1);
+                            buffer_delete_selection(buffer, state, cur.start-1, cur.end);
                         }
                         undo_push(state, &state->undo_stack, state->cur_undo);
                         buffer_calculate_rows(buffer);
