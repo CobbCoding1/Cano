@@ -286,6 +286,40 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
     CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
     return 1;
 }
+    
+void buffer_handle_undo(State *state, Undo *undo) {
+    Buffer *buffer = state->buffer;
+    Undo redo = {0};    
+    redo.start = undo->start;
+    state->cur_undo = redo;
+    switch(undo->type) {
+        case NONE:
+            break;
+        case INSERT_CHARS:
+            state->cur_undo.type = (undo->data.count > 1) ? DELETE_MULT_CHAR : DELETE_CHAR;
+            state->cur_undo.end = undo->start + undo->data.count-1;
+            buffer->cursor = undo->start;
+            buffer_insert_selection(buffer, &undo->data, undo->start);
+            break;
+        case DELETE_CHAR:
+            state->cur_undo.type = INSERT_CHARS;
+            buffer->cursor = undo->start;
+            buffer_delete_char(buffer, state);
+            break;
+        case DELETE_MULT_CHAR:
+            state->cur_undo.type = INSERT_CHARS;
+            state->cur_undo.end = undo->end;
+            buffer->cursor = undo->start;
+            buffer_delete_selection(buffer, state, undo->start, undo->end);
+            break;
+        case REPLACE_CHAR:
+            state->cur_undo.type = REPLACE_CHAR;
+            buffer->cursor = undo->start;
+            DA_APPEND(&undo->data, buffer->data.data[buffer->cursor]);
+            buffer->data.data[buffer->cursor] = undo->data.data[0]; 
+            break;
+    }
+}
 
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
@@ -352,72 +386,13 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         } break;
         case 'u': {
             Undo undo = undo_pop(&state->undo_stack); 
-            Undo redo = {0};
-            redo.start = undo.start;
-            state->cur_undo = redo;
-            switch(undo.type) {
-                case NONE:
-                    break;
-                case INSERT_CHARS:
-                    state->cur_undo.type = (undo.data.count > 1) ? DELETE_MULT_CHAR : DELETE_CHAR;
-                    state->cur_undo.end = undo.start + undo.data.count-1;
-                    buffer->cursor = undo.start;
-                    buffer_insert_selection(buffer, &undo.data, undo.start);
-                    break;
-                case DELETE_CHAR:
-                    state->cur_undo.type = INSERT_CHARS;
-                    buffer->cursor = undo.start;
-                    buffer_delete_char(buffer, state);
-                    break;
-                case DELETE_MULT_CHAR:
-                    state->cur_undo.type = INSERT_CHARS;
-                    state->cur_undo.end = undo.end;
-                    buffer->cursor = undo.start;
-                    buffer_delete_selection(buffer, state, undo.start, undo.end);
-                    break;
-                case REPLACE_CHAR:
-                    state->cur_undo.type = REPLACE_CHAR;
-                    buffer->cursor = undo.start;
-                    DA_APPEND(&undo.data, buffer->data.data[buffer->cursor]);
-                    buffer->data.data[buffer->cursor] = undo.data.data[0]; 
-                    break;
-            }
+            buffer_handle_undo(state, &undo);                        
             undo_push(state, &state->redo_stack, state->cur_undo);
             free_undo(&undo);
         } break;
         case 'U': {
             Undo redo = undo_pop(&state->redo_stack); 
-            Undo undo = {0};
-            undo.start = redo.start;
-            state->cur_undo = undo;
-            switch(redo.type) {
-                case NONE:
-                    return;
-                    break;
-                case INSERT_CHARS:
-                    state->cur_undo.type = (redo.data.count > 1) ? DELETE_MULT_CHAR : DELETE_CHAR;
-                    state->cur_undo.end = redo.start + redo.data.count;
-                    buffer->cursor = redo.start;
-                    buffer_insert_selection(buffer, &redo.data, redo.start);
-                    break;
-                case DELETE_CHAR:
-                    state->cur_undo.type = INSERT_CHARS;
-                    buffer->cursor = redo.start;
-                    buffer_delete_char(buffer, state);
-                    break;
-                case DELETE_MULT_CHAR:
-                    state->cur_undo.type = INSERT_CHARS;
-                    state->cur_undo.end = redo.end;
-                    buffer->cursor = redo.start;
-                    buffer_delete_selection(buffer, state, redo.start, redo.end);
-                    break;
-                case REPLACE_CHAR:
-                    state->cur_undo.type = REPLACE_CHAR;
-                    buffer->cursor = redo.start;
-                    DA_APPEND(&redo.data, buffer->data.data[buffer->cursor]);
-                    buffer->data.data[buffer->cursor] = redo.data.data[0]; 
-                    break;
-            }
+            buffer_handle_undo(state, &redo);            
             undo_push(state, &state->undo_stack, state->cur_undo);
             free_undo(&redo);
         } break;

@@ -43,6 +43,7 @@ void buffer_delete_ch(Buffer *buffer, State *state) {
     reset_command(state->clipboard.str, &state->clipboard.len);
     buffer_yank_char(buffer, state);
     buffer_delete_char(buffer, state);
+    state->cur_undo.end = buffer->cursor;
     undo_push(state, &state->undo_stack, state->cur_undo);
 }
     
@@ -149,13 +150,12 @@ void buffer_yank_selection(Buffer *buffer, State *state, size_t start, size_t en
 
 void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t end) {
     buffer_yank_selection(buffer, state, start, end);
-    
-    buffer->cursor = start;
-        
-    // +1 to delete the last character as well
     size_t size = end-start;
+    if(size >= buffer->data.count) size = buffer->data.count;    
+    buffer->cursor = start;    
+    ASSERT(buffer->cursor+size < buffer->data.count, "size is too great");
+    
     // constrain size to be within the buffer
-    if(size >= buffer->data.count) size = buffer->data.count;
         
     // resize undo as necessary
     if(state->cur_undo.data.capacity < size) {

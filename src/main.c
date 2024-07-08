@@ -66,6 +66,7 @@ void handle_flags(char *program, char **argv, int argc, char **config_filename, 
 
 int main(int argc, char **argv) {
     WRITE_LOG("starting (int main)");
+    // nice
     setlocale(LC_ALL, "");
     char *program = argv[0];        
     char *config_filename = NULL, *syntax_filename = NULL, *help_filename = NULL;
