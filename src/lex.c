@@ -135,7 +135,7 @@ Color_Arr parse_syntax_file(char *filename) {
                 num_of_commas++;
             }
         }
-        String_View words[num_of_commas];
+        String_View *words = malloc(num_of_commas * sizeof *words);
         size_t words_s = 0;
         char *cur = lines[i].data;
         size_t cur_size = 0;
