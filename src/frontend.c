@@ -1,4 +1,10 @@
+#include <stddef.h>
+#include <stdio.h>
+#include <unistd.h>
+
+#include "buffer.h"
 #include "frontend.h"
+#include "tools.h"
 
 size_t num_of_open_braces(Buffer *buffer) {
     size_t index = buffer->cursor;

@@ -1,3 +1,8 @@
+#include <dirent.h>
+#include <sys/stat.h>
+
+#include "buffer.h"
+#include "commands.h"
 #include "tools.h"
 
 typedef int(* __compar_fn_t) (const void *, const void *);

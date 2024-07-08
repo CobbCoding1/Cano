@@ -1,4 +1,5 @@
 #include "buffer.h"
+#include "main.h"
 
 // updates the rows to be consistent with the buffer data
 void buffer_calculate_rows(Buffer *buffer) {
@@ -296,7 +297,7 @@ void buffer_newline_indent(Buffer *buffer, State *state) {
 }
 
 
-State init_state() {
+State init_state(void) {
     State state = {0};
     state.config = (Config){0};
     state.config.relative_nums = 1;
