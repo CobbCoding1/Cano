@@ -192,29 +192,31 @@ void free_files(Files **files) {
     free((*files)->data);        
     free(*files);
 }
-    
+
 void load_config_from_file(State *state, Buffer *buffer, char *config_filename, char *syntax_filename) {
+    char *config_dir;
+
     if(config_filename == NULL) {
-        char default_config_filename[128] = {0};
-        char config_dir[64] = {0};
-		if(!state->env) {
-			state->env = calloc(128, sizeof(char));
+		if (state->env == NULL) {
 	        char *env = getenv("HOME");			
 	        if(env == NULL) CRASH("could not get HOME");			
 			state->env = env;
 		}
-        sprintf(config_dir, "%s/.config/cano", state->env);
-        struct stat st = {0};
-        if(stat(config_dir, &st) == -1) {
+
+        asprintf(&config_dir, "%s/.config/cano", state->env);
+
+        struct stat st;
+        if(stat(config_dir, &st) == -1)
             mkdir(config_dir, 0755);
-        }
-        sprintf(default_config_filename, "%s/config.cano", config_dir);
-        config_filename = default_config_filename;
+
+        if (!S_ISDIR(st.st_mode))
+            CRASH("a file conflict with the config directory.");
+
+        asprintf(&config_filename, "%s/config.cano", config_dir);
 
         char *language = strip_off_dot(buffer->filename, strlen(buffer->filename));
         if(language != NULL) {
-            syntax_filename = calloc(strlen(config_dir)+strlen(language)+sizeof(".cyntax")+1, sizeof(char));
-            sprintf(syntax_filename, "%s/%s.cyntax", config_dir, language);
+            asprintf(&syntax_filename, "%s/%s.cyntax", config_dir, language);
             free(language);
         }
     }
