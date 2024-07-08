@@ -67,14 +67,10 @@ int is_type(char *word, size_t word_s) {
 }
 
 char *strip_off_dot(char *str, size_t str_s) {
-    char *result = NULL;
-    for(size_t i = 0; i < str_s; i++) {
-        if(str[i] == '.') {
-            result = malloc(sizeof(char)*str_s-i+1);
-            strncpy(result, str+i+1, str_s-i+1);
-        }
-    }
-    return result;
+    char *p = str + str_s;
+
+    for (; p > str && *p != '.'; --p);
+    return (p == str) ? NULL : strdup(++p);
 }
 
 size_t read_file_to_str(char *filename, char **contents) {
@@ -135,7 +131,7 @@ Color_Arr parse_syntax_file(char *filename) {
                 num_of_commas++;
             }
         }
-        String_View *words = malloc(num_of_commas * sizeof *words);
+        String_View *words = malloc((num_of_commas + 1) * sizeof *words);
         size_t words_s = 0;
         char *cur = lines[i].data;
         size_t cur_size = 0;
