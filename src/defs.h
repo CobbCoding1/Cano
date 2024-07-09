@@ -2,6 +2,7 @@
 #define DEFS_H
 
 #include <ncurses.h>
+#include <ctype.h>
 
 #include "view.h"
 
