@@ -14,7 +14,7 @@ Data dynstr_to_data(Sized_Str str) {
         .capacity = str.len,
     };
 }
-    
+
 void handle_cursor_shape(State *state) {
     switch(state->config.mode) {
         case NORMAL:
@@ -22,15 +22,15 @@ void handle_cursor_shape(State *state) {
         case COMMAND:
         case SEARCH:
             system("echo -e -n \"\x1b[\x30 q\"");
-            wrefresh(stdscr);    
+            wrefresh(stdscr);
             break;
         case INSERT:
             system("echo -e -n \"\x1b[\x35 q\"");
-            wrefresh(stdscr);    
+            wrefresh(stdscr);
             break;
         case MODE_COUNT:
         default:
-            ASSERT(false, "unreachable");    
+            ASSERT(false, "unreachable");
     }
 }
 
@@ -47,7 +47,7 @@ void free_buffer(Buffer *buffer) {
 void free_undo(Undo *undo) {
     free(undo->data.data);
 }
-    
+
 void reset_command(char *command, size_t *command_s) {
     memset(command, 0, *command_s);
     *command_s = 0;
@@ -62,14 +62,14 @@ void free_undo_stack(Undo_Stack *undo) {
 
 
 void handle_save(Buffer *buffer) {
-    FILE *file = fopen(buffer->filename, "w"); 
+    FILE *file = fopen(buffer->filename, "w");
     fwrite(buffer->data.data, buffer->data.count, sizeof(char), file);
     fclose(file);
 }
 
 Buffer *load_buffer_from_file(char *filename) {
     Buffer *buffer = calloc(1, sizeof(Buffer));
-    size_t filename_s = strlen(filename)+1; 
+    size_t filename_s = strlen(filename)+1;
     buffer->filename = calloc(filename_s, sizeof(char));
     strncpy(buffer->filename, filename, filename_s);
     FILE *file = fopen(filename, "a+");
@@ -137,14 +137,14 @@ Brace find_opposite_brace(char opening) {
     }
 }
 
-    
+
 int check_keymaps(Buffer *buffer, State *state) {
     (void)buffer;
     for(size_t i = 0; i < state->config.key_maps.count; i++) {
         if(state->ch == state->config.key_maps.data[i].a) {
             for(size_t j = 0; j < state->config.key_maps.data[i].b_s; j++) {
                 state->ch = state->config.key_maps.data[i].b[j];
-                state->key_func[state->config.mode](buffer, &buffer, state);   
+                state->key_func[state->config.mode](buffer, &buffer, state);
             }
             return 1;
         }
@@ -168,12 +168,12 @@ void scan_files(State *state, char *directory) {
     while((dent = readdir(dp)) != NULL) {
         // Do not ignore .. in order to navigate back to the last directory
         if(strcmp(dent->d_name, ".") == 0) continue;
-        
+
         char *path = calloc(256, sizeof(char));
         strcpy(path, directory);
         strcat(path, "/");
         strcat(path, dent->d_name);
-        
+
         char *name = calloc(256, sizeof(char));
         strcpy(name, dent->d_name);
 
@@ -194,7 +194,7 @@ void free_files(Files **files) {
         free((*files)->data[i].name);
         free((*files)->data[i].path);
     }
-    free((*files)->data);        
+    free((*files)->data);
     free(*files);
 }
 
@@ -243,7 +243,7 @@ void load_config_from_file(State *state, Buffer *buffer, char *config_filename, 
         if(color_arr.arr != NULL) {
             for(size_t i = 0; i < color_arr.arr_s; i++) {
                 init_pair(color_arr.arr[i].custom_slot, color_arr.arr[i].custom_id, state->config.background_color);
-                init_ncurses_color(color_arr.arr[i].custom_id, color_arr.arr[i].custom_r, 
+                init_ncurses_color(color_arr.arr[i].custom_id, color_arr.arr[i].custom_r,
                                    color_arr.arr[i].custom_g, color_arr.arr[i].custom_b);
             }
 
@@ -331,7 +331,7 @@ void *check_for_errors(void *args) {
                 }
                 strcpy(return_message, buffer);
 
-                free(buffer); 
+                free(buffer);
                 loop = 0;
                 fclose(file_contents);
 
@@ -360,7 +360,7 @@ Ncurses_Color rgb_to_ncurses(int r, int g, int b) {
     return color;
 
 }
-    
+
 void init_ncurses_color(int id, int r, int g, int b) {
         Ncurses_Color color = rgb_to_ncurses(r, g, b);
         init_color(id, color.r, color.g, color.b);

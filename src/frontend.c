@@ -15,8 +15,8 @@ size_t num_of_open_braces(Buffer *buffer) {
         if(buffer->data.data[index] == '"' || buffer->data.data[index] == '\'') in_str = !in_str;
         Brace brace = find_opposite_brace(buffer->data.data[index]);
         if(brace.brace != '0' && !in_str) {
-            if(!brace.closing) count++; 
-            if(brace.closing) count--; 
+            if(!brace.closing) count++;
+            if(brace.closing) count--;
         }
     }
     if(count < 0) return 0;
@@ -29,7 +29,7 @@ size_t count_num_tabs(Buffer *buffer, size_t row) {
     size_t start = cur.start;
     size_t count = 0;
     for(size_t i = start; i < buffer->cursor; i++) {
-        if(buffer->data.data[i] == '\t') count++;   
+        if(buffer->data.data[i] == '\t') count++;
     }
     return count;
 }
@@ -64,7 +64,7 @@ void state_render(State *state) {
     werase(state->line_num_win);
     size_t cur_row = buffer_get_row(state->buffer);
     if(state->is_exploring) cur_row = state->explore_cursor;
-    Row cur = state->buffer->rows.data[cur_row]; 
+    Row cur = state->buffer->rows.data[cur_row];
     size_t col = state->buffer->cursor - cur.start;
     if(state->is_exploring) col = 0;
     if(cur_row <= row_render_start) row_render_start = cur_row;
@@ -72,9 +72,9 @@ void state_render(State *state) {
      if(col <= col_render_start) col_render_start = col;
     if(col >= col_render_start+state->main_col) col_render_start = col-state->main_col+1;
      state->num_of_braces = num_of_open_braces(state->buffer);
-    
+
     if(state->is_print_msg) {
-        mvwprintw(state->status_bar, 1, 0, "%s", state->status_bar_msg);    
+        mvwprintw(state->status_bar, 1, 0, "%s", state->status_bar_msg);
         wrefresh(state->status_bar);
         sleep(1);
         wclear(state->status_bar);
@@ -85,12 +85,12 @@ void state_render(State *state) {
         getmaxyx(state->line_num_win, state->line_num_row, state->line_num_col);			
         mvwin(state->status_bar, state->grow-2, 0);
     }
-        
+
     mvwprintw(state->status_bar, 0, state->gcol/2, "%zu:%zu", cur_row+1, col+1);
     mvwprintw(state->status_bar, 0, state->main_col-11, "%c", state->config.leaders[state->leader]);
     mvwprintw(state->status_bar, 0, 0, "%.7s", string_modes[state->config.mode]);
     mvwprintw(state->status_bar, 0, state->main_col-5, "%.*s", (int)state->num.count, state->num.data);
-    
+
     if(state->config.mode == COMMAND || state->config.mode == SEARCH) mvwprintw(state->status_bar, 1, 0, ":%.*s", (int)state->command_s, state->command);
      if(state->is_exploring) {
         wattron(state->main_win, COLOR_PAIR(BLUE_COLOR));
@@ -120,8 +120,8 @@ void state_render(State *state) {
             Token *token_arr = calloc(token_capacity, sizeof(Token));
             size_t token_s = 0;
              if(state->config.syntax) {
-                token_s = generate_tokens(state->buffer->data.data+state->buffer->rows.data[i].start, 
-                                        state->buffer->rows.data[i].end-state->buffer->rows.data[i].start, 
+                token_s = generate_tokens(state->buffer->data.data+state->buffer->rows.data[i].start,
+                                        state->buffer->rows.data[i].end-state->buffer->rows.data[i].start,
                                         token_arr, &token_capacity);
             }
              Color_Pairs color = 0;
@@ -129,7 +129,7 @@ void state_render(State *state) {
                 if(j < state->buffer->rows.data[i].start+col_render_start || j > state->buffer->rows.data[i].end+col+state->main_col) continue;
                 size_t col = j-state->buffer->rows.data[i].start;
                 size_t print_index_x = col-col_render_start;
-                
+
                 for(size_t chr = state->buffer->rows.data[i].start; chr < j; chr++) {
                     if(state->buffer->data.data[chr] == '\t') print_index_x += 3;
                 }
@@ -140,19 +140,19 @@ void state_render(State *state) {
                 }
                 if(col == off_at) wattroff(state->main_win, COLOR_PAIR(color));
                  if(col > state->buffer->rows.data[i].end) break;
-                int between = (state->buffer->visual.start > state->buffer->visual.end) 
-                    ? is_between(state->buffer->visual.end, state->buffer->visual.start, state->buffer->rows.data[i].start+col) 
+                int between = (state->buffer->visual.start > state->buffer->visual.end)
+                    ? is_between(state->buffer->visual.end, state->buffer->visual.start, state->buffer->rows.data[i].start+col)
                     : is_between(state->buffer->visual.start, state->buffer->visual.end, state->buffer->rows.data[i].start+col);
                 if(state->config.mode == VISUAL && between) wattron(state->main_win, A_STANDOUT);
                 else wattroff(state->main_win, A_STANDOUT);
-                mvwprintw(state->main_win, print_index_y, print_index_x, "%c", state->buffer->data.data[state->buffer->rows.data[i].start+col]);       
+                mvwprintw(state->main_win, print_index_y, print_index_x, "%c", state->buffer->data.data[state->buffer->rows.data[i].start+col]);
             }
             free(token_arr);
         }
     }
-        
-    col += count_num_tabs(state->buffer, buffer_get_row(state->buffer))*3;                     
-        
+
+    col += count_num_tabs(state->buffer, buffer_get_row(state->buffer))*3;
+
     wrefresh(state->main_win);
     wrefresh(state->line_num_win);
     wrefresh(state->status_bar);
@@ -163,7 +163,7 @@ void state_render(State *state) {
         frontend_move_cursor(state->main_win, cur_row-row_render_start, col-col_render_start);
     }
 }
-    
+
 void frontend_init(State *state) {
     initscr();
     noecho();
@@ -184,14 +184,14 @@ void frontend_init(State *state) {
 
     keypad(status_bar, TRUE);
     keypad(main_win, TRUE);
-    
+
     set_escdelay(0);
 }
-    
+
 void frontend_move_cursor(WINDOW *window, size_t x_pos, size_t y_pos) {
     wmove(window, x_pos, y_pos);
 }
-    
+
 void frontend_cursor_visible(int value) {
     curs_set(value);
 }
