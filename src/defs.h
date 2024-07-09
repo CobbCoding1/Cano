@@ -2,6 +2,7 @@
 #define DEFS_H
 
 #include <ncurses.h>
+
 #include "view.h"
 
 #define DATA_START_CAPACITY 1024

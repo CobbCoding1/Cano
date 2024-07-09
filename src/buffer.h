@@ -2,8 +2,6 @@
 #define BUFFER_H
 
 #include "defs.h"
-#include "tools.h"
-#include "frontend.h"
 
 void buffer_calculate_rows(Buffer *buffer);
 void buffer_insert_char(State *state, Buffer *buffer, char ch);
@@ -27,6 +25,6 @@ void buffer_next_brace(Buffer *buffer);
 int isword(char ch);
 void buffer_create_indent(Buffer *buffer, State *state);
 void buffer_newline_indent(Buffer *buffer, State *state);
-State init_state();
+State init_state(void);
 
 #endif

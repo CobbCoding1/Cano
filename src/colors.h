@@ -1,6 +1,8 @@
 #ifndef COLORS_H
 #define COLORS_H
 
+#include <stddef.h>
+
 // allows for custom colors to be defined throughout multipe files
 // and share data between the two.
 

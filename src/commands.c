@@ -1,5 +1,7 @@
 #include "commands.h"
+#include "tools.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
     
