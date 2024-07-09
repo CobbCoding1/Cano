@@ -19,17 +19,17 @@ char *get_help_page(char *page) {
 
     return help_page;
 }
-    
+
 void handle_flags(char *program, char **argv, int argc, char **config_filename, char **help_filename) {
     char *flag = NULL;
-    
+
     struct option longopts[] = {
         {"help", no_argument, NULL, 'h'},
         {"config", optional_argument, NULL, 'c'},
     };
-        
+
     char opt = cgetopt_long(argc, argv, "", longopts, NULL);
-    
+
     while(true) {
         if(opt == -1) break;
         switch(opt) {
@@ -40,7 +40,7 @@ void handle_flags(char *program, char **argv, int argc, char **config_filename, 
                     exit(EXIT_FAILURE);
                 }
                 *config_filename = flag;
-                break;           
+                break;
             case 'h':
                 flag = optarg;
                 if (flag == NULL) {
@@ -48,7 +48,7 @@ void handle_flags(char *program, char **argv, int argc, char **config_filename, 
                 } else {
                     *help_filename = get_help_page(flag);
                 }
-    
+
                 if (*help_filename == NULL) {
                     fprintf(stderr, "Failed to open help page. Check for typos or if you installed cano properly.\n");
                     exit(EXIT_FAILURE);
@@ -58,7 +58,7 @@ void handle_flags(char *program, char **argv, int argc, char **config_filename, 
                 fprintf(stderr, "Unexpected flag");
                 exit(EXIT_FAILURE);
        }
-       opt = cgetopt_long(argc, argv, "", longopts, NULL);            
+       opt = cgetopt_long(argc, argv, "", longopts, NULL);
     }
 }
 
@@ -68,10 +68,10 @@ int main(int argc, char **argv) {
     WRITE_LOG("starting (int main)");
     // nice
     setlocale(LC_ALL, "");
-    char *program = argv[0];        
+    char *program = argv[0];
     char *config_filename = NULL, *syntax_filename = NULL, *help_filename = NULL;
     handle_flags(program, argv, argc, &config_filename, &help_filename);
-    
+
     char *filename = argv[optind];
 
     // define functions based on current mode
@@ -96,9 +96,9 @@ int main(int argc, char **argv) {
     } else {
         state.buffer = load_buffer_from_file(filename);
     }
-    
+
     load_config_from_file(&state, state.buffer, config_filename, syntax_filename);
-    
+
     char status_bar_msg[128] = {0};
     state.status_bar_msg = status_bar_msg;
     buffer_calculate_rows(state.buffer);
@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
         state.ch = frontend_getch(state.main_win);
         state.key_func[state.config.mode](state.buffer, &state.buffer, &state);
     }
-    
+
     frontend_end();
 
     free_buffer(state.buffer);

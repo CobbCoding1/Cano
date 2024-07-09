@@ -6,7 +6,7 @@
 // allows for custom colors to be defined throughout multipe files
 // and share data between the two.
 
-typedef enum { 
+typedef enum {
     YELLOW_COLOR = 1,
     BLUE_COLOR,
     GREEN_COLOR,

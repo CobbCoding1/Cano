@@ -38,7 +38,7 @@ void buffer_delete_char(Buffer *buffer, State *state) {
         buffer_calculate_rows(buffer);
     }
 }
-    
+
 void buffer_delete_ch(Buffer *buffer, State *state) {
     CREATE_UNDO(INSERT_CHARS, buffer->cursor);
     reset_command(state->clipboard.str, &state->clipboard.len);
@@ -47,7 +47,7 @@ void buffer_delete_ch(Buffer *buffer, State *state) {
     state->cur_undo.end = buffer->cursor;
     undo_push(state, &state->undo_stack, state->cur_undo);
 }
-    
+
 void buffer_delete_row(Buffer *buffer, State *state) {
     size_t repeat = state->repeating.repeating_count;
     if(repeat == 0) repeat = 1;
@@ -76,11 +76,11 @@ void buffer_delete_row(Buffer *buffer, State *state) {
     }
     state->repeating.repeating_count = 0;
 }
-    
+
 void buffer_replace_ch(Buffer *buffer, State *state) {
     CREATE_UNDO(REPLACE_CHAR, buffer->cursor);
     DA_APPEND(&state->cur_undo.data, buffer->data.data[buffer->cursor]);
-    state->ch = frontend_getch(state->main_win); 
+    state->ch = frontend_getch(state->main_win);
     buffer->data.data[buffer->cursor] = state->ch;
     undo_push(state, &state->undo_stack, state->cur_undo);
 }
@@ -115,10 +115,10 @@ void buffer_yank_line(Buffer *buffer, State *state, size_t offset) {
     if(offset > index_get_row(buffer, buffer->data.count)) return;
     Row cur = buffer->rows.data[row+offset];
     int line_offset = 0;
-    size_t initial_s = state->clipboard.len;    
+    size_t initial_s = state->clipboard.len;
     state->clipboard.len = cur.end - cur.start + 1; // account for new line
     // resize the clipboard as necessary
-    state->clipboard.str = realloc(state->clipboard.str, 
+    state->clipboard.str = realloc(state->clipboard.str,
                                    initial_s+state->clipboard.len*sizeof(char));
     if(row > 0) line_offset = -1;
     else {
@@ -133,31 +133,31 @@ void buffer_yank_line(Buffer *buffer, State *state, size_t offset) {
 
 void buffer_yank_char(Buffer *buffer, State *state) {
     reset_command(state->clipboard.str, &state->clipboard.len);
-    state->clipboard.len = 2; 
-    // resize the clipboard as necessary    
-    state->clipboard.str = realloc(state->clipboard.str, 
+    state->clipboard.len = 2;
+    // resize the clipboard as necessary
+    state->clipboard.str = realloc(state->clipboard.str,
                                    state->clipboard.len*sizeof(char));
-    ASSERT(state->clipboard.str != NULL, "clipboard was null");    
+    ASSERT(state->clipboard.str != NULL, "clipboard was null");
     strncpy(state->clipboard.str, buffer->data.data+buffer->cursor, state->clipboard.len);
 }
 
 void buffer_yank_selection(Buffer *buffer, State *state, size_t start, size_t end) {
     state->clipboard.len = end-start+1;
-    state->clipboard.str = realloc(state->clipboard.str, 
+    state->clipboard.str = realloc(state->clipboard.str,
                                    state->clipboard.len*sizeof(char)+1);
-    ASSERT(state->clipboard.str != NULL, "clipboard was null");            
+    ASSERT(state->clipboard.str != NULL, "clipboard was null");
     strncpy(state->clipboard.str, buffer->data.data+start, state->clipboard.len);
 }
 
 void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t end) {
     buffer_yank_selection(buffer, state, start, end);
     size_t size = end-start;
-    if(size >= buffer->data.count) size = buffer->data.count;    
-    buffer->cursor = start;    
+    if(size >= buffer->data.count) size = buffer->data.count;
+    buffer->cursor = start;
     ASSERT(buffer->cursor+size < buffer->data.count, "size is too great");
-    
+
     // constrain size to be within the buffer
-        
+
     // resize undo as necessary
     if(state->cur_undo.data.capacity < size) {
         state->cur_undo.data.capacity = size;
@@ -166,30 +166,30 @@ void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t 
     }
     strncpy(state->cur_undo.data.data, &buffer->data.data[buffer->cursor], size);
     state->cur_undo.data.count = size;
-    
-    memmove(&buffer->data.data[buffer->cursor], 
-        &buffer->data.data[buffer->cursor+size], 
+
+    memmove(&buffer->data.data[buffer->cursor],
+        &buffer->data.data[buffer->cursor+size],
         buffer->data.count - (end));
     buffer->data.count -= (size);
     buffer_calculate_rows(buffer);
 }
-    
+
 void buffer_insert_selection(Buffer *buffer, Data *selection, size_t start) {
     buffer->cursor = start;
-        
+
     size_t size = selection->count;
-        
+
     // resize buffer as necessary
     if(buffer->data.count + size >= buffer->data.capacity) {
         buffer->data.capacity += size*2;
         buffer->data.data = realloc(buffer->data.data, sizeof(char)*buffer->data.capacity+1);
         ASSERT(buffer->data.data != NULL, "could not alloc");
     }
-    memmove(&buffer->data.data[buffer->cursor+size], 
-        &buffer->data.data[buffer->cursor], 
+    memmove(&buffer->data.data[buffer->cursor+size],
+        &buffer->data.data[buffer->cursor],
         buffer->data.count - buffer->cursor);
     strncpy(&buffer->data.data[buffer->cursor], selection->data, size);
-    
+
     buffer->data.count += size;
     buffer_calculate_rows(buffer);
 }
@@ -211,9 +211,9 @@ void buffer_move_down(Buffer *buffer) {
     size_t row = buffer_get_row(buffer);
     size_t col = buffer->cursor - buffer->rows.data[row].start;
     if(row < buffer->rows.count - 1) {
-        // set to next row on current column        
+        // set to next row on current column
         buffer->cursor = buffer->rows.data[row+1].start + col;
-        // clamp the cursor position to the end of the row        
+        // clamp the cursor position to the end of the row
         if(buffer->cursor > buffer->rows.data[row+1].end) {
             buffer->cursor = buffer->rows.data[row+1].end;
         }
@@ -229,7 +229,7 @@ void buffer_move_left(Buffer *buffer) {
 }
 
 int skip_to_char(Buffer *buffer, int cur_pos, int direction, char c) {
-    // check if currently on c 
+    // check if currently on c
     if(buffer->data.data[cur_pos] == c) {
         // increment by the direciton, can be positive or negative
         cur_pos += direction;
@@ -258,7 +258,7 @@ void buffer_next_brace(Buffer *buffer) {
         cur_pos = skip_to_char(buffer, cur_pos, direction, '"');
         cur_pos = skip_to_char(buffer, cur_pos, direction, '\'');
         Brace cur_brace = find_opposite_brace(buffer->data.data[cur_pos]);
-        // if not currently on a brace, continue        
+        // if not currently on a brace, continue
         if(cur_brace.brace == '0') continue;
         if((cur_brace.closing && direction == -1) || (!cur_brace.closing && direction == 1)) {
             brace_stack++;
@@ -276,7 +276,7 @@ int isword(char ch) {
     if(isalnum(ch) || ch == '_') return 1;
     return 0;
 }
-    
+
 void buffer_create_indent(Buffer *buffer, State *state) {
     // if indent is 0, then use tabs, otherwise spaces
     if(state->config.indent > 0) {
@@ -286,7 +286,7 @@ void buffer_create_indent(Buffer *buffer, State *state) {
     } else {
         for(size_t i = 0; i < state->num_of_braces; i++) {
             buffer_insert_char(state, buffer, '\t');
-        }    
+        }
     }
 }
 

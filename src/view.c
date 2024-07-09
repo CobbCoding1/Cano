@@ -82,7 +82,7 @@ String_View view_chop(String_View view, char c) {
     while(view.data[i] != c && i != view.len)
         i++;
     if(i < view.len)
-        i++; 
+        i++;
     return view_create(view.data + i, view.len - i);
 }
 
@@ -92,7 +92,7 @@ String_View view_rev(String_View view, char *data, size_t data_s) {
     String_View result = view_create(data, view.len);
 
     for(int i = view.len-1; i >= 0; i--)
-        result.data[view.len-1 - i] = view.data[i]; 
+        result.data[view.len-1 - i] = view.data[i];
     return result;
 }
 
@@ -106,7 +106,7 @@ size_t view_find(String_View haystack, String_View needle) {
     }
     return 0;
 }
-    
+
 int view_to_int(String_View view) {
     return strtol(view.data, NULL, 10);
 }

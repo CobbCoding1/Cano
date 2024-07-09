@@ -13,7 +13,7 @@
             frontend_end();                 \
             fprintf(stderr, str"\n"); \
             exit(1);                  \
-        } while(0) 
+        } while(0)
 
 #define ASSERT(cond, ...) \
     do { \
@@ -51,16 +51,16 @@
 #define ctrl(x) ((x) & 0x1f)
 
 #define ESCAPE      27
-#define SPACE       32 
+#define SPACE       32
 #define ENTER       10
 #define KEY_TAB     9
-#define DOWN_ARROW  258 
-#define UP_ARROW    259 
-#define LEFT_ARROW  260 
-#define RIGHT_ARROW 261 
+#define DOWN_ARROW  258
+#define UP_ARROW    259
+#define LEFT_ARROW  260
+#define RIGHT_ARROW 261
 
 #define STARTING_ROWS_SIZE 128
-#define STARTING_ROW_SIZE 64 
+#define STARTING_ROW_SIZE 64
 
 typedef enum {
     NORMAL,
@@ -70,7 +70,7 @@ typedef enum {
     VISUAL,
     MODE_COUNT,
 } Mode;
-    
+
 typedef enum {
     LEADER_NONE,
     LEADER_R,
@@ -177,7 +177,7 @@ typedef struct {
     size_t count;
     size_t capacity;
 } Undo_Stack;
-    
+
 typedef struct {
     bool repeating;
     size_t repeating_count;
@@ -194,7 +194,7 @@ typedef struct {
     char *b;
     size_t b_s;
 } Map;
-    
+
 typedef struct {
     Map *data;
     size_t count;
@@ -202,7 +202,7 @@ typedef struct {
 } Maps;
 
 typedef union {
-    int as_int;    
+    int as_int;
     float as_float;
     void *as_ptr;
 } Var_Value;
@@ -215,7 +215,7 @@ typedef enum {
 
 typedef struct {
     char *name;
-    Var_Value value;    
+    Var_Value value;
     Var_Type type;
 } Variable;
 
@@ -274,12 +274,12 @@ typedef struct State {
     size_t num_of_braces; // braces that preceed the cursor
     int ch;               // current character
 	char *env;	        // home folder
-    
+
     char *command;        // most recent command entered by user
     size_t command_s;     // size of command
-    
+
     Variables variables;
-    
+
     Repeating repeating;
     Data num;
     Leader leader;        // current leader key
@@ -301,7 +301,7 @@ typedef struct State {
     Files* files;
     bool is_exploring;
     size_t explore_cursor;
-    
+
     // text buffer
     Buffer* buffer;
 
@@ -340,7 +340,7 @@ typedef struct {
     size_t col;
     size_t size;
 } Syntax_Highlighting;
-    
+
 extern char *string_modes[MODE_COUNT];
 
 #endif // DEFS_H

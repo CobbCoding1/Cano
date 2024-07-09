@@ -44,7 +44,7 @@ typedef struct {
 typedef struct {
     int value;
 } Expr;
-    
+
 typedef enum {
     OP_NONE = 0,
     OP_PLUS,
@@ -59,10 +59,10 @@ typedef struct Bin_Expr {
     Expr rvalue;
     Operator operator;
 } Bin_Expr;
-    
+
 typedef union {
     Expr as_expr;
-    Bin_Expr as_bin;   
+    Bin_Expr as_bin;
     Command_Type as_keyword;
     Str_Literal as_str;
     Identifier as_ident;
@@ -79,7 +79,7 @@ typedef enum {
     NODE_CONFIG,
     NODE_INT,
 } Node_Type;
- 
+
 typedef struct Node {
     Node_Val value;
     Node_Type type;
@@ -94,16 +94,16 @@ typedef struct {
 
 Command_Type get_token_type(State *state, String_View view);
 Command_Token create_token(State *state, String_View command);
-Command_Token *lex_command(State *state, String_View command, size_t *token_s);   
+Command_Token *lex_command(State *state, String_View command, size_t *token_s);
 void print_token(Command_Token token);
-int expect_token(State *state, Command_Token token, Command_Type type);   
+int expect_token(State *state, Command_Token token, Command_Type type);
 Node *create_node(Node_Type type, Node_Val value);
 Operator get_operator(Command_Token token);
-int get_special_char(String_View view);   
-Bin_Expr *parse_bin_expr(State *state, Command_Token *command, size_t command_s);   
-Node *parse_command(State *state, Command_Token *command, size_t command_s);   
+int get_special_char(String_View view);
+Bin_Expr *parse_bin_expr(State *state, Command_Token *command, size_t command_s);
+Node *parse_command(State *state, Command_Token *command, size_t command_s);
 int interpret_expr(Bin_Expr *expr);
-void interpret_command(Buffer *buffer, State *state, Node *root);   
+void interpret_command(Buffer *buffer, State *state, Node *root);
 void print_tree(Node *node, size_t depth);
 int execute_command(Buffer *buffer, State *state, Command_Token *command, size_t command_s);
 

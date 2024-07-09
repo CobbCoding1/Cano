@@ -12,7 +12,7 @@ size_t search(Buffer *buffer, char *command, size_t command_s) {
     return buffer->cursor;
 }
 
-void replace(Buffer *buffer, State *state, char *new_str, size_t old_str_s, size_t new_str_s) { 
+void replace(Buffer *buffer, State *state, char *new_str, size_t old_str_s, size_t new_str_s) {
     if (buffer == NULL || new_str == NULL) {
         WRITE_LOG("Error: null pointer");
         return;
@@ -28,7 +28,7 @@ void replace(Buffer *buffer, State *state, char *new_str, size_t old_str_s, size
 }
 
 
-void find_and_replace(Buffer *buffer, State *state, char *old_str, char *new_str) { 
+void find_and_replace(Buffer *buffer, State *state, char *old_str, char *new_str) {
     size_t old_str_s = strlen(old_str);
     size_t new_str_s = strlen(new_str);
 
@@ -40,12 +40,12 @@ void find_and_replace(Buffer *buffer, State *state, char *old_str, char *new_str
         replace(buffer, state, new_str, old_str_s, new_str_s);
     }
 }
-    
+
 void motion_g(State *state) {
-    size_t row = buffer_get_row(state->buffer);            
-    if(state->repeating.repeating_count >= state->buffer->rows.count) 
+    size_t row = buffer_get_row(state->buffer);
+    if(state->repeating.repeating_count >= state->buffer->rows.count)
             state->repeating.repeating_count = state->buffer->rows.count;
-    if(state->repeating.repeating_count == 0) state->repeating.repeating_count = 1;                
+    if(state->repeating.repeating_count == 0) state->repeating.repeating_count = 1;
     state->buffer->cursor = state->buffer->rows.data[state->repeating.repeating_count-1].start;
     state->repeating.repeating_count = 0;
     if(state->leader != LEADER_D) return;
@@ -61,12 +61,12 @@ void motion_G(State *state) {
     size_t row = buffer_get_row(state->buffer);
     size_t start = state->buffer->rows.data[row].start;
     if(state->repeating.repeating_count > 0) {
-        if(state->repeating.repeating_count >= state->buffer->rows.count) 
+        if(state->repeating.repeating_count >= state->buffer->rows.count)
             state->repeating.repeating_count = state->buffer->rows.count;
         state->buffer->cursor = state->buffer->rows.data[state->repeating.repeating_count-1].start;
-        state->repeating.repeating_count = 0;                
+        state->repeating.repeating_count = 0;
     } else {
-        state->buffer->cursor = state->buffer->data.count;   
+        state->buffer->cursor = state->buffer->data.count;
     }
     if(state->leader != LEADER_D) return;
     // TODO: this doesn't work with row jumps
@@ -75,7 +75,7 @@ void motion_G(State *state) {
     buffer_delete_selection(state->buffer, state, start, end);
     undo_push(state, &state->undo_stack, state->cur_undo);
 }
-    
+
 void motion_0(State *state) {
     size_t row = buffer_get_row(state->buffer);
     size_t end = state->buffer->cursor;
@@ -97,13 +97,13 @@ void motion_$(State *state) {
     buffer_delete_selection(state->buffer, state, start, end-1);
     undo_push(state, &state->undo_stack, state->cur_undo);
 }
-    
+
 void motion_e(State *state) {
     size_t start = state->buffer->cursor;
-    if(state->buffer->cursor+1 < state->buffer->data.count && 
+    if(state->buffer->cursor+1 < state->buffer->data.count &&
        !isword(state->buffer->data.data[state->buffer->cursor+1])) state->buffer->cursor++;
-    while(state->buffer->cursor+1 < state->buffer->data.count && 
-        (isword(state->buffer->data.data[state->buffer->cursor+1]) || 
+    while(state->buffer->cursor+1 < state->buffer->data.count &&
+        (isword(state->buffer->data.data[state->buffer->cursor+1]) ||
           isspace(state->buffer->data.data[state->buffer->cursor]))
     ) {
         state->buffer->cursor++;
@@ -114,13 +114,13 @@ void motion_e(State *state) {
     buffer_delete_selection(state->buffer, state, start, end);
     undo_push(state, &state->undo_stack, state->cur_undo);
 }
-    
+
 void motion_b(State *state) {
     Buffer *buffer = state->buffer;
     if(buffer->cursor == 0) return;
     size_t end = buffer->cursor;
     if(buffer->cursor-1 > 0 && !isword(buffer->data.data[buffer->cursor-1])) buffer->cursor--;
-    while(buffer->cursor-1 > 0 && 
+    while(buffer->cursor-1 > 0 &&
         (isword(buffer->data.data[buffer->cursor-1]) || isspace(buffer->data.data[buffer->cursor+1]))
     ) {
         buffer->cursor--;
@@ -132,11 +132,11 @@ void motion_b(State *state) {
     buffer_delete_selection(buffer, state, start, end);
     undo_push(state, &state->undo_stack, state->cur_undo);
 }
-    
+
 void motion_w(State *state) {
     Buffer *buffer = state->buffer;
     size_t start = buffer->cursor;
-    while(buffer->cursor < buffer->data.count && 
+    while(buffer->cursor < buffer->data.count &&
         (isword(buffer->data.data[buffer->cursor]) || isspace(buffer->data.data[buffer->cursor+1]))
     ) {
         buffer->cursor++;
@@ -148,7 +148,7 @@ void motion_w(State *state) {
     buffer_delete_selection(buffer, state, start, end-1);
     undo_push(state, &state->undo_stack, state->cur_undo);
 }
-    
+
 int handle_motion_keys(Buffer *buffer, State *state, int ch, size_t *repeating_count) {
     (void)repeating_count;
     switch(ch) {
@@ -195,22 +195,22 @@ int handle_motion_keys(Buffer *buffer, State *state, int ch, size_t *repeating_c
         }
         default: { // If the key is not a motion key, return 0
             return 0;
-        } 
+        }
     }
     return 1; // If the key is a motion key, return 1
 }
-    
+
 int handle_leader_keys(State *state) {
     switch(state->ch) {
-        case 'd': 
+        case 'd':
             state->leader = LEADER_D;
             break;
-        case 'y': 
-            state->leader = LEADER_Y; 
+        case 'y':
+            state->leader = LEADER_Y;
             break;
         default:
             return 0;
-    }    
+    }
     return 1;
 }
 
@@ -248,7 +248,7 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
         case 'I': {
             size_t row = buffer_get_row(buffer);
             Row cur = buffer->rows.data[row];
-            buffer->cursor = cur.start;            
+            buffer->cursor = cur.start;
             while(buffer->cursor < cur.end && isspace(buffer->data.data[buffer->cursor])) buffer->cursor++;
             state->config.mode = INSERT;
         } break;
@@ -287,10 +287,10 @@ int handle_normal_to_insert_keys(Buffer *buffer, State *state) {
     CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
     return 1;
 }
-    
+
 void buffer_handle_undo(State *state, Undo *undo) {
     Buffer *buffer = state->buffer;
-    Undo redo = {0};    
+    Undo redo = {0};
     redo.start = undo->start;
     state->cur_undo = redo;
     switch(undo->type) {
@@ -317,21 +317,21 @@ void buffer_handle_undo(State *state, Undo *undo) {
             state->cur_undo.type = REPLACE_CHAR;
             buffer->cursor = undo->start;
             DA_APPEND(&undo->data, buffer->data.data[buffer->cursor]);
-            buffer->data.data[buffer->cursor] = undo->data.data[0]; 
+            buffer->data.data[buffer->cursor] = undo->data.data[0];
             break;
     }
 }
 
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
-    
+
     if(check_keymaps(buffer, state)) return;
-    if(state->leader == LEADER_NONE && handle_leader_keys(state)) return;   
+    if(state->leader == LEADER_NONE && handle_leader_keys(state)) return;
     if(isdigit(state->ch) && !(state->ch == '0' && state->num.count == 0)) {
         DA_APPEND(&state->num, state->ch);
         return;
-    } 
-    
+    }
+
     if(!isdigit(state->ch) && state->num.count > 0) {
         ASSERT(state->num.data, "num is not initialized");
         state->repeating.repeating_count = atoi(state->num.data);
@@ -353,9 +353,9 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             break;
         case '/':
             if(state->is_exploring) break;
-            reset_command(state->command, &state->command_s);        
+            reset_command(state->command, &state->command_s);
             state->x = state->command_s+1;
-            frontend_move_cursor(state->status_bar, state->x, 1);        
+            frontend_move_cursor(state->status_bar, state->x, 1);
             state->config.mode = SEARCH;
             break;
         case 'v':
@@ -386,14 +386,14 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             buffer->cursor = index;
         } break;
         case 'u': {
-            Undo undo = undo_pop(&state->undo_stack); 
-            buffer_handle_undo(state, &undo);                        
+            Undo undo = undo_pop(&state->undo_stack);
+            buffer_handle_undo(state, &undo);
             undo_push(state, &state->redo_stack, state->cur_undo);
             free_undo(&undo);
         } break;
         case 'U': {
-            Undo redo = undo_pop(&state->redo_stack); 
-            buffer_handle_undo(state, &redo);            
+            Undo redo = undo_pop(&state->redo_stack);
+            buffer_handle_undo(state, &redo);
             undo_push(state, &state->undo_stack, state->cur_undo);
             free_undo(&redo);
         } break;
@@ -436,8 +436,8 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             }
             buffer_insert_selection(buffer, &data, buffer->cursor);
             state->cur_undo.end = buffer->cursor;
-            undo_push(state, &state->undo_stack, state->cur_undo); 
-            if(state->clipboard.len > 0 && state->clipboard.str[0] == '\n' && buffer->cursor < buffer->data.count) 
+            undo_push(state, &state->undo_stack, state->cur_undo);
+            if(state->clipboard.len > 0 && state->clipboard.str[0] == '\n' && buffer->cursor < buffer->data.count)
                     buffer->cursor++;
         } break;
         case ctrl('n'): {
@@ -497,10 +497,10 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 	ASSERT(buffer, "buffer exists");
 	ASSERT(state, "state exists");
 	
-    switch(state->ch) { 
+    switch(state->ch) {
         case '\b':
         case 127:
-        case KEY_BACKSPACE: { 
+        case KEY_BACKSPACE: {
             if(buffer->cursor > 0) {
                 buffer->cursor--;
                 buffer_delete_char(buffer, state);
@@ -510,7 +510,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             handle_save(buffer);
             state->config.QUIT = 1;
         } break;
-        case ctrl('c'):        
+        case ctrl('c'):
         case ESCAPE: // Switch to NORMAL mode
             //state->cur_undo.end = buffer->cursor;
             if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
@@ -557,9 +557,9 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             if(state->cur_undo.end != state->cur_undo.start) {
                 undo_push(state, &state->undo_stack, state->cur_undo);
             }
-            
-            Brace brace = find_opposite_brace(buffer->data.data[buffer->cursor]);                    
-            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);            
+
+            Brace brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
+            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
             buffer_newline_indent(buffer, state);
 
             if(brace.brace != '0' && brace.closing) {
@@ -569,15 +569,15 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     for(size_t i = 0; i < state->config.indent*(state->num_of_braces-1); i++) {
                         buffer_insert_char(state, buffer, ' ');
                     }
-                    buffer->cursor -= state->config.indent*(state->num_of_braces-1);                    
+                    buffer->cursor -= state->config.indent*(state->num_of_braces-1);
                 } else {
                     for(size_t i = 0; i < state->num_of_braces-1; i++) {
-                        buffer_insert_char(state, buffer, '\t');                            
-                    }        
+                        buffer_insert_char(state, buffer, '\t');
+                    }
                     buffer->cursor -= state->num_of_braces-1;
                 }
                 buffer->cursor--;
-                undo_push(state, &state->undo_stack, state->cur_undo);                
+                undo_push(state, &state->undo_stack, state->cur_undo);
             } else {
                 undo_push(state, &state->undo_stack, state->cur_undo);
             }
@@ -590,7 +590,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
 			if(buffer->cursor == 0) cur_brace = find_opposite_brace(buffer->data.data[0]);			
 			else cur_brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
 			
-            if((cur_brace.brace != '0' && cur_brace.closing && 
+            if((cur_brace.brace != '0' && cur_brace.closing &&
                 state->ch == find_opposite_brace(cur_brace.brace).brace)) {
                 buffer->cursor++;
                 break;
@@ -620,7 +620,7 @@ void handle_command_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 frontend_move_cursor(state->status_bar, 1, state->x);
             }
         } break;
-        case ctrl('c'):        
+        case ctrl('c'):
         case ESCAPE:
             reset_command(state->command, &state->command_s);
             state->config.mode = NORMAL;
@@ -681,7 +681,7 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 frontend_move_cursor(state->status_bar, 1, state->x);
             }
         } break;
-        case ctrl('c'):        
+        case ctrl('c'):
         case ESCAPE:
             reset_command(state->command, &state->command_s);
             state->config.mode = NORMAL;
@@ -712,7 +712,7 @@ void handle_search_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 }
                 index = search(buffer, args[0], strlen(args[0]));
                 find_and_replace(buffer, state, args[0], args[1]);
-            } 
+            }
             buffer->cursor = index;
             state->config.mode = NORMAL;
         } break;
@@ -744,11 +744,11 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
     frontend_cursor_visible(0);
     switch(state->ch) {
-        case ctrl('c'):        
+        case ctrl('c'):
         case ESCAPE: {
             state->config.mode = NORMAL;
-            frontend_cursor_visible(1);        
-            state->buffer->visual = (Visual){0};        
+            frontend_cursor_visible(1);
+            state->buffer->visual = (Visual){0};
         } break;
         case ENTER: break;
         case ctrl('s'): {
@@ -781,22 +781,22 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                         buffer_insert_char(state, buffer, ' ');
                     }
                 } else {
-                     buffer_insert_char(state, buffer, '\t');                           
+                     buffer_insert_char(state, buffer, '\t');
                 }
             }
             buffer->cursor = position;
             state->config.mode = NORMAL;
-            frontend_cursor_visible(1);                    
+            frontend_cursor_visible(1);
         } break;
         case '<': {
             int cond = (buffer->visual.start > buffer->visual.end);
             size_t start = (cond) ? buffer->visual.end : buffer->visual.start;
             size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
             size_t row = index_get_row(buffer, start);
-            size_t end_row = index_get_row(buffer, end);            
+            size_t end_row = index_get_row(buffer, end);
             size_t offset = 0;
             for(size_t i = row; i <= end_row; i++) {
-                buffer_calculate_rows(buffer);                
+                buffer_calculate_rows(buffer);
                 buffer->cursor = buffer->rows.data[i].start;
                 if(state->config.indent > 0) {
                     for(size_t j = 0; (int)j < state->config.indent; j++) {
@@ -815,7 +815,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 }
             }
             state->config.mode = NORMAL;
-            frontend_cursor_visible(1);                                
+            frontend_cursor_visible(1);
         } break;
         case 'y': {
             reset_command(state->clipboard.str, &state->clipboard.len);
@@ -825,7 +825,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             buffer_yank_selection(buffer, state, start, end);
             buffer->cursor = start;
             state->config.mode = NORMAL;
-            frontend_cursor_visible(1);                                            
+            frontend_cursor_visible(1);
             break;
         }
         default: {

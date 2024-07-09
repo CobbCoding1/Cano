@@ -76,7 +76,7 @@ char *strip_off_dot(char *str, size_t str_s) {
 size_t read_file_to_str(char *filename, char **contents) {
     FILE *file = fopen(filename, "r");
     if(file == NULL) {
-       return 0; 
+       return 0;
     }
     fseek(file, 0, SEEK_END);
     size_t length = ftell(file);
@@ -154,7 +154,7 @@ Color_Arr parse_syntax_file(char *filename) {
 
         Custom_Color color = {0};
         color.custom_id = i+8;
-        char cur_type = words[0].data[0]; 
+        char cur_type = words[0].data[0];
         color.custom_r = view_to_int(words[1]);
         color.custom_g = view_to_int(words[2]);
         color.custom_b = view_to_int(words[3]);
@@ -201,7 +201,7 @@ Color_Arr parse_syntax_file(char *filename) {
     free(lines);
     free(contents);
 
-    return arr; 
+    return arr;
 }
 
 int is_in_tokens_index(Token *token_arr, size_t token_s, size_t index, size_t *size, Color_Pairs *color) {
@@ -242,7 +242,7 @@ Token generate_word(String_View *view, char *contents) {
     size_t word_s = 0;
     while(view->len > 0 && (isalpha(view->data[0]) || view->data[0] == '_')) {
         if(word_s >= 128) break;
-        word[word_s++] = view->data[0]; 
+        word[word_s++] = view->data[0];
         view->data++;
         view->len--;
     }
