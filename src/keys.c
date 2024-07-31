@@ -493,6 +493,15 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     }
 }
 
+void undo_move_left(State *state, size_t num) {
+    state->cur_undo.end = state->buffer->cursor;
+    if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
+    for(size_t i = 0; i < num; i++) {
+        buffer_move_left(state->buffer);                    
+    }
+    CREATE_UNDO(DELETE_MULT_CHAR, state->buffer->cursor);
+}
+
 void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
 	ASSERT(buffer, "buffer exists");
@@ -520,10 +529,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);        
             break;
         case LEFT_ARROW: { // Move cursor left
-            state->cur_undo.end = buffer->cursor;
-            if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
-            buffer_move_left(buffer);
-            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+            undo_move_left(state, 1);                                
         } break;
         case DOWN_ARROW: { // Move cursor down
             state->cur_undo.end = buffer->cursor;
@@ -558,9 +564,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case KEY_ENTER:
         case ENTER: {
             state->cur_undo.end = buffer->cursor;                                    
-            //if(state->cur_undo.end != state->cur_undo.start) {
-                undo_push(state, &state->undo_stack, state->cur_undo);
-            //}
+            undo_push(state, &state->undo_stack, state->cur_undo);
 
             Brace brace = find_opposite_brace(buffer->data.data[buffer->cursor]);
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
@@ -574,26 +578,18 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     for(size_t i = 0; i < state->config.indent*(state->num_of_braces-1); i++) {
                         buffer_insert_char(state, buffer, ' ');
                     }
-                    //buffer->cursor -= state->config.indent*(state->num_of_braces-1);
+                    undo_move_left(state, state->config.indent*(state->num_of_braces-1));                        
                 } else {
                     for(size_t i = 0; i < state->num_of_braces-1; i++) {
                         buffer_insert_char(state, buffer, '\t');
                     }
-                    state->cur_undo.end = buffer->cursor;
-                    if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
-                    for(size_t i = 0; i < state->num_of_braces-1; i++) {
-                        buffer_move_left(buffer);                    
-                    }
-                    CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+                    undo_move_left(state, state->num_of_braces-1);
                 }
-                state->cur_undo.end = buffer->cursor;
-                if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
-                buffer_move_left(buffer);                    
-                //undo_push(state, &state->undo_stack, state->cur_undo);
+                undo_move_left(state, 1);                
             } else {
                 undo_push(state, &state->undo_stack, state->cur_undo);
+                CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);                                                                        
             }
-            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);                                                        
         } break;
         default: { // Handle other characters
 			ASSERT(buffer->data.count >= buffer->cursor, "check");
@@ -618,10 +614,7 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 buffer_insert_char(state, buffer, brace.brace);
 	            undo_push(state, &state->undo_stack, state->cur_undo);
                 CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);                                                    
-            state->cur_undo.end = buffer->cursor;
-            if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
-            buffer_move_left(buffer);
-            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+                undo_move_left(state, 1);                        
             }
         } break;
     }
