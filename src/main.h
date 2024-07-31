@@ -25,11 +25,12 @@
 #include "tools.h"
 #include "buffer.h"
 
-#define CREATE_UNDO(t, p)    \
+#define CREATE_UNDO(t, p) do {    \
     Undo undo = {0};         \
     undo.type = (t);         \
     undo.start = (p);        \
-    state->cur_undo = undo   \
+    state->cur_undo = undo;   \
+} while(0)
 
 /* --------------------------- FUNCTIONS --------------------------- */
 

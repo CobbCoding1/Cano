@@ -145,7 +145,7 @@ void buffer_yank_selection(Buffer *buffer, State *state, size_t start, size_t en
     state->clipboard.len = end-start+1;
     state->clipboard.str = realloc(state->clipboard.str,
                                    state->clipboard.len*sizeof(char)+1);
-    ASSERT(state->clipboard.str != NULL, "clipboard was null");
+    ASSERT(state->clipboard.str != NULL, "clipboard was null %zu", state->clipboard.len);
     strncpy(state->clipboard.str, buffer->data.data+start, state->clipboard.len);
 }
 
@@ -154,9 +154,9 @@ void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t 
     size_t size = end-start;
     if(size >= buffer->data.count) size = buffer->data.count;
     buffer->cursor = start;
-    ASSERT(buffer->cursor+size <= buffer->data.count, "size is too great");
 
-    // constrain size to be within the buffer
+    // constrain size to be within the buffer    
+    ASSERT(buffer->cursor+size <= buffer->data.count, "size is too great %zu", buffer->cursor+size);
 
     // resize undo as necessary
     if(state->cur_undo.data.capacity < size) {
@@ -170,7 +170,7 @@ void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t 
     memmove(&buffer->data.data[buffer->cursor],
         &buffer->data.data[buffer->cursor+size],
         buffer->data.count - (end));
-    buffer->data.count -= (size);
+    buffer->data.count -= size;
     buffer_calculate_rows(buffer);
 }
 
