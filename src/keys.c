@@ -493,7 +493,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     }
 }
 
-void undo_move_left(State *state, size_t num) {
+void handle_move_left(State *state, size_t num) {
     state->cur_undo.end = state->buffer->cursor;
     if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
     for(size_t i = 0; i < num; i++) {
@@ -501,6 +501,34 @@ void undo_move_left(State *state, size_t num) {
     }
     CREATE_UNDO(DELETE_MULT_CHAR, state->buffer->cursor);
 }
+    
+void handle_move_down(State *state, size_t num) {
+    state->cur_undo.end = state->buffer->cursor;
+    if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
+    for(size_t i = 0; i < num; i++) {
+        buffer_move_down(state->buffer);                    
+    }
+    CREATE_UNDO(DELETE_MULT_CHAR, state->buffer->cursor);
+}
+    
+void handle_move_up(State *state, size_t num) {
+    state->cur_undo.end = state->buffer->cursor;
+    if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
+    for(size_t i = 0; i < num; i++) {
+        buffer_move_up(state->buffer);                    
+    }
+    CREATE_UNDO(DELETE_MULT_CHAR, state->buffer->cursor);
+}
+    
+void handle_move_right(State *state, size_t num) {
+    state->cur_undo.end = state->buffer->cursor;
+    if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
+    for(size_t i = 0; i < num; i++) {
+        buffer_move_right(state->buffer);                    
+    }
+    CREATE_UNDO(DELETE_MULT_CHAR, state->buffer->cursor);
+}
+
 
 void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
@@ -523,31 +551,21 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
         case ctrl('c'):
         case ESCAPE: // Switch to NORMAL mode
             state->cur_undo.end = buffer->cursor;
-            //if(state->cur_undo.end != state->cur_undo.start) 
-                undo_push(state, &state->undo_stack, state->cur_undo);
+            undo_push(state, &state->undo_stack, state->cur_undo);
             state->config.mode = NORMAL;
             CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);        
             break;
         case LEFT_ARROW: { // Move cursor left
-            undo_move_left(state, 1);                                
+            handle_move_left(state, 1);                                
         } break;
         case DOWN_ARROW: { // Move cursor down
-            state->cur_undo.end = buffer->cursor;
-            if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
-            buffer_move_down(buffer);
-            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+            handle_move_down(state, 1);                                        
         } break;
         case UP_ARROW: {   // Move cursor up
-            state->cur_undo.end = buffer->cursor;
-            if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
-            buffer_move_up(buffer);
-            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+            handle_move_up(state, 1);                                                
         } break;
         case RIGHT_ARROW: { // Move cursor right
-            state->cur_undo.end = buffer->cursor;
-            if(state->cur_undo.end != state->cur_undo.start) undo_push(state, &state->undo_stack, state->cur_undo);
-            buffer_move_right(buffer);
-            CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);
+            handle_move_right(state, 1);                                                        
         } break;
         case KEY_RESIZE: {
             frontend_resize_window(state);
@@ -578,14 +596,14 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                     for(size_t i = 0; i < state->config.indent*(state->num_of_braces-1); i++) {
                         buffer_insert_char(state, buffer, ' ');
                     }
-                    undo_move_left(state, state->config.indent*(state->num_of_braces-1));                        
+                    handle_move_left(state, state->config.indent*(state->num_of_braces-1));                        
                 } else {
                     for(size_t i = 0; i < state->num_of_braces-1; i++) {
                         buffer_insert_char(state, buffer, '\t');
                     }
-                    undo_move_left(state, state->num_of_braces-1);
+                    handle_move_left(state, state->num_of_braces-1);
                 }
-                undo_move_left(state, 1);                
+                handle_move_left(state, 1);                
             } else {
                 undo_push(state, &state->undo_stack, state->cur_undo);
                 CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);                                                                        
@@ -614,7 +632,8 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
                 buffer_insert_char(state, buffer, brace.brace);
 	            undo_push(state, &state->undo_stack, state->cur_undo);
                 CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);                                                    
-                undo_move_left(state, 1);                        
+                handle_move_left(state, 1);                                                            
+                CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);                                                                    
             }
         } break;
     }
