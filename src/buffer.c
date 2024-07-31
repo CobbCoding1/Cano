@@ -154,7 +154,7 @@ void buffer_delete_selection(Buffer *buffer, State *state, size_t start, size_t 
     size_t size = end-start;
     if(size >= buffer->data.count) size = buffer->data.count;
     buffer->cursor = start;
-    ASSERT(buffer->cursor+size < buffer->data.count, "size is too great");
+    ASSERT(buffer->cursor+size <= buffer->data.count, "size is too great");
 
     // constrain size to be within the buffer
 
