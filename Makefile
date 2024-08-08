@@ -21,9 +21,13 @@ SRC += buffer.c
 SRC += tools.c
 
 OBJ := $(SRC:%.c=$(BUILD_DIR)/release-objs/%.o)
-OBJ_DEBUG :=$(SRC:%.c=$(BUILD_DIR)/debug-objs/%.o)
+OBJ_DEBUG := $(SRC:%.c=$(BUILD_DIR)/debug-objs/%.o)
 
-HELP_DIR ?= /usr/share/cano/help
+PREFIX ?= /usr
+
+BINDIR ?= $(PREFIX)/bin/
+HELP_DIR ?= $(PREFIX)/share/cano/help
+
 ABS_HELP_DIR = $(shell realpath --canonicalize-missing $(HELP_DIR))
 
 CFLAGS_main += -DHELP_DIR='"$(ABS_HELP_DIR)"'
@@ -57,15 +61,17 @@ clean:
 fclean:
 	$(RM) -r $(BUILD_DIR)
 
-re: fclean
-	$(MAKE) all
-
-install: all
-	@ install -v -D -t $(HELP_DIR) ./docs/help/*
-	@ sudo install -v ./build/cano /usr/bin
-
-uninstall:
-	@ rm -rf ~/.local/share/cano
-	@ sudo rm -f /usr/bin/cano
+.NOTPARALLEL: re
+re: fclean all
 
 .PHONY: clean fclean re
+
+install: all
+	@ install -Dv ./docs/help/* -t $(HELP_DIR)
+	@ install -Dv ./build/cano -t $(BINDIR)
+
+uninstall:
+	@ $(RM) -r ~/$(HELP_DIR)
+	@ $(RM) $(BINDIR)
+
+.PHONY: install uninstall
