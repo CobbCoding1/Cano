@@ -6,16 +6,18 @@ _Static_assert(sizeof(string_modes)/sizeof(*string_modes) == MODE_COUNT, "Number
 char *get_help_page(char *page) {
     if (page == NULL) return NULL;
 
-    char *env = getenv("HOME");
-    if(env == NULL) CRASH("could not get HOME");
+#ifndef HELP_DIR
+    #warning "Missing HELP_DIR definition"
 
-    char *help_page = calloc(128, sizeof(char));
-    if (help_page == NULL) CRASH("could not calloc memory for help page");
-    snprintf(help_page, 128, "%s/.local/share/cano/help/%s", env, page);
+    #define HELP_DIR "docs/help"
+#endif
 
-    // check if file exists
-    struct stat st;
-    if (stat(help_page, &st) != 0) return NULL;
+    char *help_page;
+    asprintf(&help_page, (HELP_DIR "/%s"), page);
+
+    struct stat file_info;
+    if (stat(help_page, &file_info) < 0 || !S_ISREG(file_info.st_mode))
+        return NULL;
 
     return help_page;
 }
