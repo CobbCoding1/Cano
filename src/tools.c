@@ -63,6 +63,10 @@ void free_undo_stack(Undo_Stack *undo) {
 
 void handle_save(Buffer *buffer) {
     FILE *file = fopen(buffer->filename, "w");
+
+    if (file == NULL)
+        return; // TODO: add proper uesr-feedback
+
     fwrite(buffer->data.data, buffer->data.count, sizeof(char), file);
     fclose(file);
 }
