@@ -63,6 +63,10 @@ void free_undo_stack(Undo_Stack *undo) {
 
 void handle_save(Buffer *buffer) {
     FILE *file = fopen(buffer->filename, "w");
+
+    if (file == NULL)
+        return; // TODO: add proper uesr-feedback
+
     fwrite(buffer->data.data, buffer->data.count, sizeof(char), file);
     fclose(file);
 }
@@ -72,7 +76,7 @@ Buffer *load_buffer_from_file(char *filename) {
     size_t filename_s = strlen(filename)+1;
     buffer->filename = calloc(filename_s, sizeof(char));
     strncpy(buffer->filename, filename, filename_s);
-    FILE *file = fopen(filename, "a+");
+    FILE *file = fopen(filename, "r");
     if(file == NULL) CRASH("Could not open file");
     fseek(file, 0, SEEK_END);
     size_t length = ftell(file);
