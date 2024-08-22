@@ -14,7 +14,8 @@
       inherit hardeningDisable;
 
       inputsFrom = [self.packages.${system}.cano];
-      packages = with pkgs; [ gcc bear valgrind ];
+      packages = with pkgs; [gcc bear valgrind];
+      env.HELP_DIR = "docs/help";
     };
 
     formatter.${system} = pkgs.alejandra;
@@ -29,13 +30,15 @@
 
         buildInputs = [pkgs.ncurses];
 
-        installPhase = ''
-          runHook preInstall
+        makeFlags = "PREFIX=${placeholder "out"}";
 
-          install -Dm755 build/cano -t $out/bin
-
-          runHook postInstall
-        '';
+        meta = {
+          description = "Text Editor Written In C Using ncurses";
+          license = pkgs.lib.licenses.asl20;
+          maintainers = with pkgs.lib.maintainers; [ sigmanificient ];
+          platforms = pkgs.lib.platforms.linux;
+          mainProgram = "cano";
+        };
       };
     };
   };
