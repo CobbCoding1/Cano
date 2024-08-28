@@ -23,8 +23,10 @@ void buffer_move_left(Buffer *buffer);
 int skip_to_char(Buffer *buffer, int cur_pos, int direction, char c);
 void buffer_next_brace(Buffer *buffer);
 int isword(char ch);
-void buffer_create_indent(Buffer *buffer, State *state);
+void buffer_create_indent(Buffer *buffer, State *state, size_t indent_count);
+void buffer_delete_indent(State *state, size_t indent_count);
 void buffer_newline_indent(Buffer *buffer, State *state);
+void buffer_brace_indent(State *state, Brace brace);
 State init_state(void);
 
 #endif

@@ -278,23 +278,56 @@ int isword(char ch) {
     return 0;
 }
 
-void buffer_create_indent(Buffer *buffer, State *state) {
+void buffer_create_indent(Buffer *buffer, State *state, size_t indent_count) {
     // if indent is 0, then use tabs, otherwise spaces
     if(state->config.indent > 0) {
-        for(size_t i = 0; i < state->config.indent*state->num_of_braces; i++) {
+        for(size_t i = 0; i < state->config.indent*indent_count; i++) {
             buffer_insert_char(state, buffer, ' ');
         }
     } else {
-        for(size_t i = 0; i < state->num_of_braces; i++) {
+        for(size_t i = 0; i < indent_count; i++) {
             buffer_insert_char(state, buffer, '\t');
         }
     }
+}
+	
+void buffer_delete_indent(State *state, size_t indent_count) {
+	Buffer *buffer = state->buffer;
+	for(size_t i = 0; i < indent_count; i++) {	
+		if(isspace(buffer->data.data[buffer->cursor])) {
+			buffer_delete_char(buffer, state);
+			buffer_calculate_rows(buffer);
+		}
+	}
 }
 
 // insert newline, then indent
 void buffer_newline_indent(Buffer *buffer, State *state) {
     buffer_insert_char(state, buffer, '\n');
-    buffer_create_indent(buffer, state);
+    buffer_create_indent(buffer, state, state->num_of_braces);
+}
+
+void buffer_brace_indent(State *state, Brace brace) {
+	Buffer *buffer = state->buffer;
+    if(brace.brace != '0' && brace.closing) {
+        buffer_insert_char(state, buffer, '\n');
+        if(state->num_of_braces == 0) state->num_of_braces = 1;
+        if(state->config.indent > 0) {
+            for(size_t i = 0; i < state->config.indent*(state->num_of_braces-1); i++) {
+                buffer_insert_char(state, buffer, ' ');
+            }
+            handle_move_left(state, state->config.indent*(state->num_of_braces-1));                        
+        } else {
+            for(size_t i = 0; i < state->num_of_braces-1; i++) {
+                buffer_insert_char(state, buffer, '\t');
+            }
+            handle_move_left(state, state->num_of_braces-1);
+        }
+        handle_move_left(state, 1);                
+    } else {
+        undo_push(state, &state->undo_stack, state->cur_undo);
+        CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);                                                                        
+    }
 }
 
 

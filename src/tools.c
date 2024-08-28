@@ -156,8 +156,7 @@ int check_keymaps(Buffer *buffer, State *state) {
     return 0;
 }
 
-int compare_name(File const *leftp, File const *rightp)
-{
+int compare_name(File const *leftp, File const *rightp) {
     return strcoll(leftp->name, rightp->name);
 }
 
@@ -202,6 +201,7 @@ void free_files(Files **files) {
     free(*files);
 }
 
+// TODO: breaks when a config is already loaded
 void load_config_from_file(State *state, Buffer *buffer, char *config_filename, char *syntax_filename) {
     char *config_dir;
 

@@ -322,6 +322,42 @@ void buffer_handle_undo(State *state, Undo *undo) {
             break;
     }
 }
+	
+void handle_explore_keys(State *state) {
+       switch(state->ch) {
+             case DOWN_ARROW:
+             case 'j': // Move down
+                 if (state->explore_cursor < state->files->count-1) {
+                     state->explore_cursor++;
+                 }
+                 break;
+             case UP_ARROW:
+             case 'k': // Move up
+                 if (state->explore_cursor > 0) {
+                     state->explore_cursor--;
+                 }
+                 break;
+             case ENTER: {
+                 File f = state->files->data[state->explore_cursor];
+                 if (f.is_directory) {
+                     char str[256];
+                     strcpy(str, f.path);
+                      free_files(&state->files);
+                     state->files = calloc(32, sizeof(File));
+                     scan_files(state, str);
+                     state->explore_cursor = 0;
+                 } else {
+                     free_buffer(state->buffer);
+                     state->buffer = load_buffer_from_file(f.path);
+					 //char *config_filename = NULL;
+					 //char *syntax_filename = NULL;							
+					 // TODO: Make this config work
+	 				//load_config_from_file(state, state->buffer, config_filename, syntax_filename);			
+	             	state->is_exploring = false;
+            }
+       } break;
+	}
+}
 
 void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
     (void)modify_buffer;
@@ -445,44 +481,7 @@ void handle_normal_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             state->is_exploring = !state->is_exploring;
         } break;
         default: {
-            if(state->is_exploring) {
-                switch(state->ch) {
-                    case DOWN_ARROW:
-                    case 'j': // Move down
-                        if (state->explore_cursor < state->files->count-1) {
-                            state->explore_cursor++;
-                        }
-                        break;
-                    case UP_ARROW:
-                    case 'k': // Move up
-                        if (state->explore_cursor > 0) {
-                            state->explore_cursor--;
-                        }
-                        break;
-                    case ENTER: {
-                        File f = state->files->data[state->explore_cursor];
-                        if (f.is_directory) {
-                            char str[256];
-                            strcpy(str, f.path);
-
-                            free_files(&state->files);
-                            state->files = calloc(32, sizeof(File));
-                            scan_files(state, str);
-                            state->explore_cursor = 0;
-                        } else {
-                            // TODO: Load syntax highlighting right here
-                            free_buffer(state->buffer);
-                            state->buffer = load_buffer_from_file(f.path);
-							char *config_filename = NULL;
-							char *syntax_filename = NULL;							
-						    load_config_from_file(state, state->buffer, config_filename, syntax_filename);			
-                            state->is_exploring = false;
-                        }
-                    } break;
-                }
-                break;
-            }
-
+			if(state->is_exploring) handle_explore_keys(state);
             if(handle_modifying_keys(buffer, state)) break;
             if(handle_motion_keys(buffer, state, state->ch, &state->repeating.repeating_count)) break;
             if(handle_normal_to_insert_keys(buffer, state)) break;
@@ -571,14 +570,8 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             frontend_resize_window(state);
         } break;
         case KEY_TAB:
-            if(state->config.indent > 0) {
-                for(size_t i = 0; (int)i < state->config.indent; i++) {
-                    buffer_insert_char(state, buffer, ' ');
-                }
-            } else {
-                buffer_insert_char(state, buffer, '\t');
-            }
-            break;
+			buffer_create_indent(buffer, state, 1);
+			break;
         case KEY_ENTER:
         case ENTER: {
             state->cur_undo.end = buffer->cursor;                                    
@@ -589,25 +582,8 @@ void handle_insert_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             buffer_newline_indent(buffer, state);
             state->cur_undo.end = buffer->cursor;                            
 
-            if(brace.brace != '0' && brace.closing) {
-                buffer_insert_char(state, buffer, '\n');
-                if(state->num_of_braces == 0) state->num_of_braces = 1;
-                if(state->config.indent > 0) {
-                    for(size_t i = 0; i < state->config.indent*(state->num_of_braces-1); i++) {
-                        buffer_insert_char(state, buffer, ' ');
-                    }
-                    handle_move_left(state, state->config.indent*(state->num_of_braces-1));                        
-                } else {
-                    for(size_t i = 0; i < state->num_of_braces-1; i++) {
-                        buffer_insert_char(state, buffer, '\t');
-                    }
-                    handle_move_left(state, state->num_of_braces-1);
-                }
-                handle_move_left(state, 1);                
-            } else {
-                undo_push(state, &state->undo_stack, state->cur_undo);
-                CREATE_UNDO(DELETE_MULT_CHAR, buffer->cursor);                                                                        
-            }
+			// handle the extra brace which gets inserted for brace auto-close
+			buffer_brace_indent(state, brace);
         } break;
         default: { // Handle other characters
 			ASSERT(buffer->data.count >= buffer->cursor, "check");
@@ -806,13 +782,7 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             for(size_t i = row; i <= end_row; i++) {
                 buffer_calculate_rows(buffer);
                 buffer->cursor = buffer->rows.data[i].start;
-                if(state->config.indent > 0) {
-                    for(size_t i = 0; (int)i < state->config.indent; i++) {
-                        buffer_insert_char(state, buffer, ' ');
-                    }
-                } else {
-                     buffer_insert_char(state, buffer, '\t');
-                }
+				buffer_create_indent(buffer, state, 1);
             }
             buffer->cursor = position;
             state->config.mode = NORMAL;
@@ -824,24 +794,14 @@ void handle_visual_keys(Buffer *buffer, Buffer **modify_buffer, State *state) {
             size_t end = (cond) ? buffer->visual.start : buffer->visual.end;
             size_t row = index_get_row(buffer, start);
             size_t end_row = index_get_row(buffer, end);
-            size_t offset = 0;
             for(size_t i = row; i <= end_row; i++) {
                 buffer_calculate_rows(buffer);
                 buffer->cursor = buffer->rows.data[i].start;
                 if(state->config.indent > 0) {
-                    for(size_t j = 0; (int)j < state->config.indent; j++) {
-                        if(isspace(buffer->data.data[buffer->cursor])) {
-                            buffer_delete_char(buffer, state);
-                            offset++;
-                            buffer_calculate_rows(buffer);
-                        }
-                    }
+					buffer_delete_indent(state, state->config.indent);
                 } else {
-                    if(isspace(buffer->data.data[buffer->cursor])) {
-                        buffer_delete_char(buffer, state);
-                        offset++;
-                        buffer_calculate_rows(buffer);
-                    }
+					buffer_delete_indent(state, 1);
+
                 }
             }
             state->config.mode = NORMAL;
