@@ -118,26 +118,13 @@ Undo undo_pop(Undo_Stack *stack) {
 
 Brace find_opposite_brace(char opening) {
     switch(opening) {
-        case '(':
-            return (Brace){.brace = ')', .closing = 0};
-            break;
-        case '{':
-            return (Brace){.brace = '}', .closing = 0};
-            break;
-        case '[':
-            return (Brace){.brace = ']', .closing = 0};
-            break;
-        case ')':
-            return (Brace){.brace = '(', .closing = 1};
-            break;
-        case '}':
-            return (Brace){.brace = '{', .closing = 1};
-            break;
-        case ']':
-            return (Brace){.brace = '[', .closing = 1};
-            break;
-		default:
-		    return (Brace){.brace = '0'};		
+        case '(': return (Brace){.brace = ')', .closing = 0};
+        case '{': return (Brace){.brace = '}', .closing = 0};
+        case '[': return (Brace){.brace = ']', .closing = 0};
+        case ')': return (Brace){.brace = '(', .closing = 1};
+        case '}': return (Brace){.brace = '{', .closing = 1};
+        case ']': return (Brace){.brace = '[', .closing = 1};
+		default:  return (Brace){.brace = '0'};		
     }
 }
 
